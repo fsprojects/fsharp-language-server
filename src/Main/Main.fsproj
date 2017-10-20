@@ -9,4 +9,7 @@
     <Compile Include="Program.fs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FSharp.Compiler.Service" Version="16.0.2" />
+  </ItemGroup>
 </Project>
