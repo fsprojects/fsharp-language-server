@@ -37,7 +37,14 @@ module Tokenizer =
         acc.ToString()
 
     let takeMessage (client: IEnumerator<char>) (contentLength: int): string =
-        raise (NotImplementedException())
+        let acc = StringBuilder()
+        for remaining = contentLength downto 1 do 
+            if not (client.MoveNext()) then 
+                raise (Exception(sprintf "Expected %d more characters in message but input ended" remaining))
+            acc.Append(client.Current) |> ignore
+        takeChar client '\r'
+        takeChar client '\n'
+        acc.ToString()
 
     let tokenize (client: seq<char>): seq<string> = 
         raise (NotImplementedException())

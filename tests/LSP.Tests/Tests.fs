@@ -25,3 +25,10 @@ module TokenizerTests =
                       Line 2"
         let chars = sample.GetEnumerator()
         Assert.That(Tokenizer.takeHeader chars, Is.EqualTo("Line 1"))
+
+    [<Test>]
+    let ``take message token`` () = 
+        let sample = "{}\r\n\
+                      next line..."
+        let chars = sample.GetEnumerator()
+        Assert.That(Tokenizer.takeMessage chars 2, Is.EqualTo("{}"))
