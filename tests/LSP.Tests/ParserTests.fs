@@ -155,7 +155,24 @@ module ParserTests =
                     text = "let x = 1"
                 }]
             }))
-            
+
+    [<Test>]
+    let ``parse a WillSaveTextDocument notification`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "reason": 2
+        }"""
+        Assert.That(
+            parseNotification "textDocument/willSave" (Some json),
+            Is.EqualTo (WillSaveTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                reason = AfterDelay
+            }))
+
     [<Test>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{

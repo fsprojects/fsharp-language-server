@@ -72,6 +72,20 @@ module Parser =
         textDocument: VersionedTextDocumentIdentifier
         contentChanges: list<TextDocumentContentChangeEvent>
     }
+
+    type TextDocumentIdentifier = {
+        uri: Uri
+    }
+
+    type TextDocumentSaveReason = 
+    | Manual
+    | AfterDelay
+    | FocusOut
+
+    type WillSaveTextDocumentParams = {
+        textDocument: TextDocumentIdentifier
+        reason: TextDocumentSaveReason
+    }
         
     type Notification = 
     | Cancel of id: int 
@@ -81,6 +95,7 @@ module Parser =
     | DidChangeConfiguration of DidChangeConfigurationParams
     | DidOpenTextDocument of DidOpenTextDocumentParams
     | DidChangeTextDocument of DidChangeTextDocumentParams
+    | WillSaveTextDocument of WillSaveTextDocumentParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -138,6 +153,23 @@ module Parser =
             contentChanges = json?contentChanges.AsArray() |> List.ofArray |> List.map parseTextDocumentContentChangeEvent
         }
 
+    let parseTextDocumentIdentifier (json: JsonValue): TextDocumentIdentifier = 
+        {
+            uri = json?uri.AsString() |> Uri
+        }
+
+    let parseTextDocumentSaveReason (i: int): TextDocumentSaveReason = 
+        match i with 
+        | 1 -> Manual 
+        | 2 -> AfterDelay 
+        | 3 -> FocusOut
+
+    let parseWillSaveTextDocumentParams (json: JsonValue): WillSaveTextDocumentParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            reason = json?reason.AsInteger() |> parseTextDocumentSaveReason
+        }
+
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
@@ -147,6 +179,7 @@ module Parser =
         | "workspace/didChangeConfiguration", Some body -> DidChangeConfiguration (parseDidChangeConfigurationParams body)
         | "textDocument/didOpen", Some body -> DidOpenTextDocument (parseDidOpenTextDocumentParams body)
         | "textDocument/didChange", Some body -> DidChangeTextDocument (parseDidChangeTextDocumentParams body)
+        | "textDocument/willSave", Some body -> WillSaveTextDocument (parseWillSaveTextDocumentParams body)
 
     type Location = {
         uri: Uri 
@@ -182,10 +215,6 @@ module Parser =
     type WorkspaceEdit = {
         changes: Map<string, list<TextEdit>>
         documentChanges: list<TextDocumentEdit>
-    }
-
-    type TextDocumentIdentifier = {
-        uri: Uri
     }
 
     type TextDocumentPositionParams = {
