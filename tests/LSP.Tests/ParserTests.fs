@@ -191,6 +191,39 @@ module ParserTests =
             }))
 
     [<Test>]
+    let ``parse a DidSaveTextDocument notification`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            }
+        }"""
+        Assert.That(
+            parseNotification "textDocument/didSave" (Some json),
+            Is.EqualTo (DidSaveTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                text = None
+            }))
+
+    [<Test>]
+    let ``parse a DidSaveTextDocument notification with text`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "text": "let x = 1"
+        }"""
+        Assert.That(
+            parseNotification "textDocument/didSave" (Some json),
+            Is.EqualTo (DidSaveTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                text = Some "let x = 1"
+            }))
+
+    [<Test>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{
             "processId": 1,

@@ -86,6 +86,11 @@ module Parser =
         textDocument: TextDocumentIdentifier
         reason: TextDocumentSaveReason
     }
+
+    type DidSaveTextDocumentParams = {
+        textDocument: TextDocumentIdentifier
+        text: option<string>
+    }
         
     type Notification = 
     | Cancel of id: int 
@@ -97,6 +102,7 @@ module Parser =
     | DidChangeTextDocument of DidChangeTextDocumentParams
     | WillSaveTextDocument of WillSaveTextDocumentParams
     | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
+    | DidSaveTextDocument of DidSaveTextDocumentParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -171,6 +177,12 @@ module Parser =
             reason = json?reason.AsInteger() |> parseTextDocumentSaveReason
         }
 
+    let parseDidSaveTextDocumentParams (json: JsonValue): DidSaveTextDocumentParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            text = json.TryGetProperty("text") |> Option.map JsonExtensions.AsString
+        }
+
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
@@ -182,6 +194,7 @@ module Parser =
         | "textDocument/didChange", Some body -> DidChangeTextDocument (parseDidChangeTextDocumentParams body)
         | "textDocument/willSave", Some body -> WillSaveTextDocument (parseWillSaveTextDocumentParams body)
         | "textDocument/willSaveWaitUntil", Some body -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams body)
+        | "textDocument/didSave", Some body -> DidSaveTextDocument (parseDidSaveTextDocumentParams body)
 
     type Location = {
         uri: Uri 
