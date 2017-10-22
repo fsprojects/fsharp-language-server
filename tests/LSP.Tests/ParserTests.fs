@@ -77,3 +77,30 @@ module ParserTests =
                 Map.empty,
                 None)))
         Assert.That(expectedResponse, Is.EqualTo(ExpectedResponse "InitializeResult"))
+    
+    [<Test>]
+    let ``processId can be null`` () = 
+        let json = JsonValue.Parse """{
+            "processId": null,
+            "rootUri": "file://workspace",
+            "capabilities": {
+            }
+        }"""
+        let Initialize(processId, _, _, _, _), _ = parseRequest "initialize" json 
+        Assert.That(processId, Is.EqualTo(None))
+
+    [<Test>]
+    let ``parse capabilities as map`` () = 
+        let json = JsonValue.Parse """{
+            "processId": 1,
+            "rootUri": "file://workspace",
+            "capabilities": {
+                "workspace": {
+                    "workspaceEdit": {
+                        "documentChanges": true
+                    }
+                }
+            }
+        }"""
+        let Initialize(_, _, _, capabilities, _), _ = parseRequest "initialize" json 
+        Assert.That(capabilities, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))

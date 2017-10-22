@@ -135,7 +135,7 @@ module Parser =
                 for (key, value) in node.Properties do 
                     let newPath = path + "." + key
                     match value with 
-                    | JsonValue.Boolean setting -> yield (path, setting)
+                    | JsonValue.Boolean setting -> yield (newPath, setting)
                     | _ -> yield! flatten newPath value
             } 
         let kvs = seq {
