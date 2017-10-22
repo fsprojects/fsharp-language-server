@@ -81,7 +81,7 @@ module ParserTests =
     let ``parse a DidOpenTextDocument notification`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
-                "uri": "file://workspace",
+                "uri": "file://workspace/Main.fs",
                 "languageId": "fsharp",
                 "version": 1,
                 "text": "let x = 1"
@@ -91,12 +91,71 @@ module ParserTests =
             parseNotification "textDocument/didOpen" (Some json),
             Is.EqualTo (DidOpenTextDocument {
                 textDocument = {
-                    uri = Uri("file://workspace")
+                    uri = Uri("file://workspace/Main.fs")
                     languageId = "fsharp"
                     version = 1
                     text = "let x = 1"
                 }
             }))
+
+    [<Test>]
+    let ``parse a DidChangeTextDocument notification`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs",
+                "version": 1
+            },
+            "contentChanges": [{
+                "text": "let x = 1"
+            }]
+        }"""
+        Assert.That(
+            parseNotification "textDocument/didChange" (Some json),
+            Is.EqualTo (DidChangeTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                    version = 1
+                }
+                contentChanges = [{
+                    range = None 
+                    rangeLength = None
+                    text = "let x = 1"
+                }]
+            }))
+
+    [<Test>]
+    let ``parse a DidChangeTextDocument notification with range`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs",
+                "version": 1
+            },
+            "contentChanges": [{
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 0, "character": 3}
+                },
+                "rangeLength": 3,
+                "text": "let x = 1"
+            }]
+        }"""
+        Assert.That(
+            parseNotification "textDocument/didChange" (Some json),
+            Is.EqualTo (DidChangeTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                    version = 1
+                }
+                contentChanges = [{
+                    range = Some {
+                        start = {line = 0; character = 0}
+                        _end = {line = 0; character = 3}
+                    }
+                    rangeLength = Some 3
+                    text = "let x = 1"
+                }]
+            }))
+            
     [<Test>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{

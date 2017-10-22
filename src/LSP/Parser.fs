@@ -46,6 +46,32 @@ module Parser =
     type DidOpenTextDocumentParams = {
         textDocument: TextDocumentItem
     }
+
+    type VersionedTextDocumentIdentifier = {
+        uri: Uri 
+        version: int 
+    }
+
+    type Position = {
+        line: int
+        character: int
+    }
+
+    type Range = {
+        start: Position
+        _end: Position
+    }
+
+    type TextDocumentContentChangeEvent = {
+        range: option<Range>
+        rangeLength: option<int>
+        text: string
+    }
+
+    type DidChangeTextDocumentParams = {
+        textDocument: VersionedTextDocumentIdentifier
+        contentChanges: list<TextDocumentContentChangeEvent>
+    }
         
     type Notification = 
     | Cancel of id: int 
@@ -54,6 +80,7 @@ module Parser =
     | Exit 
     | DidChangeConfiguration of DidChangeConfigurationParams
     | DidOpenTextDocument of DidOpenTextDocumentParams
+    | DidChangeTextDocument of DidChangeTextDocumentParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -80,6 +107,37 @@ module Parser =
             textDocument = body?textDocument |> parseTextDocumentItem 
         }
 
+    let parsePosition (json: JsonValue): Position = 
+        {
+            line = json?line.AsInteger()
+            character = json?character.AsInteger()
+        }
+
+    let parseRange (json: JsonValue): Range = 
+        {
+            start = json?start |> parsePosition 
+            _end = json?``end`` |> parsePosition
+        }
+
+    let parseVersionedTextDocumentIdentifier (json: JsonValue): VersionedTextDocumentIdentifier = 
+        {
+            uri = json?uri.AsString() |> Uri 
+            version = json?version.AsInteger()
+        }
+
+    let parseTextDocumentContentChangeEvent (json: JsonValue): TextDocumentContentChangeEvent = 
+        {
+            range = json.TryGetProperty("range") |> Option.map parseRange
+            rangeLength = json.TryGetProperty("rangeLength") |> Option.map JsonExtensions.AsInteger 
+            text = json?text.AsString()
+        }
+    
+    let parseDidChangeTextDocumentParams (json: JsonValue): DidChangeTextDocumentParams = 
+        {
+            textDocument = json?textDocument |> parseVersionedTextDocumentIdentifier
+            contentChanges = json?contentChanges.AsArray() |> List.ofArray |> List.map parseTextDocumentContentChangeEvent
+        }
+
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
@@ -88,16 +146,7 @@ module Parser =
         | "exit", None -> Exit 
         | "workspace/didChangeConfiguration", Some body -> DidChangeConfiguration (parseDidChangeConfigurationParams body)
         | "textDocument/didOpen", Some body -> DidOpenTextDocument (parseDidOpenTextDocumentParams body)
-
-    type Position = {
-        line: int
-        character: int
-    }
-
-    type Range = {
-        start: Position
-        _end: Position
-    }
+        | "textDocument/didChange", Some body -> DidChangeTextDocument (parseDidChangeTextDocumentParams body)
 
     type Location = {
         uri: Uri 
@@ -123,11 +172,6 @@ module Parser =
     type TextEdit = {
         range: Range 
         newText: string
-    }
-
-    type VersionedTextDocumentIdentifier = {
-        uri: Uri 
-        version: int 
     }
 
     type TextDocumentEdit = {
