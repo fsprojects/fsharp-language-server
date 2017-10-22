@@ -431,3 +431,25 @@ module ParserTests =
                     character = 5
                 }
             }))
+
+    [<Test>]
+    let ``parse GotoDefinition request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "position": {
+                "line": 0,
+                "character": 5
+            }
+        }"""
+        Assert.That(parseRequest "textDocument/definition" json,
+            Is.EqualTo(GotoDefinition {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                position = {
+                    line = 0
+                    character = 5
+                }
+            }))

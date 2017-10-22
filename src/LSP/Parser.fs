@@ -344,6 +344,7 @@ module Parser =
     | Completion of TextDocumentPositionParams
     | Resolve of CompletionItem
     | SignatureHelp of TextDocumentPositionParams
+    | GotoDefinition of TextDocumentPositionParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -458,4 +459,5 @@ module Parser =
         | "textDocument/completion" -> Completion (parseTextDocumentPositionParams body)
         | "completionItem/resolve" -> Resolve (parseCompletionItem body)
         | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams body)
+        | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
