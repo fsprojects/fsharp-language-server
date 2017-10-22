@@ -503,3 +503,17 @@ module ParserTests =
                     character = 5
                 }
             }))
+
+    [<Test>]
+    let ``parse DocumentSymbols request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            }
+        }"""
+        Assert.That(parseRequest "textDocument/documentSymbol" json,
+            Is.EqualTo(DocumentSymbols {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+            }))

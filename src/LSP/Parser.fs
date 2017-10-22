@@ -349,6 +349,10 @@ module Parser =
         context: ReferenceContext
     }
 
+    type DocumentSymbolParams = {
+        textDocument: TextDocumentIdentifier
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -357,6 +361,7 @@ module Parser =
     | GotoDefinition of TextDocumentPositionParams
     | FindReferences of ReferenceParams
     | DocumentHighlight of TextDocumentPositionParams
+    | DocumentSymbols of DocumentSymbolParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -477,6 +482,11 @@ module Parser =
             context = json?context |> parseReferenceContext
         }
 
+    let parseDocumentSymbolParams (json: JsonValue): DocumentSymbolParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -486,4 +496,5 @@ module Parser =
         | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams body)
         | "textDocument/references" -> FindReferences (parseReferenceParams body)
         | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams body)
+        | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
