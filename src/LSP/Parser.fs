@@ -31,12 +31,17 @@ module Parser =
         _type: MessageType 
         message: string
     }
+
+    type DidChangeConfigurationParams = {
+        settings: JsonValue
+    }
         
     type Notification = 
     | Cancel of id: int 
     | Initialized
     | Shutdown 
     | Exit 
+    | DidChangeConfiguration of DidChangeConfigurationParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -45,13 +50,18 @@ module Parser =
         | 3 -> Info 
         | 4 -> Log
 
+    let parseDidChangeConfigurationParams (body: JsonValue): DidChangeConfigurationParams = 
+        {
+            settings = body?settings
+        }
+
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
         | "initialized", None -> Initialized
         | "shutdown", None -> Shutdown 
         | "exit", None -> Exit 
-        
+        | "workspace/didChangeConfiguration", Some body -> DidChangeConfiguration (parseDidChangeConfigurationParams body)
 
     type Position = {
         line: int
