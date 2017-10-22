@@ -299,3 +299,25 @@ module ParserTests =
         }"""
         let (Initialize i) = parseRequest "initialize" json 
         Assert.That(i.capabilitiesMap, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
+
+    [<Test>]
+    let ``parse Completion request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "position": {
+                "line": 0,
+                "character": 5
+            }
+        }"""
+        Assert.That(parseRequest "textDocument/completion" json,
+            Is.EqualTo(Completion {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                position = {
+                    line = 0
+                    character = 5
+                }
+            }))

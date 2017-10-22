@@ -301,6 +301,7 @@ module Parser =
 
     type Request = 
     | Initialize of InitializeParams
+    | Completion of TextDocumentPositionParams
 
     let checkNull (json: JsonValue): option<JsonValue> = 
         match json with 
@@ -342,7 +343,14 @@ module Parser =
              trace = body.TryGetProperty("trace") |> Option.bind checkNull |> Option.map JsonExtensions.AsString |> Option.map parseTrace
         }
 
+    let parseTextDocumentPositionParams (json: JsonValue): TextDocumentPositionParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            position = json?position |> parsePosition
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
+        | "textDocument/completion" -> Completion (parseTextDocumentPositionParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
