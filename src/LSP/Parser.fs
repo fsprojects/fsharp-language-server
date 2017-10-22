@@ -339,12 +339,23 @@ module Parser =
         data: JsonValue
     }
 
+    type ReferenceContext = {
+        includeDeclaration: bool
+    }
+
+    type ReferenceParams = {
+        textDocument: TextDocumentIdentifier
+        position: Position
+        context: ReferenceContext
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
     | Resolve of CompletionItem
     | SignatureHelp of TextDocumentPositionParams
     | GotoDefinition of TextDocumentPositionParams
+    | FindReferences of ReferenceParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -453,6 +464,18 @@ module Parser =
             data = json.TryGetProperty("data") |> noneAs JsonValue.Null
         }
 
+    let parseReferenceContext (json: JsonValue): ReferenceContext = 
+        {
+            includeDeclaration = json?includeDeclaration.AsBoolean()
+        }
+
+    let parseReferenceParams (json: JsonValue): ReferenceParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            position = json?position |> parsePosition
+            context = json?context |> parseReferenceContext
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -460,4 +483,5 @@ module Parser =
         | "completionItem/resolve" -> Resolve (parseCompletionItem body)
         | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams body)
         | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams body)
+        | "textDocument/references" -> FindReferences (parseReferenceParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

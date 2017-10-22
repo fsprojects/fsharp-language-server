@@ -453,3 +453,31 @@ module ParserTests =
                     character = 5
                 }
             }))
+
+    [<Test>]
+    let ``parse FindReferences request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "position": {
+                "line": 0,
+                "character": 5
+            },
+            "context": {
+                "includeDeclaration": true
+            }
+        }"""
+        Assert.That(parseRequest "textDocument/references" json,
+            Is.EqualTo(FindReferences {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                position = {
+                    line = 0
+                    character = 5
+                }
+                context = {
+                    includeDeclaration = true
+                }
+            }))
