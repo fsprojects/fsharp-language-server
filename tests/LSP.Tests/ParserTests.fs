@@ -1,5 +1,6 @@
 namespace LSP
 
+open System
 open Parser
 open NUnit.Framework
 open FSharp.Data
@@ -54,4 +55,25 @@ module ParserTests =
         let json = JsonValue.Parse """{
             "id": 1
         }""" 
-        Assert.That(parseNotification json, Is.EqualTo (Cancel 1))
+        Assert.That(
+            parseNotification json, 
+            Is.EqualTo (Cancel 1))
+
+    [<Test>]
+    let ``parse a minimal Initialize request`` () = 
+        let json = JsonValue.Parse """{
+            "processId": 1,
+            "rootUri": "file://workspace",
+            "capabilities": {
+            }
+        }"""
+        let parsed, expectedResponse = parseRequest "initialize" json
+        Assert.That(
+            parsed, 
+            Is.EqualTo(Initialize(
+                Some 1,
+                Some (Uri("file://workspace")),
+                None,
+                Map.empty,
+                None)))
+        Assert.That(expectedResponse, Is.EqualTo(ExpectedResponse "InitializeResult"))
