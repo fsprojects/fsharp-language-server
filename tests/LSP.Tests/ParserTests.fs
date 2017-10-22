@@ -70,12 +70,12 @@ module ParserTests =
         let parsed, expectedResponse = parseRequest "initialize" json
         Assert.That(
             parsed, 
-            Is.EqualTo(Initialize(
-                Some 1,
-                Some (Uri("file://workspace")),
-                None,
-                Map.empty,
-                None)))
+            Is.EqualTo(Initialize {
+                processId = Some 1;
+                rootUri = Some (Uri("file://workspace"));
+                initializationOptions = None;
+                capabilitiesMap = Map.empty;
+                trace = None}))
         Assert.That(expectedResponse, Is.EqualTo(ExpectedResponse "InitializeResult"))
     
     [<Test>]
@@ -86,8 +86,8 @@ module ParserTests =
             "capabilities": {
             }
         }"""
-        let Initialize(processId, _, _, _, _), _ = parseRequest "initialize" json 
-        Assert.That(processId, Is.EqualTo(None))
+        let Initialize i, _ = parseRequest "initialize" json 
+        Assert.That(i.processId, Is.EqualTo(None))
 
     [<Test>]
     let ``parse capabilities as map`` () = 
@@ -102,5 +102,5 @@ module ParserTests =
                 }
             }
         }"""
-        let Initialize(_, _, _, capabilities, _), _ = parseRequest "initialize" json 
-        Assert.That(capabilities, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
+        let Initialize i, _ = parseRequest "initialize" json 
+        Assert.That(i.capabilitiesMap, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))

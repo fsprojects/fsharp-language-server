@@ -104,13 +104,16 @@ module Parser =
 
     type Trace = Off | Messages | Verbose
 
-    type Request = 
-    | Initialize of 
-        processId: option<int> * 
-        rootUri: option<Uri> * 
-        initializationOptions: option<JsonValue> *
-        capabilitiesMap: Map<string, bool> *
+    type InitializeParams = {
+        processId: option<int>
+        rootUri: option<Uri>
+        initializationOptions: option<JsonValue>
+        capabilitiesMap: Map<string, bool>
         trace: option<Trace>
+    }
+
+    type Request = 
+    | Initialize of InitializeParams
 
     type ExpectedResponse = ExpectedResponse of string
 
@@ -146,12 +149,13 @@ module Parser =
         Map.ofSeq kvs
 
     let parseInitialize (body: JsonValue): Request = 
-        let processId = body?processId |> checkNull |> Option.map JsonExtensions.AsInteger
-        let rootUri = body?rootUri |> checkNull |> Option.map JsonExtensions.AsString |> Option.map Uri
-        let initializationOptions = body.TryGetProperty("initializationOptions") 
-        let capabilities = body?capabilities |> parseCapabilities 
-        let trace = body.TryGetProperty("trace") |> Option.bind checkNull |> Option.map JsonExtensions.AsString |> Option.map parseTrace
-        Initialize(processId, rootUri, initializationOptions, capabilities, trace)
+        Initialize { 
+             processId = body?processId |> checkNull |> Option.map JsonExtensions.AsInteger
+             rootUri = body?rootUri |> checkNull |> Option.map JsonExtensions.AsString |> Option.map Uri
+             initializationOptions = body.TryGetProperty("initializationOptions") 
+             capabilitiesMap = body?capabilities |> parseCapabilities 
+             trace = body.TryGetProperty("trace") |> Option.bind checkNull |> Option.map JsonExtensions.AsString |> Option.map parseTrace
+        }
 
     let parseRequest (method: string) (body: JsonValue): Request * ExpectedResponse = 
         match method with 
