@@ -409,3 +409,25 @@ module ParserTests =
                 } 
                 data = JsonValue.Parse """{"hello":"world"}"""
             }))
+
+    [<Test>]
+    let ``parse SignatureHelp request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "position": {
+                "line": 0,
+                "character": 5
+            }
+        }"""
+        Assert.That(parseRequest "textDocument/signatureHelp" json,
+            Is.EqualTo(SignatureHelp {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                position = {
+                    line = 0
+                    character = 5
+                }
+            }))
