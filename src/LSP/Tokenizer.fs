@@ -5,11 +5,6 @@ open System.Net.Sockets
 open System.Text
 open System.Collections.Generic
 
-type Request = TodoRequest
-type Response = TodoResponse
-type ILanguageServer = 
-    abstract member Start: requests: seq<Request> -> seq<Response>
-
 module Tokenizer = 
     type Header = ContentLength of int | EmptyHeader | OtherHeader
 
@@ -62,10 +57,3 @@ module Tokenizer =
                     | Some (EmptyHeader) -> yield takeMessage enum contentLength 
                     | _ -> ()
         }
-
-module Parser = 
-    let parse (body: string): Request = 
-        raise (NotImplementedException())
-
-    let stringify (response: Response): string = 
-        raise (NotImplementedException())
