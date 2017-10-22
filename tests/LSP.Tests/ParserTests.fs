@@ -13,7 +13,7 @@ module ParserTests =
             "method": "helloWorld"
         }"""
         Assert.That(
-            parse json, 
+            parseMessage json, 
             Is.EqualTo (RequestMessage (1, "helloWorld", None)))
 
     [<Test>]
@@ -25,7 +25,7 @@ module ParserTests =
             "params": {"hello": "world"}
         }"""
         Assert.That(
-            parse json, 
+            parseMessage json, 
             Is.EqualTo (RequestMessage (1, "helloWorld", Some (JsonValue.Parse """{"hello":"world"}"""))))
 
     [<Test>]
@@ -35,7 +35,7 @@ module ParserTests =
             "method": "helloNotification"
         }"""
         Assert.That(
-            parse json, 
+            parseMessage json, 
             Is.EqualTo (NotificationMessage ("helloNotification", None)))
 
     [<Test>]
@@ -46,5 +46,12 @@ module ParserTests =
             "params": {"hello": "world"}
         }"""
         Assert.That(
-            parse json, 
+            parseMessage json, 
             Is.EqualTo (NotificationMessage ("helloNotification", Some (JsonValue.Parse """{"hello":"world"}"""))))
+
+    [<Test>]
+    let ``parse a Cancel message`` () = 
+        let json = JsonValue.Parse """{
+            "id": 1
+        }""" 
+        Assert.That(parseNotification json, Is.EqualTo (Cancel 1))

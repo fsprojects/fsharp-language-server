@@ -9,7 +9,7 @@ module Parser =
     | RequestMessage of id: int * method: string * body: option<JsonValue>
     | NotificationMessage of method: string * body: option<JsonValue>
 
-    let parse (jsonText: string): Message = 
+    let parseMessage (jsonText: string): Message = 
         let json = JsonValue.Parse jsonText
         let jsonRpcVersion = json.GetProperty("jsonrpc").AsString()
         assert (jsonRpcVersion = "2.0")
@@ -21,3 +21,8 @@ module Parser =
         | Some id -> RequestMessage (id, method, body)
         | None -> NotificationMessage (method, body)
         
+    type NotificationBody = 
+    | Cancel of id: int 
+
+    let parseNotification (body: JsonValue): NotificationBody = 
+        Cancel (body.GetProperty("id").AsInteger())
