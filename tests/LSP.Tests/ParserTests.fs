@@ -59,6 +59,16 @@ module ParserTests =
             parseNotification "cancel" (Some json), 
             Is.EqualTo (Cancel 1))
 
+    [<Test>]
+    let ``parse a ShowMessage notification`` () = 
+        let json = JsonValue.Parse """{
+            "type": 3,
+            "message": "Hello!"
+        }"""
+        Assert.That(
+            parseNotification "window/showMessage" (Some json), 
+            Is.EqualTo (ShowMessage {_type = Info; message = "Hello!"}))
+
     let ``parse an Initialized notification`` () = 
         Assert.That(
             parseNotification "initialized" None,

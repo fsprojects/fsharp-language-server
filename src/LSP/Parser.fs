@@ -20,15 +20,45 @@ module Parser =
         match maybeId with
         | Some id -> RequestMessage (id, method, body)
         | None -> NotificationMessage (method, body)
+
+    type MessageType = 
+    | Error
+    | Warning 
+    | Info 
+    | Log
+
+    type ShowMessageParams = {
+        _type: MessageType 
+        message: string
+    }
         
     type Notification = 
     | Cancel of id: int 
     | Initialized
+    | Shutdown 
+    | Exit 
+    | ShowMessage of ShowMessageParams
+
+    let parseMessageType (id: int): MessageType = 
+        match id with 
+        | 1 -> Error 
+        | 2 -> Warning 
+        | 3 -> Info 
+        | 4 -> Log
+
+    let parseShowMessage (body: JsonValue): ShowMessageParams = 
+        {
+            _type = body?``type``.AsInteger() |> parseMessageType
+            message = body?message.AsString()
+        }
 
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
         | "initialized", None -> Initialized
+        | "shutdown", None -> Shutdown 
+        | "exit", None -> Exit 
+        | "window/showMessage", Some body -> ShowMessage (parseShowMessage body)
         
 
     type Position = {
