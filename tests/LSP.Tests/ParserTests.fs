@@ -224,6 +224,21 @@ module ParserTests =
             }))
 
     [<Test>]
+    let ``parse a DidCloseTextDocument notification`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            }
+        }"""
+        Assert.That(
+            parseNotification "textDocument/didClose" (Some json),
+            Is.EqualTo (DidCloseTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+            }))
+
+    [<Test>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{
             "processId": 1,
