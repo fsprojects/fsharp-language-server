@@ -1,5 +1,25 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
+  <!-- This is a temporary workaround so we can use FSharp.Data -->
+  <!-- It tells dotnet core to use the mono fsharp compiler -->
+  <!-- https://github.com/Microsoft/visualfsharp/issues/3303 -->
+  <PropertyGroup>
+    <IsWindows Condition="'$(OS)' == 'Windows_NT'">true</IsWindows>
+    <IsOSX Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</IsOSX>
+    <IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsWindows)' == 'true'">
+    <FscToolPath>C:\Program Files (x86)\Microsoft SDKs\F#\4.1\Framework\v4.0</FscToolPath>
+    <FscToolExe>fsc.exe</FscToolExe>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsOSX)' == 'true'">
+    <FscToolPath>/usr/local/bin</FscToolPath>
+    <FscToolExe>fsharpc</FscToolExe>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(IsLinux)' == 'true'">
+    <FscToolPath>/usr/bin</FscToolPath>
+    <FscToolExe>fsharpc</FscToolExe>
+  </PropertyGroup>
+  
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
 
@@ -8,6 +28,7 @@
 
   <ItemGroup>
     <Compile Include="TokenizerTests.fs" />
+    <Compile Include="ParserTests.fs" />
   </ItemGroup>
 
   <ItemGroup>
