@@ -73,8 +73,30 @@ module ParserTests =
         }"""
         Assert.That(
             parseNotification "workspace/didChangeConfiguration" (Some json),
-            Is.EqualTo (DidChangeConfiguration {settings = JsonValue.Parse """{"hello":"world"}"""}))
+            Is.EqualTo (DidChangeConfiguration {
+                settings = JsonValue.Parse """{"hello":"world"}"""
+            }))
 
+    [<Test>]
+    let ``parse a DidOpenTextDocument notification`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace",
+                "languageId": "fsharp",
+                "version": 1,
+                "text": "let x = 1"
+            }
+        }"""
+        Assert.That(
+            parseNotification "textDocument/didOpen" (Some json),
+            Is.EqualTo (DidOpenTextDocument {
+                textDocument = {
+                    uri = Uri("file://workspace")
+                    languageId = "fsharp"
+                    version = 1
+                    text = "let x = 1"
+                }
+            }))
     [<Test>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{
@@ -91,7 +113,8 @@ module ParserTests =
                 rootUri = Some (Uri("file://workspace"));
                 initializationOptions = None;
                 capabilitiesMap = Map.empty;
-                trace = None}))
+                trace = None
+            }))
     
     [<Test>]
     let ``processId can be null`` () = 

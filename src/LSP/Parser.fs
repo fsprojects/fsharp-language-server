@@ -35,6 +35,17 @@ module Parser =
     type DidChangeConfigurationParams = {
         settings: JsonValue
     }
+
+    type TextDocumentItem = {
+        uri: Uri 
+        languageId: string 
+        version: int 
+        text: string
+    }
+
+    type DidOpenTextDocumentParams = {
+        textDocument: TextDocumentItem
+    }
         
     type Notification = 
     | Cancel of id: int 
@@ -42,6 +53,7 @@ module Parser =
     | Shutdown 
     | Exit 
     | DidChangeConfiguration of DidChangeConfigurationParams
+    | DidOpenTextDocument of DidOpenTextDocumentParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -55,6 +67,19 @@ module Parser =
             settings = body?settings
         }
 
+    let parseTextDocumentItem (json: JsonValue): TextDocumentItem = 
+        {
+            uri = Uri(json?uri.AsString())
+            languageId = json?languageId.AsString()
+            version = json?version.AsInteger()
+            text = json?text.AsString()
+        }
+
+    let parseDidOpenTextDocumentParams (body: JsonValue): DidOpenTextDocumentParams = 
+        {
+            textDocument = body?textDocument |> parseTextDocumentItem 
+        }
+
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
@@ -62,6 +87,7 @@ module Parser =
         | "shutdown", None -> Shutdown 
         | "exit", None -> Exit 
         | "workspace/didChangeConfiguration", Some body -> DidChangeConfiguration (parseDidChangeConfigurationParams body)
+        | "textDocument/didOpen", Some body -> DidOpenTextDocument (parseDidOpenTextDocumentParams body)
 
     type Position = {
         line: int
@@ -116,13 +142,6 @@ module Parser =
 
     type TextDocumentIdentifier = {
         uri: Uri
-    }
-
-    type TextDocumentItem = {
-        uri: Uri 
-        languageId: string 
-        version: int 
-        text: string
     }
 
     type TextDocumentPositionParams = {
