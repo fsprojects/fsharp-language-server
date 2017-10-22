@@ -356,6 +356,7 @@ module Parser =
     | SignatureHelp of TextDocumentPositionParams
     | GotoDefinition of TextDocumentPositionParams
     | FindReferences of ReferenceParams
+    | DocumentHighlight of TextDocumentPositionParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -484,4 +485,5 @@ module Parser =
         | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams body)
         | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams body)
         | "textDocument/references" -> FindReferences (parseReferenceParams body)
+        | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

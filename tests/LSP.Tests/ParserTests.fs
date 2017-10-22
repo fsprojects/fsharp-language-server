@@ -481,3 +481,25 @@ module ParserTests =
                     includeDeclaration = true
                 }
             }))
+
+    [<Test>]
+    let ``parse DocumentHighlight request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "position": {
+                "line": 0,
+                "character": 5
+            }
+        }"""
+        Assert.That(parseRequest "textDocument/documentHighlight" json,
+            Is.EqualTo(DocumentHighlight {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                position = {
+                    line = 0
+                    character = 5
+                }
+            }))
