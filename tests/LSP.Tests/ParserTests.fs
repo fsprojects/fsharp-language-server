@@ -59,16 +59,6 @@ module ParserTests =
             parseNotification "cancel" (Some json), 
             Is.EqualTo (Cancel 1))
 
-    [<Test>]
-    let ``parse a ShowMessage notification`` () = 
-        let json = JsonValue.Parse """{
-            "type": 3,
-            "message": "Hello!"
-        }"""
-        Assert.That(
-            parseNotification "window/showMessage" (Some json), 
-            Is.EqualTo (ShowMessage {_type = Info; message = "Hello!"}))
-
     let ``parse an Initialized notification`` () = 
         Assert.That(
             parseNotification "initialized" None,
@@ -118,22 +108,3 @@ module ParserTests =
         }"""
         let (Initialize i) = parseRequest "initialize" json 
         Assert.That(i.capabilitiesMap, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
-    
-    [<Test>]
-    let ``parse ShowMessageRequest`` () = 
-        let json = JsonValue.Parse """{
-            "type": 3,
-            "message": "Hello!"
-        }"""
-        let (ShowMessageRequest i) = parseRequest "window/showMessageRequest" json 
-        Assert.That(i, Is.EqualTo({ _type = Info; message = "Hello!"; actions = []}))
-
-    [<Test>]
-    let ``parse ShowMessageRequest with actions`` () = 
-        let json = JsonValue.Parse """{
-            "type": 3,
-            "message": "Hello!",
-            "actions": [{"title": "Foo"}]
-        }"""
-        let (ShowMessageRequest i) = parseRequest "window/showMessageRequest" json 
-        Assert.That(i, Is.EqualTo({ _type = Info; message = "Hello!"; actions = [{title = "Foo"}]}))
