@@ -82,16 +82,15 @@ module ParserTests =
             "capabilities": {
             }
         }"""
-        let parsed, expectedResponse = parseRequest "initialize" json
+        let (Initialize i) = parseRequest "initialize" json
         Assert.That(
-            parsed, 
-            Is.EqualTo(Initialize {
+            i, 
+            Is.EqualTo({
                 processId = Some 1;
                 rootUri = Some (Uri("file://workspace"));
                 initializationOptions = None;
                 capabilitiesMap = Map.empty;
                 trace = None}))
-        Assert.That(expectedResponse, Is.EqualTo(ExpectedResponse "InitializeResult"))
     
     [<Test>]
     let ``processId can be null`` () = 
@@ -101,7 +100,7 @@ module ParserTests =
             "capabilities": {
             }
         }"""
-        let Initialize i, _ = parseRequest "initialize" json 
+        let (Initialize i) = parseRequest "initialize" json 
         Assert.That(i.processId, Is.EqualTo(None))
 
     [<Test>]
@@ -117,5 +116,24 @@ module ParserTests =
                 }
             }
         }"""
-        let Initialize i, _ = parseRequest "initialize" json 
+        let (Initialize i) = parseRequest "initialize" json 
         Assert.That(i.capabilitiesMap, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
+    
+    [<Test>]
+    let ``parse ShowMessageRequest`` () = 
+        let json = JsonValue.Parse """{
+            "type": 3,
+            "message": "Hello!"
+        }"""
+        let (ShowMessageRequest i) = parseRequest "window/showMessageRequest" json 
+        Assert.That(i, Is.EqualTo({ _type = Info; message = "Hello!"; actions = []}))
+
+    [<Test>]
+    let ``parse ShowMessageRequest with actions`` () = 
+        let json = JsonValue.Parse """{
+            "type": 3,
+            "message": "Hello!",
+            "actions": [{"title": "Foo"}]
+        }"""
+        let (ShowMessageRequest i) = parseRequest "window/showMessageRequest" json 
+        Assert.That(i, Is.EqualTo({ _type = Info; message = "Hello!"; actions = [{title = "Foo"}]}))

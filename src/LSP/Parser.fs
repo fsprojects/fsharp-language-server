@@ -146,10 +146,19 @@ module Parser =
         trace: option<Trace>
     }
 
+    type MessageActionItem = {
+        title: string
+    }
+
+    type ShowMessageRequestParams = {
+        _type: MessageType 
+        message: string 
+        actions: list<MessageActionItem>
+    }
+
     type Request = 
     | Initialize of InitializeParams
-
-    type ExpectedResponse = ExpectedResponse of string
+    | ShowMessageRequest of ShowMessageRequestParams
 
     let checkNull (json: JsonValue): option<JsonValue> = 
         match json with 
@@ -182,8 +191,8 @@ module Parser =
         }
         Map.ofSeq kvs
 
-    let parseInitialize (body: JsonValue): Request = 
-        Initialize { 
+    let parseInitialize (body: JsonValue): InitializeParams = 
+        { 
              processId = body?processId |> checkNull |> Option.map JsonExtensions.AsInteger
              rootUri = body?rootUri |> checkNull |> Option.map JsonExtensions.AsString |> Option.map Uri
              initializationOptions = body.TryGetProperty("initializationOptions") 
@@ -191,7 +200,26 @@ module Parser =
              trace = body.TryGetProperty("trace") |> Option.bind checkNull |> Option.map JsonExtensions.AsString |> Option.map parseTrace
         }
 
-    let parseRequest (method: string) (body: JsonValue): Request * ExpectedResponse = 
+    let parseAction (node: JsonValue): MessageActionItem = 
+        {
+            title = node?title.AsString()
+        }
+
+    let parseActions (maybeActions: option<JsonValue>): list<MessageActionItem> = 
+        match maybeActions with 
+        | Some (JsonValue.Array nodes) -> nodes |> List.ofArray |> List.map parseAction
+        | Some other -> raise (Exception (sprintf "Expected array of {title} but found %s" (other.ToString())))
+        | None -> []
+
+    let parseShowMessageRequest (body: JsonValue) : ShowMessageRequestParams = 
+        {
+            _type = body?``type``.AsInteger() |> parseMessageType
+            message = body?message.AsString()
+            actions = body.TryGetProperty("actions") |> parseActions
+        } 
+
+    let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
-        | "initialize" -> (parseInitialize body, ExpectedResponse "InitializeResult")
+        | "initialize" -> Initialize (parseInitialize body)
+        | "window/showMessageRequest" -> ShowMessageRequest (parseShowMessageRequest body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
