@@ -299,9 +299,55 @@ module Parser =
         trace: option<Trace>
     }
 
+    type InsertTextFormat = 
+    | PlainText 
+    | Snippet 
+
+    type CompletionItemKind = 
+    | Text
+    | Method
+    | Function
+    | Constructor
+    | Field
+    | Variable
+    | Class
+    | Interface
+    | Module
+    | Property
+    | Unit
+    | Value
+    | Enum
+    | Keyword
+    | Snippet
+    | Color
+    | File
+    | Reference
+
+    type CompletionItem = {
+        label: string 
+        kind: option<CompletionItemKind>
+        detail: option<string>
+        documentation: option<string>
+        sortText: option<string>
+        filterText: option<string>
+        insertText: option<string>
+        insertTextFormat: option<InsertTextFormat>
+        textEdit: option<TextEdit>
+        additionalTextEdits: list<TextEdit>
+        commitCharacters: list<char>
+        command: option<Command>
+        data: JsonValue
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
+    | Resolve of CompletionItem
+
+    let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
+        match maybe with 
+        | Some value -> value 
+        | None -> orDefault
 
     let checkNull (json: JsonValue): option<JsonValue> = 
         match json with 
@@ -349,8 +395,65 @@ module Parser =
             position = json?position |> parsePosition
         }
 
+    let parseCompletionItemKind (i: int): CompletionItemKind = 
+        match i with 
+        | 1 -> Text
+        | 2 -> Method
+        | 3 -> Function
+        | 4 -> Constructor
+        | 5 -> Field
+        | 6 -> Variable
+        | 7 -> Class
+        | 8 -> Interface
+        | 9 -> Module
+        | 10 -> Property
+        | 11 -> Unit
+        | 12 -> Value
+        | 13 -> Enum
+        | 14 -> Keyword
+        | 15 -> Snippet
+        | 16 -> Color
+        | 17 -> File
+        | 18 -> Reference
+
+    let parseInsertTextFormat (i: int): InsertTextFormat = 
+        match i with 
+        | 1 -> InsertTextFormat.PlainText
+        | 2 -> InsertTextFormat.Snippet
+
+    let parseTextEdit (json: JsonValue): TextEdit = 
+        {
+            range = json?range |> parseRange
+            newText = json?newText.AsString()
+        }
+
+    let parseCommand (json: JsonValue): Command = 
+        {
+            title = json?title.AsString()
+            command = json?command.AsString()
+            arguments = json.TryGetProperty("arguments") |> Option.map JsonExtensions.AsArray |> noneAs [||] |> List.ofArray
+        }
+
+    let parseCompletionItem (json: JsonValue): CompletionItem = 
+        {
+            label = json?label.AsString()
+            kind = json.TryGetProperty("kind") |> Option.map JsonExtensions.AsInteger |> Option.map parseCompletionItemKind
+            detail = json.TryGetProperty("detail") |> Option.map JsonExtensions.AsString 
+            documentation = json.TryGetProperty("documentation") |> Option.map JsonExtensions.AsString 
+            sortText = json.TryGetProperty("sortText") |> Option.map JsonExtensions.AsString 
+            filterText = json.TryGetProperty("filterText") |> Option.map JsonExtensions.AsString 
+            insertText = json.TryGetProperty("insertText") |> Option.map JsonExtensions.AsString 
+            insertTextFormat = json.TryGetProperty("insertTextFormat") |> Option.map JsonExtensions.AsInteger |> Option.map parseInsertTextFormat
+            textEdit = json.TryGetProperty("textEdit") |> Option.map parseTextEdit
+            additionalTextEdits = json.TryGetProperty("additionalTextEdits") |> Option.map JsonExtensions.AsArray |> noneAs [||] |> List.ofArray |> List.map parseTextEdit
+            commitCharacters = json.TryGetProperty("commitCharacters") |> Option.map JsonExtensions.AsArray |> noneAs [||] |> List.ofArray |> List.map JsonExtensions.AsString |> List.map char
+            command = json.TryGetProperty("command") |> Option.map parseCommand
+            data = json.TryGetProperty("data") |> noneAs JsonValue.Null
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
         | "textDocument/completion" -> Completion (parseTextDocumentPositionParams body)
+        | "completionItem/resolve" -> Resolve (parseCompletionItem body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

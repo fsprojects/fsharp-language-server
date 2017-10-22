@@ -321,3 +321,91 @@ module ParserTests =
                     character = 5
                 }
             }))
+
+    [<Test>]
+    let ``parse minimal Resolve request`` () = 
+        let json = JsonValue.Parse """{
+            "label": "foo"
+        }"""
+        Assert.That(parseRequest "completionItem/resolve" json,
+            Is.EqualTo(Resolve {
+                label = "foo"
+                kind = None 
+                detail = None 
+                documentation = None 
+                sortText = None 
+                filterText = None 
+                insertText = None 
+                insertTextFormat = None 
+                textEdit = None 
+                additionalTextEdits = []
+                commitCharacters = []
+                command = None 
+                data = JsonValue.Null
+            }))
+
+    [<Test>]
+    let ``parse maximal Resolve request`` () = 
+        let json = JsonValue.Parse """{
+            "label": "foo",
+            "kind": 1,
+            "detail": "foo(): string",
+            "documentation": "Foo returns foo",
+            "sortText": "1/foo",
+            "filterText": "foo",
+            "insertText": "foo()",
+            "insertTextFormat": 1,
+            "textEdit": {
+                "range": {
+                    "start": {"line": 0, "character": 0},
+                    "end": {"line": 0, "character": 2}
+                },
+                "newText": "foo()"
+            },
+            "additionalTextEdits": [{
+                "range": {
+                    "start": {"line": 1, "character": 0},
+                    "end": {"line": 1, "character": 0}
+                },
+                "newText": "foo()"
+            }],
+            "commitCharacters": ["\t"],
+            "command": {
+                "title": "eval",
+                "command": "do/eval",
+                "arguments": [{"hello":"world"}]
+            },
+            "data": {"hello":"world"}
+        }"""
+        Assert.That(parseRequest "completionItem/resolve" json,
+            Is.EqualTo(Resolve {
+                label = "foo"
+                kind = Some CompletionItemKind.Text
+                detail = Some "foo(): string" 
+                documentation = Some "Foo returns foo" 
+                sortText = Some "1/foo" 
+                filterText = Some "foo" 
+                insertText = Some "foo()" 
+                insertTextFormat = Some InsertTextFormat.PlainText 
+                textEdit = Some {
+                    range = {
+                        start = {line = 0; character = 0}
+                        _end = {line = 0; character = 2}
+                    }
+                    newText = "foo()"
+                } 
+                additionalTextEdits = [{
+                    range = {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
+                    newText = "foo()"
+                }]
+                commitCharacters = ['\t']
+                command = Some {
+                    title = "eval"
+                    command = "do/eval"
+                    arguments = [JsonValue.Parse """{"hello":"world"}"""]
+                } 
+                data = JsonValue.Parse """{"hello":"world"}"""
+            }))
