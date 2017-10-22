@@ -353,6 +353,10 @@ module Parser =
         textDocument: TextDocumentIdentifier
     }
 
+    type WorkspaceSymbolParams = {
+        query: string
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -362,6 +366,7 @@ module Parser =
     | FindReferences of ReferenceParams
     | DocumentHighlight of TextDocumentPositionParams
     | DocumentSymbols of DocumentSymbolParams
+    | WorkspaceSymbols of WorkspaceSymbolParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -487,6 +492,11 @@ module Parser =
             textDocument = json?textDocument |> parseTextDocumentIdentifier
         }
 
+    let parseWorkspaceSymbolParams (json: JsonValue): WorkspaceSymbolParams = 
+        {
+            query = json?query.AsString()
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -497,4 +507,5 @@ module Parser =
         | "textDocument/references" -> FindReferences (parseReferenceParams body)
         | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams body)
         | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams body)
+        | "workspace/symbol" -> WorkspaceSymbols (parseWorkspaceSymbolParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

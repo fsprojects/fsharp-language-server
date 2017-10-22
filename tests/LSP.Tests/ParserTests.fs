@@ -246,7 +246,8 @@ module ParserTests =
                 "type": 2
             }]
         }"""
-        Assert.That(parseNotification "workspace/didChangeWatchedFiles" (Some json),
+        Assert.That(
+            parseNotification "workspace/didChangeWatchedFiles" (Some json),
             Is.EqualTo (DidChangeWatchedFiles {
                 changes = [{
                     uri = Uri("file://workspace/Main.fs")
@@ -298,7 +299,9 @@ module ParserTests =
             }
         }"""
         let (Initialize i) = parseRequest "initialize" json 
-        Assert.That(i.capabilitiesMap, Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
+        Assert.That(
+            i.capabilitiesMap, 
+            Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
 
     [<Test>]
     let ``parse Completion request`` () = 
@@ -311,7 +314,8 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(parseRequest "textDocument/completion" json,
+        Assert.That(
+            parseRequest "textDocument/completion" json,
             Is.EqualTo(Completion {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
@@ -327,7 +331,8 @@ module ParserTests =
         let json = JsonValue.Parse """{
             "label": "foo"
         }"""
-        Assert.That(parseRequest "completionItem/resolve" json,
+        Assert.That(
+            parseRequest "completionItem/resolve" json,
             Is.EqualTo(Resolve {
                 label = "foo"
                 kind = None 
@@ -377,7 +382,8 @@ module ParserTests =
             },
             "data": {"hello":"world"}
         }"""
-        Assert.That(parseRequest "completionItem/resolve" json,
+        Assert.That(
+            parseRequest "completionItem/resolve" json,
             Is.EqualTo(Resolve {
                 label = "foo"
                 kind = Some CompletionItemKind.Text
@@ -421,7 +427,8 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(parseRequest "textDocument/signatureHelp" json,
+        Assert.That(
+            parseRequest "textDocument/signatureHelp" json,
             Is.EqualTo(SignatureHelp {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
@@ -443,7 +450,8 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(parseRequest "textDocument/definition" json,
+        Assert.That(
+            parseRequest "textDocument/definition" json,
             Is.EqualTo(GotoDefinition {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
@@ -468,7 +476,8 @@ module ParserTests =
                 "includeDeclaration": true
             }
         }"""
-        Assert.That(parseRequest "textDocument/references" json,
+        Assert.That(
+            parseRequest "textDocument/references" json,
             Is.EqualTo(FindReferences {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
@@ -493,7 +502,8 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(parseRequest "textDocument/documentHighlight" json,
+        Assert.That(
+            parseRequest "textDocument/documentHighlight" json,
             Is.EqualTo(DocumentHighlight {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
@@ -511,9 +521,21 @@ module ParserTests =
                 "uri": "file://workspace/Main.fs"
             }
         }"""
-        Assert.That(parseRequest "textDocument/documentSymbol" json,
+        Assert.That(
+            parseRequest "textDocument/documentSymbol" json,
             Is.EqualTo(DocumentSymbols {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
                 }
+            }))
+
+    [<Test>]
+    let ``parse WorkspaceSymbols request`` () = 
+        let json = JsonValue.Parse """{
+            "query": "foo"
+        }"""
+        Assert.That(
+            parseRequest "workspace/symbol" json,
+            Is.EqualTo(WorkspaceSymbols {
+                query = "foo"
             }))
