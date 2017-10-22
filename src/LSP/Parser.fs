@@ -5,13 +5,19 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 
 module Parser = 
-    type RequestMessage = RequestMessage of id: int * method: string * params: option<JsonValue>
+    type Message = 
+    | RequestMessage of id: int * method: string * body: option<JsonValue>
+    | NotificationMessage of method: string * body: option<JsonValue>
 
-    let parseRequestMessage (jsonText: string): RequestMessage = 
+    let parse (jsonText: string): Message = 
         let json = JsonValue.Parse jsonText
         let jsonRpcVersion = json.GetProperty("jsonrpc").AsString()
         assert (jsonRpcVersion = "2.0")
-        let id = json.GetProperty("id").AsInteger()
+        let maybeId = json.TryGetProperty("id") |> Option.map JsonExtensions.AsInteger
         let method = json.GetProperty("method").AsString()
-        let params = json.TryGetProperty("params")
-        RequestMessage (id, method, params)
+        let body = json.TryGetProperty("params")
+
+        match maybeId with
+        | Some id -> RequestMessage (id, method, body)
+        | None -> NotificationMessage (method, body)
+        
