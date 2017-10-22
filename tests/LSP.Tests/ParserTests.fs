@@ -51,13 +51,18 @@ module ParserTests =
             Is.EqualTo (NotificationMessage ("helloNotification", Some (JsonValue.Parse """{"hello":"world"}"""))))
 
     [<Test>]
-    let ``parse a Cancel message`` () = 
+    let ``parse a Cancel notification`` () = 
         let json = JsonValue.Parse """{
             "id": 1
         }""" 
         Assert.That(
-            parseNotification json, 
+            parseNotification "cancel" (Some json), 
             Is.EqualTo (Cancel 1))
+
+    let ``parse an Initialized notification`` () = 
+        Assert.That(
+            parseNotification "initialized" None,
+            Is.EqualTo (Initialized))
 
     [<Test>]
     let ``parse a minimal Initialize request`` () = 

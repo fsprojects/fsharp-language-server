@@ -23,9 +23,13 @@ module Parser =
         
     type Notification = 
     | Cancel of id: int 
+    | Initialized
 
-    let parseNotification (body: JsonValue): Notification = 
-        Cancel (body?id.AsInteger())
+    let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
+        match method, maybeBody with 
+        | "cancel", Some body -> Cancel (body?id.AsInteger())
+        | "initialized", None -> Initialized
+        
 
     type Position = {
         line: int
