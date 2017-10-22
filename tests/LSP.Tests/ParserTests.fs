@@ -239,6 +239,22 @@ module ParserTests =
             }))
 
     [<Test>]
+    let ``parse a DidChangeWatchedFiles notification`` () = 
+        let json = JsonValue.Parse """{
+            "changes": [{
+                "uri": "file://workspace/Main.fs",
+                "type": 2
+            }]
+        }"""
+        Assert.That(parseNotification "workspace/didChangeWatchedFiles" (Some json),
+            Is.EqualTo (DidChangeWatchedFiles {
+                changes = [{
+                    uri = Uri("file://workspace/Main.fs")
+                    _type = Changed
+                }]
+            }))
+
+    [<Test>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{
             "processId": 1,

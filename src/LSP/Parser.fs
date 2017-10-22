@@ -95,6 +95,20 @@ module Parser =
     type DidCloseTextDocumentParams = {
         textDocument: TextDocumentIdentifier
     }
+
+    type FileChangeType = 
+    | Created
+    | Changed 
+    | Deleted
+
+    type FileEvent = {
+        uri: Uri 
+        _type: FileChangeType
+    }
+
+    type DidChangeWatchedFilesParams = {
+        changes: list<FileEvent>
+    }
         
     type Notification = 
     | Cancel of id: int 
@@ -108,6 +122,7 @@ module Parser =
     | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
     | DidSaveTextDocument of DidSaveTextDocumentParams
     | DidCloseTextDocument of DidCloseTextDocumentParams
+    | DidChangeWatchedFiles of DidChangeWatchedFilesParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -193,6 +208,23 @@ module Parser =
             textDocument = json?textDocument |> parseTextDocumentIdentifier
         }
 
+    let parseFileChangeType (i: int): FileChangeType = 
+        match i with 
+        | 1 -> Created 
+        | 2 -> Changed 
+        | 3 -> Deleted
+
+    let parseFileEvent (json: JsonValue): FileEvent = 
+        {
+            uri = json?uri.AsString() |> Uri 
+            _type = json?``type``.AsInteger() |> parseFileChangeType
+        }
+
+    let parseDidChangeWatchedFilesParams (json: JsonValue): DidChangeWatchedFilesParams = 
+        {
+            changes = json?changes.AsArray() |> List.ofArray |> List.map parseFileEvent
+        }
+
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
         | "cancel", Some body -> Cancel (body?id.AsInteger())
@@ -206,6 +238,7 @@ module Parser =
         | "textDocument/willSaveWaitUntil", Some body -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams body)
         | "textDocument/didSave", Some body -> DidSaveTextDocument (parseDidSaveTextDocumentParams body)
         | "textDocument/didClose", Some body -> DidCloseTextDocument (parseDidCloseTextDocumentParams body)
+        | "workspace/didChangeWatchedFiles", Some body -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams body)
 
     type Location = {
         uri: Uri 
