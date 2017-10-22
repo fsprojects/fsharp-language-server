@@ -96,6 +96,7 @@ module Parser =
     | DidOpenTextDocument of DidOpenTextDocumentParams
     | DidChangeTextDocument of DidChangeTextDocumentParams
     | WillSaveTextDocument of WillSaveTextDocumentParams
+    | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
 
     let parseMessageType (id: int): MessageType = 
         match id with 
@@ -180,6 +181,7 @@ module Parser =
         | "textDocument/didOpen", Some body -> DidOpenTextDocument (parseDidOpenTextDocumentParams body)
         | "textDocument/didChange", Some body -> DidChangeTextDocument (parseDidChangeTextDocumentParams body)
         | "textDocument/willSave", Some body -> WillSaveTextDocument (parseWillSaveTextDocumentParams body)
+        | "textDocument/willSaveWaitUntil", Some body -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams body)
 
     type Location = {
         uri: Uri 
