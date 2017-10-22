@@ -22,19 +22,22 @@ module Tokenizer =
         elif header = "" then EmptyHeader
         else OtherHeader
 
-    let takeChar (client: IEnumerator<char>) (expected: char): unit = 
+    let takeChar (client: IEnumerator<char>) (expected: char): bool = 
         if not (client.MoveNext()) then 
-            raise (Exception (sprintf "Expected %c but input ended" expected))
+            false
         elif expected <> client.Current then 
             raise (Exception (sprintf "Expected %c but found %c" expected client.Current))
-        else ()
+        else true
 
-    let takeHeader (client: IEnumerator<char>): string = 
+    let takeHeader (client: IEnumerator<char>): option<string> = 
         let acc = StringBuilder()
         while client.MoveNext() && client.Current <> '\r' do 
             acc.Append(client.Current) |> ignore
-        takeChar client '\n'
-        acc.ToString()
+        if takeChar client '\n' then
+            Some (acc.ToString())
+        else
+            None
+
 
     let takeMessage (client: IEnumerator<char>) (contentLength: int): string =
         let acc = StringBuilder()
@@ -42,12 +45,23 @@ module Tokenizer =
             if not (client.MoveNext()) then 
                 raise (Exception(sprintf "Expected %d more characters in message but input ended" remaining))
             acc.Append(client.Current) |> ignore
-        takeChar client '\r'
-        takeChar client '\n'
+        takeChar client '\r' |> ignore
+        takeChar client '\n' |> ignore
         acc.ToString()
 
     let tokenize (client: seq<char>): seq<string> = 
-        raise (NotImplementedException())
+        seq {
+            let enum = client.GetEnumerator()
+            let mutable contentLength = -1
+            let mutable endOfInput = false
+            while not endOfInput do 
+                let next = Option.map parseHeader (takeHeader enum)
+                match next with 
+                    | None -> endOfInput <- true 
+                    | Some (ContentLength l) -> contentLength <- l 
+                    | Some (EmptyHeader) -> yield takeMessage enum contentLength 
+                    | _ -> ()
+        }
 
 module Parser = 
     let parse (body: string): Request = 
