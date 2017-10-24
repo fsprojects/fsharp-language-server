@@ -685,8 +685,56 @@ module ParserTests =
         }"""
         Assert.That(
             parseRequest "textDocument/codeLens" json,
-            Is.EqualTo(CodeLens {
+            Is.EqualTo(Request.CodeLens {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
                 }
+            }))
+
+    [<Test>]
+    let ``parse minimal ResolveCodeLens request`` () = 
+        let json = JsonValue.Parse """{
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            }
+        }"""
+        Assert.That(
+            parseRequest "codeLens/resolve" json,
+            Is.EqualTo(ResolveCodeLens {
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+                command = None 
+                data = JsonValue.Null
+            }))
+
+    [<Test>]
+    let ``parse maximal ResolveCodeLens request`` () = 
+        let json = JsonValue.Parse """{
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            },
+            "command": {
+                "title": "save",
+                "command": "doSave",
+                "arguments": ["hi"]
+            },
+            "data": "hi"
+        }"""
+        Assert.That(
+            parseRequest "codeLens/resolve" json,
+            Is.EqualTo(ResolveCodeLens {
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+                command = Some {
+                    title = "save"
+                    command = "doSave"
+                    arguments = [JsonValue.String "hi"]
+                } 
+                data = JsonValue.String "hi"
             }))
