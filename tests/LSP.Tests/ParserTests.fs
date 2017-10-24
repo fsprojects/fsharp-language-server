@@ -675,3 +675,18 @@ module ParserTests =
                     }]
                 }
             }))
+
+    [<Test>]
+    let ``parse CodeLens request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/codeLens" json,
+            Is.EqualTo(CodeLens {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+            }))

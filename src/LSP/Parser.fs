@@ -367,6 +367,10 @@ module Parser =
         context: CodeActionContext
     }
 
+    type CodeLensParams = {
+        textDocument: TextDocumentIdentifier
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -378,6 +382,7 @@ module Parser =
     | DocumentSymbols of DocumentSymbolParams
     | WorkspaceSymbols of WorkspaceSymbolParams
     | CodeActions of CodeActionParams
+    | CodeLens of CodeLensParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -536,6 +541,11 @@ module Parser =
             context = json?context |> parseCodeActionContext
         }
 
+    let parseCodeLensParams (json: JsonValue): CodeLensParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -548,4 +558,5 @@ module Parser =
         | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams body)
         | "workspace/symbol" -> WorkspaceSymbols (parseWorkspaceSymbolParams body)
         | "textDocument/codeAction" -> CodeActions (parseCodeActionParams body)
+        | "textDocument/codeLens" -> CodeLens (parseCodeLensParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
