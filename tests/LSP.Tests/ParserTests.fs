@@ -771,3 +771,36 @@ module ParserTests =
                 }
                 target = None
             }))
+    
+    [<Test>]
+    let ``parse DocumentFormatting request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "options": {
+                "tabSize": 1,
+                "insertSpaces": true,
+                "boolOption": true,
+                "intOption": 1,
+                "stringOption": "foo"
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/formatting" json,
+            Is.EqualTo(DocumentFormatting {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                options = {
+                    tabSize = 1
+                    insertSpaces = true 
+                }
+                optionsMap = Map.ofSeq [
+                    "tabSize", "1";
+                    "insertSpaces", "true";
+                    "boolOption", "true";
+                    "intOption", "1";
+                    "stringOption", "foo"
+                ]
+            }))

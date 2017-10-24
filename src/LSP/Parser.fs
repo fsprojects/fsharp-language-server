@@ -386,6 +386,17 @@ module Parser =
         target: option<Uri>
     }
 
+    type DocumentFormattingOptions = {
+        tabSize: int 
+        insertSpaces: bool 
+    }
+
+    type DocumentFormattingParams = {
+        textDocument: TextDocumentIdentifier
+        options: DocumentFormattingOptions
+        optionsMap: Map<string, string>
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -401,6 +412,7 @@ module Parser =
     | ResolveCodeLens of CodeLens
     | DocumentLink of DocumentLinkParams
     | ResolveDocumentLink of DocumentLink
+    | DocumentFormatting of DocumentFormattingParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -582,6 +594,21 @@ module Parser =
             target = json.TryGetProperty("target") |> Option.map JsonExtensions.AsString |> Option.map Uri 
         }
 
+    let parseDocumentFormattingOptions (json: JsonValue): DocumentFormattingOptions = 
+        {
+            tabSize = json?tabSize.AsInteger()
+            insertSpaces = json?insertSpaces.AsBoolean()
+        }
+
+    let valueAsString (key: string, value: JsonValue) = (key, value.AsString())
+
+    let parseDocumentFormattingParams (json: JsonValue): DocumentFormattingParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            options = json?options |> parseDocumentFormattingOptions
+            optionsMap = Seq.map valueAsString json?options.Properties |> Map.ofSeq
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -598,4 +625,5 @@ module Parser =
         | "codeLens/resolve" -> ResolveCodeLens (parseCodeLens body)
         | "textDocument/documentLink" -> DocumentLink (parseDocumentLinkParams body)
         | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink body)
+        | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
