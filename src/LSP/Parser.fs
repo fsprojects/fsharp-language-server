@@ -412,6 +412,12 @@ module Parser =
         ch: char 
     }
 
+    type RenameParams = {
+        textDocument: TextDocumentIdentifier
+        position: Position
+        newName: string
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -430,6 +436,7 @@ module Parser =
     | DocumentFormatting of DocumentFormattingParams
     | DocumentRangeFormatting of DocumentRangeFormattingParams
     | DocumentOnTypeFormatting of DocumentOnTypeFormattingParams
+    | Rename of RenameParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -643,6 +650,13 @@ module Parser =
             ch = json?ch.AsString() |> char
         }
 
+    let parseRenameParams (json: JsonValue): RenameParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            position = json?position |> parsePosition
+            newName = json?newName.AsString()
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -662,4 +676,5 @@ module Parser =
         | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams body)
         | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams body)
         | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams body)
+        | "textDocument/rename" -> Rename (parseRenameParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

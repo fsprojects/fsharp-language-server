@@ -888,3 +888,28 @@ module ParserTests =
                 }
                 ch = 'a'
             }))
+    
+    [<Test>]
+    let ``parse Rename request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "position": {
+                "line": 0,
+                "character": 0
+            },
+            "newName": "foo"
+        }"""
+        Assert.That(
+            parseRequest "textDocument/rename" json,
+            Is.EqualTo(Rename {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                position = {
+                    line = 0
+                    character = 0
+                }
+                newName = "foo"
+            }))
