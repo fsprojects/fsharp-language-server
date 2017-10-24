@@ -804,3 +804,44 @@ module ParserTests =
                     "stringOption", "foo"
                 ]
             }))
+    
+    [<Test>]
+    let ``parse DocumentRangeFormatting request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "options": {
+                "tabSize": 1,
+                "insertSpaces": true,
+                "boolOption": true,
+                "intOption": 1,
+                "stringOption": "foo"
+            },
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/rangeFormatting" json,
+            Is.EqualTo(DocumentRangeFormatting {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                options = {
+                    tabSize = 1
+                    insertSpaces = true 
+                }
+                optionsMap = Map.ofSeq [
+                    "tabSize", "1";
+                    "insertSpaces", "true";
+                    "boolOption", "true";
+                    "intOption", "1";
+                    "stringOption", "foo"
+                ]
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+            }))

@@ -397,6 +397,13 @@ module Parser =
         optionsMap: Map<string, string>
     }
 
+    type DocumentRangeFormattingParams = {
+        textDocument: TextDocumentIdentifier
+        options: DocumentFormattingOptions
+        optionsMap: Map<string, string>
+        range: Range
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -413,6 +420,7 @@ module Parser =
     | DocumentLink of DocumentLinkParams
     | ResolveDocumentLink of DocumentLink
     | DocumentFormatting of DocumentFormattingParams
+    | DocumentRangeFormatting of DocumentRangeFormattingParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -606,7 +614,15 @@ module Parser =
         {
             textDocument = json?textDocument |> parseTextDocumentIdentifier
             options = json?options |> parseDocumentFormattingOptions
-            optionsMap = Seq.map valueAsString json?options.Properties |> Map.ofSeq
+            optionsMap = json?options.Properties |> Seq.map valueAsString |> Map.ofSeq
+        }
+
+    let parseDocumentRangeFormattingParams (json: JsonValue): DocumentRangeFormattingParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            options = json?options |> parseDocumentFormattingOptions
+            optionsMap = json?options.Properties |> Seq.map valueAsString |> Map.ofSeq
+            range = json?range |> parseRange
         }
 
     let parseRequest (method: string) (body: JsonValue): Request = 
@@ -626,4 +642,5 @@ module Parser =
         | "textDocument/documentLink" -> DocumentLink (parseDocumentLinkParams body)
         | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink body)
         | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams body)
+        | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
