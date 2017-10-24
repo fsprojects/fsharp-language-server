@@ -404,6 +404,14 @@ module Parser =
         range: Range
     }
 
+    type DocumentOnTypeFormattingParams = {
+        textDocument: TextDocumentIdentifier
+        options: DocumentFormattingOptions
+        optionsMap: Map<string, string>
+        position: Position
+        ch: char 
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -421,6 +429,7 @@ module Parser =
     | ResolveDocumentLink of DocumentLink
     | DocumentFormatting of DocumentFormattingParams
     | DocumentRangeFormatting of DocumentRangeFormattingParams
+    | DocumentOnTypeFormatting of DocumentOnTypeFormattingParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -625,6 +634,15 @@ module Parser =
             range = json?range |> parseRange
         }
 
+    let parseDocumentOnTypeFormattingParams (json: JsonValue): DocumentOnTypeFormattingParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            options = json?options |> parseDocumentFormattingOptions
+            optionsMap = json?options.Properties |> Seq.map valueAsString |> Map.ofSeq
+            position = json?position |> parsePosition
+            ch = json?ch.AsString() |> char
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -643,4 +661,5 @@ module Parser =
         | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink body)
         | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams body)
         | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams body)
+        | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
