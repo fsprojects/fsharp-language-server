@@ -357,6 +357,16 @@ module Parser =
         query: string
     }
 
+    type CodeActionContext = {
+        diagnostics: list<Diagnostic>
+    }
+
+    type CodeActionParams = {
+        textDocument: TextDocumentIdentifier
+        range: Range
+        context: CodeActionContext
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -367,6 +377,7 @@ module Parser =
     | DocumentHighlight of TextDocumentPositionParams
     | DocumentSymbols of DocumentSymbolParams
     | WorkspaceSymbols of WorkspaceSymbolParams
+    | CodeActions of CodeActionParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -497,6 +508,34 @@ module Parser =
             query = json?query.AsString()
         }
 
+    let parseDiagnosticSeverity (i: int): DiagnosticSeverity = 
+        match i with 
+        | 1 -> Error 
+        | 2 -> Warning 
+        | 3 -> Information 
+        | 4 -> Hint
+
+    let parseDiagnostic (json: JsonValue): Diagnostic = 
+        {
+            range = json?range |> parseRange
+            severity = json.TryGetProperty("severity") |> Option.map JsonExtensions.AsInteger |> Option.map parseDiagnosticSeverity
+            code = json.TryGetProperty("code") |> Option.map JsonExtensions.AsString 
+            source = json.TryGetProperty("source") |> Option.map JsonExtensions.AsString
+            message = json?message.AsString()
+        }
+
+    let parseCodeActionContext (json: JsonValue): CodeActionContext = 
+        {
+            diagnostics = json?diagnostics.AsArray() |> List.ofArray |> List.map parseDiagnostic
+        }
+
+    let parseCodeActionParams (json: JsonValue): CodeActionParams = 
+        {
+            textDocument = json?textDocument |> parseTextDocumentIdentifier
+            range = json?range |> parseRange
+            context = json?context |> parseCodeActionContext
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -508,4 +547,5 @@ module Parser =
         | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams body)
         | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams body)
         | "workspace/symbol" -> WorkspaceSymbols (parseWorkspaceSymbolParams body)
+        | "textDocument/codeAction" -> CodeActions (parseCodeActionParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

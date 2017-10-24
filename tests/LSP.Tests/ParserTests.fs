@@ -539,3 +539,139 @@ module ParserTests =
             Is.EqualTo(WorkspaceSymbols {
                 query = "foo"
             }))
+
+    [<Test>]
+    let ``parse minimal CodeActions request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            },
+            "context": {
+                "diagnostics": [{
+                    "range": {
+                        "start": {"line": 1, "character": 0},
+                        "end": {"line": 1, "character": 0}
+                    },
+                    "message": "Some error"
+                }]
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/codeAction" json,
+            Is.EqualTo(CodeActions {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+                context = {
+                    diagnostics = [{
+                        range = {
+                            start = {line = 1; character = 0}
+                            _end = {line = 1; character = 0}
+                        }
+                        severity = None
+                        code = None
+                        source = None
+                        message = "Some error"
+                    }]
+                }
+            }))
+
+    [<Test>]
+    let ``parse maximal CodeActions request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            },
+            "context": {
+                "diagnostics": [{
+                    "range": {
+                        "start": {"line": 1, "character": 0},
+                        "end": {"line": 1, "character": 0}
+                    },
+                    "severity": 1,
+                    "code": "SomeError",
+                    "source": "compiler",
+                    "message": "Some error"
+                }]
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/codeAction" json,
+            Is.EqualTo(CodeActions {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+                context = {
+                    diagnostics = [{
+                        range = {
+                            start = {line = 1; character = 0}
+                            _end = {line = 1; character = 0}
+                        }
+                        severity = Some DiagnosticSeverity.Error
+                        code = Some "SomeError"
+                        source = Some "compiler"
+                        message = "Some error"
+                    }]
+                }
+            }))
+
+    [<Test>]
+    let ``parse CodeActions request with an integer code`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            },
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            },
+            "context": {
+                "diagnostics": [{
+                    "range": {
+                        "start": {"line": 1, "character": 0},
+                        "end": {"line": 1, "character": 0}
+                    },
+                    "code": 1,
+                    "message": "Some error"
+                }]
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/codeAction" json,
+            Is.EqualTo(CodeActions {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+                context = {
+                    diagnostics = [{
+                        range = {
+                            start = {line = 1; character = 0}
+                            _end = {line = 1; character = 0}
+                        }
+                        severity = None
+                        code = Some "1"
+                        source = None
+                        message = "Some error"
+                    }]
+                }
+            }))
