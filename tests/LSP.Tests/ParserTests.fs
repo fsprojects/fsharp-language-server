@@ -327,13 +327,13 @@ module ParserTests =
             }))
 
     [<Test>]
-    let ``parse minimal Resolve request`` () = 
+    let ``parse minimal ResolveCompletionItem request`` () = 
         let json = JsonValue.Parse """{
             "label": "foo"
         }"""
         Assert.That(
             parseRequest "completionItem/resolve" json,
-            Is.EqualTo(Resolve {
+            Is.EqualTo(ResolveCompletionItem {
                 label = "foo"
                 kind = None 
                 detail = None 
@@ -350,7 +350,7 @@ module ParserTests =
             }))
 
     [<Test>]
-    let ``parse maximal Resolve request`` () = 
+    let ``parse maximal ResolveCompletionItem request`` () = 
         let json = JsonValue.Parse """{
             "label": "foo",
             "kind": 1,
@@ -384,7 +384,7 @@ module ParserTests =
         }"""
         Assert.That(
             parseRequest "completionItem/resolve" json,
-            Is.EqualTo(Resolve {
+            Is.EqualTo(ResolveCompletionItem {
                 label = "foo"
                 kind = Some CompletionItemKind.Text
                 detail = Some "foo(): string" 

@@ -374,7 +374,7 @@ module Parser =
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
-    | Resolve of CompletionItem
+    | ResolveCompletionItem of CompletionItem
     | SignatureHelp of TextDocumentPositionParams
     | GotoDefinition of TextDocumentPositionParams
     | FindReferences of ReferenceParams
@@ -550,7 +550,7 @@ module Parser =
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
         | "textDocument/completion" -> Completion (parseTextDocumentPositionParams body)
-        | "completionItem/resolve" -> Resolve (parseCompletionItem body)
+        | "completionItem/resolve" -> ResolveCompletionItem (parseCompletionItem body)
         | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams body)
         | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams body)
         | "textDocument/references" -> FindReferences (parseReferenceParams body)
