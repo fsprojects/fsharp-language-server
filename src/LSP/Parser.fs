@@ -381,6 +381,11 @@ module Parser =
         textDocument: TextDocumentIdentifier
     }
 
+    type DocumentLink = {
+        range: Range 
+        target: option<Uri>
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -395,6 +400,7 @@ module Parser =
     | CodeLens of CodeLensParams
     | ResolveCodeLens of CodeLens
     | DocumentLink of DocumentLinkParams
+    | ResolveDocumentLink of DocumentLink
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -570,6 +576,12 @@ module Parser =
             textDocument = json?textDocument |> parseTextDocumentIdentifier
         }
 
+    let parseDocumentLink (json: JsonValue): DocumentLink = 
+        {
+            range = json?range |> parseRange
+            target = json.TryGetProperty("target") |> Option.map JsonExtensions.AsString |> Option.map Uri 
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -585,4 +597,5 @@ module Parser =
         | "textDocument/codeLens" -> CodeLens (parseCodeLensParams body)
         | "codeLens/resolve" -> ResolveCodeLens (parseCodeLens body)
         | "textDocument/documentLink" -> DocumentLink (parseDocumentLinkParams body)
+        | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

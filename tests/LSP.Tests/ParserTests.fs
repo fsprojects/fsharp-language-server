@@ -753,3 +753,21 @@ module ParserTests =
                     uri = Uri("file://workspace/Main.fs")
                 }
             }))
+    
+    [<Test>]
+    let ``parse ResolveDocumentLink request`` () = 
+        let json = JsonValue.Parse """{
+            "range": {
+                "start": {"line": 1, "character": 0},
+                "end": {"line": 1, "character": 0}
+            }
+        }"""
+        Assert.That(
+            parseRequest "documentLink/resolve" json,
+            Is.EqualTo(ResolveDocumentLink {
+                range = {
+                    start = {line = 1; character = 0}
+                    _end = {line = 1; character = 0}
+                }
+                target = None
+            }))
