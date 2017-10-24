@@ -6,8 +6,8 @@ open FSharp.Data.JsonExtensions
 
 module Parser = 
     type Message = 
-    | RequestMessage of id: int * method: string * body: option<JsonValue>
-    | NotificationMessage of method: string * body: option<JsonValue>
+    | RequestMessage of id: int * method: string * json: option<JsonValue>
+    | NotificationMessage of method: string * json: option<JsonValue>
 
     let parseMessage (jsonText: string): Message = 
         let json = JsonValue.Parse jsonText
@@ -15,11 +15,11 @@ module Parser =
         assert (jsonRpcVersion = "2.0")
         let maybeId = json.TryGetProperty("id") |> Option.map JsonExtensions.AsInteger
         let method = json?method.AsString()
-        let body = json.TryGetProperty("params")
+        let json = json.TryGetProperty("params")
 
         match maybeId with
-        | Some id -> RequestMessage (id, method, body)
-        | None -> NotificationMessage (method, body)
+        | Some id -> RequestMessage (id, method, json)
+        | None -> NotificationMessage (method, json)
 
     type MessageType = 
     | Error
@@ -131,9 +131,9 @@ module Parser =
         | 3 -> Info 
         | 4 -> Log
 
-    let parseDidChangeConfigurationParams (body: JsonValue): DidChangeConfigurationParams = 
+    let parseDidChangeConfigurationParams (json: JsonValue): DidChangeConfigurationParams = 
         {
-            settings = body?settings
+            settings = json?settings
         }
 
     let parseTextDocumentItem (json: JsonValue): TextDocumentItem = 
@@ -144,9 +144,9 @@ module Parser =
             text = json?text.AsString()
         }
 
-    let parseDidOpenTextDocumentParams (body: JsonValue): DidOpenTextDocumentParams = 
+    let parseDidOpenTextDocumentParams (json: JsonValue): DidOpenTextDocumentParams = 
         {
-            textDocument = body?textDocument |> parseTextDocumentItem 
+            textDocument = json?textDocument |> parseTextDocumentItem 
         }
 
     let parsePosition (json: JsonValue): Position = 
@@ -227,18 +227,18 @@ module Parser =
 
     let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
         match method, maybeBody with 
-        | "cancel", Some body -> Cancel (body?id.AsInteger())
+        | "cancel", Some json -> Cancel (json?id.AsInteger())
         | "initialized", None -> Initialized
         | "shutdown", None -> Shutdown 
         | "exit", None -> Exit 
-        | "workspace/didChangeConfiguration", Some body -> DidChangeConfiguration (parseDidChangeConfigurationParams body)
-        | "textDocument/didOpen", Some body -> DidOpenTextDocument (parseDidOpenTextDocumentParams body)
-        | "textDocument/didChange", Some body -> DidChangeTextDocument (parseDidChangeTextDocumentParams body)
-        | "textDocument/willSave", Some body -> WillSaveTextDocument (parseWillSaveTextDocumentParams body)
-        | "textDocument/willSaveWaitUntil", Some body -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams body)
-        | "textDocument/didSave", Some body -> DidSaveTextDocument (parseDidSaveTextDocumentParams body)
-        | "textDocument/didClose", Some body -> DidCloseTextDocument (parseDidCloseTextDocumentParams body)
-        | "workspace/didChangeWatchedFiles", Some body -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams body)
+        | "workspace/didChangeConfiguration", Some json -> DidChangeConfiguration (parseDidChangeConfigurationParams json)
+        | "textDocument/didOpen", Some json -> DidOpenTextDocument (parseDidOpenTextDocumentParams json)
+        | "textDocument/didChange", Some json -> DidChangeTextDocument (parseDidChangeTextDocumentParams json)
+        | "textDocument/willSave", Some json -> WillSaveTextDocument (parseWillSaveTextDocumentParams json)
+        | "textDocument/willSaveWaitUntil", Some json -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams json)
+        | "textDocument/didSave", Some json -> DidSaveTextDocument (parseDidSaveTextDocumentParams json)
+        | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
+        | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
 
     type Location = {
         uri: Uri 
@@ -480,13 +480,13 @@ module Parser =
         }
         Map.ofSeq kvs
 
-    let parseInitialize (body: JsonValue): InitializeParams = 
+    let parseInitialize (json: JsonValue): InitializeParams = 
         { 
-             processId = body?processId |> checkNull |> Option.map JsonExtensions.AsInteger
-             rootUri = body?rootUri |> checkNull |> Option.map JsonExtensions.AsString |> Option.map Uri
-             initializationOptions = body.TryGetProperty("initializationOptions") 
-             capabilitiesMap = body?capabilities |> parseCapabilities 
-             trace = body.TryGetProperty("trace") |> Option.bind checkNull |> Option.map JsonExtensions.AsString |> Option.map parseTrace
+             processId = json?processId |> checkNull |> Option.map JsonExtensions.AsInteger
+             rootUri = json?rootUri |> checkNull |> Option.map JsonExtensions.AsString |> Option.map Uri
+             initializationOptions = json.TryGetProperty("initializationOptions") 
+             capabilitiesMap = json?capabilities |> parseCapabilities 
+             trace = json.TryGetProperty("trace") |> Option.bind checkNull |> Option.map JsonExtensions.AsString |> Option.map parseTrace
         }
 
     let parseTextDocumentPositionParams (json: JsonValue): TextDocumentPositionParams = 
@@ -669,25 +669,25 @@ module Parser =
             arguments = json.TryGetProperty("arguments") |> Option.map JsonExtensions.AsArray |> Option.map List.ofSeq |> noneAs []
         }
 
-    let parseRequest (method: string) (body: JsonValue): Request = 
+    let parseRequest (method: string) (json: JsonValue): Request = 
         match method with 
-        | "initialize" -> Initialize (parseInitialize body)
-        | "textDocument/completion" -> Completion (parseTextDocumentPositionParams body)
-        | "completionItem/resolve" -> ResolveCompletionItem (parseCompletionItem body)
-        | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams body)
-        | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams body)
-        | "textDocument/references" -> FindReferences (parseReferenceParams body)
-        | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams body)
-        | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams body)
-        | "workspace/symbol" -> WorkspaceSymbols (parseWorkspaceSymbolParams body)
-        | "textDocument/codeAction" -> CodeActions (parseCodeActionParams body)
-        | "textDocument/codeLens" -> CodeLens (parseCodeLensParams body)
-        | "codeLens/resolve" -> ResolveCodeLens (parseCodeLens body)
-        | "textDocument/documentLink" -> DocumentLink (parseDocumentLinkParams body)
-        | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink body)
-        | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams body)
-        | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams body)
-        | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams body)
-        | "textDocument/rename" -> Rename (parseRenameParams body)
-        | "workspace/executeCommand" -> ExecuteCommand (parseExecuteCommandParams body)
+        | "initialize" -> Initialize (parseInitialize json)
+        | "textDocument/completion" -> Completion (parseTextDocumentPositionParams json)
+        | "completionItem/resolve" -> ResolveCompletionItem (parseCompletionItem json)
+        | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams json)
+        | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams json)
+        | "textDocument/references" -> FindReferences (parseReferenceParams json)
+        | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams json)
+        | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams json)
+        | "workspace/symbol" -> WorkspaceSymbols (parseWorkspaceSymbolParams json)
+        | "textDocument/codeAction" -> CodeActions (parseCodeActionParams json)
+        | "textDocument/codeLens" -> CodeLens (parseCodeLensParams json)
+        | "codeLens/resolve" -> ResolveCodeLens (parseCodeLens json)
+        | "textDocument/documentLink" -> DocumentLink (parseDocumentLinkParams json)
+        | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink json)
+        | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams json)
+        | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams json)
+        | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams json)
+        | "textDocument/rename" -> Rename (parseRenameParams json)
+        | "workspace/executeCommand" -> ExecuteCommand (parseExecuteCommandParams json)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
