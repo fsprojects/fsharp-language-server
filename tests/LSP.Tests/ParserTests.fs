@@ -913,3 +913,28 @@ module ParserTests =
                 }
                 newName = "foo"
             }))
+    
+    [<Test>]
+    let ``parse ExecuteCommand request with no arguments`` () = 
+        let json = JsonValue.Parse """{
+            "command": "foo"
+        }"""
+        Assert.That(
+            parseRequest "workspace/executeCommand" json,
+            Is.EqualTo(ExecuteCommand {
+                command = "foo"
+                arguments = []
+            }))
+    
+    [<Test>]
+    let ``parse ExecuteCommand request with arguments`` () = 
+        let json = JsonValue.Parse """{
+            "command": "foo",
+            "arguments": ["bar"]
+        }"""
+        Assert.That(
+            parseRequest "workspace/executeCommand" json,
+            Is.EqualTo(ExecuteCommand {
+                command = "foo"
+                arguments = [JsonValue.String "bar"]
+            }))

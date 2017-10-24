@@ -418,6 +418,11 @@ module Parser =
         newName: string
     }
 
+    type ExecuteCommandParams = {
+        command: string 
+        arguments: list<JsonValue>
+    }
+
     type Request = 
     | Initialize of InitializeParams
     | Completion of TextDocumentPositionParams
@@ -437,6 +442,7 @@ module Parser =
     | DocumentRangeFormatting of DocumentRangeFormattingParams
     | DocumentOnTypeFormatting of DocumentOnTypeFormattingParams
     | Rename of RenameParams
+    | ExecuteCommand of ExecuteCommandParams
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -657,6 +663,12 @@ module Parser =
             newName = json?newName.AsString()
         }
 
+    let parseExecuteCommandParams (json: JsonValue): ExecuteCommandParams = 
+        {
+            command = json?command.AsString()
+            arguments = json.TryGetProperty("arguments") |> Option.map JsonExtensions.AsArray |> Option.map List.ofSeq |> noneAs []
+        }
+
     let parseRequest (method: string) (body: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize body)
@@ -677,4 +689,5 @@ module Parser =
         | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams body)
         | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams body)
         | "textDocument/rename" -> Rename (parseRenameParams body)
+        | "workspace/executeCommand" -> ExecuteCommand (parseExecuteCommandParams body)
         | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
