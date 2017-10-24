@@ -738,3 +738,18 @@ module ParserTests =
                 } 
                 data = JsonValue.String "hi"
             }))
+
+    [<Test>]
+    let ``parse DocumentLink request`` () = 
+        let json = JsonValue.Parse """{
+            "textDocument": {
+                "uri": "file://workspace/Main.fs"
+            }
+        }"""
+        Assert.That(
+            parseRequest "textDocument/documentLink" json,
+            Is.EqualTo(DocumentLink {
+                textDocument = {
+                    uri = Uri("file://workspace/Main.fs")
+                }
+            }))
