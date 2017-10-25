@@ -6,18 +6,6 @@ open LanguageServer
 open System.Runtime.Serialization
 open NUnit.Framework
 open System.Text.RegularExpressions
-
-[<DataContract>]
-type Simple = {
-    [<field: DataMember(Name="simpleProp")>]
-    simpleProp: int
-}
-
-[<Test>]
-let ``serialize a simple record class to JSON`` () = 
-    let serializer = serializerFactory<Simple>()
-    Assert.That(serializer({simpleProp = 1}), Is.EqualTo("""{"simpleProp":1}"""))
-
 let removeSpace (expected: string) = 
     Regex.Replace(expected, @"\s", "")
 
@@ -30,3 +18,9 @@ let ``remove newline from string`` () =
     let actual = """foo 
     bar"""
     Assert.That(removeSpace actual, Is.EqualTo "foobar")
+
+[<Test>]
+let ``serialize primitive types to JSON`` () = 
+    Assert.That(serializerFactory<bool>() true, Is.EqualTo("true"))
+    Assert.That(serializerFactory<int>() 1, Is.EqualTo("1"))
+    Assert.That(serializerFactory<string>() "foo", Is.EqualTo("\"foo\""))
