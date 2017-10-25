@@ -174,7 +174,7 @@ module ParserTests =
             }))
 
     [<Test>]
-    let ``parse a WillSaveWaitUntilTextDocument notification`` () = 
+    let ``parse a WillSaveWaitUntilTextDocument request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
                 "uri": "file://workspace/Main.fs"
@@ -182,7 +182,7 @@ module ParserTests =
             "reason": 2
         }"""
         Assert.That(
-            parseNotification "textDocument/willSaveWaitUntil" (Some json),
+            parseRequest "textDocument/willSaveWaitUntil" json,
             Is.EqualTo (WillSaveWaitUntilTextDocument {
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")

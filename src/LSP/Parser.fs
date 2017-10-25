@@ -119,7 +119,6 @@ module Parser =
     | DidOpenTextDocument of DidOpenTextDocumentParams
     | DidChangeTextDocument of DidChangeTextDocumentParams
     | WillSaveTextDocument of WillSaveTextDocumentParams
-    | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
     | DidSaveTextDocument of DidSaveTextDocumentParams
     | DidCloseTextDocument of DidCloseTextDocumentParams
     | DidChangeWatchedFiles of DidChangeWatchedFilesParams
@@ -235,7 +234,6 @@ module Parser =
         | "textDocument/didOpen", Some json -> DidOpenTextDocument (parseDidOpenTextDocumentParams json)
         | "textDocument/didChange", Some json -> DidChangeTextDocument (parseDidChangeTextDocumentParams json)
         | "textDocument/willSave", Some json -> WillSaveTextDocument (parseWillSaveTextDocumentParams json)
-        | "textDocument/willSaveWaitUntil", Some json -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams json)
         | "textDocument/didSave", Some json -> DidSaveTextDocument (parseDidSaveTextDocumentParams json)
         | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
         | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
@@ -425,7 +423,9 @@ module Parser =
 
     type Request = 
     | Initialize of InitializeParams
+    | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
     | Completion of TextDocumentPositionParams
+    | Hover of TextDocumentPositionParams
     | ResolveCompletionItem of CompletionItem
     | SignatureHelp of TextDocumentPositionParams
     | GotoDefinition of TextDocumentPositionParams
@@ -672,7 +672,9 @@ module Parser =
     let parseRequest (method: string) (json: JsonValue): Request = 
         match method with 
         | "initialize" -> Initialize (parseInitialize json)
+        | "textDocument/willSaveWaitUntil" -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams json)
         | "textDocument/completion" -> Completion (parseTextDocumentPositionParams json)
+        | "textDocument/hover" -> Hover (parseTextDocumentPositionParams json)
         | "completionItem/resolve" -> ResolveCompletionItem (parseCompletionItem json)
         | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams json)
         | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams json)
