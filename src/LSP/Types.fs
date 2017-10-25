@@ -280,3 +280,223 @@ type ExecuteCommandParams = {
     command: string 
     arguments: list<JsonValue>
 }
+
+[<RequireQualifiedAccess>]
+type TextDocumentSyncKind = 
+| None 
+| Full
+| Incremental
+
+type CompletionOptions = {
+    resolveProvider: bool 
+    triggerCharacters: list<char>
+}
+
+let defaultCompletionOptions = {
+    resolveProvider = false 
+    triggerCharacters = ['.']
+}
+
+type SignatureHelpOptions = {
+    triggerCharacters: list<char>
+}
+
+let defaultSignatureHelpOptions = {
+    triggerCharacters = ['('; ',']
+}
+
+type CodeLensOptions = {
+    resolveProvider: bool  
+}
+
+let defaultCodeLensOptions = {
+    resolveProvider = false
+}
+
+type DocumentOnTypeFormattingOptions = {
+    firstTriggerCharacter: char
+    moreTriggerCharacter: list<char>
+}
+
+type DocumentLinkOptions = {
+    resolveProvider: bool
+}
+
+let defaultDocumentLinkOptions = {
+    resolveProvider = false
+}
+
+type ExecuteCommandOptions = {
+    commands: list<string>
+}
+
+type SaveOptions = {
+    includeText: bool
+}
+
+let defaultSaveOptions = {
+    includeText = false
+}
+
+type TextDocumentSyncOptions = {
+    openClose: bool
+    change: TextDocumentSyncKind
+    willSave: bool
+    willSaveWaitUntil: bool
+    save: SaveOptions
+}
+
+let defaultTextDocumentSyncOptions = {
+    openClose = false
+    change = TextDocumentSyncKind.Incremental
+    willSave = false 
+    willSaveWaitUntil = false
+    save = defaultSaveOptions
+}
+
+type ServerCapabilities = {
+    textDocumentSync: TextDocumentSyncOptions
+    hoverProvider: bool
+    completionProvider: option<CompletionOptions>
+    signatureHelpProvider: option<SignatureHelpOptions>
+    definitionProvider: bool
+    referencesProvider: bool
+    documentHighlightProvider: bool
+    documentSymbolProvider: bool
+    workspaceSymbolProvider: bool
+    codeActionProvider: bool
+    codeLensProvider: option<CodeLensOptions>
+    documentFormattingProvider: bool
+    documentRangeFormattingProvider: bool
+    documentOnTypeFormattingProvider: option<DocumentOnTypeFormattingOptions>
+    renameProvider: bool
+    documentLinkProvider: option<DocumentLinkOptions>
+    executeCommandProvider: option<ExecuteCommandOptions>
+}
+
+let defaultServerCapabilities: ServerCapabilities = {
+    textDocumentSync = defaultTextDocumentSyncOptions
+    hoverProvider = false
+    completionProvider = None
+    signatureHelpProvider = None
+    definitionProvider = false
+    referencesProvider = false
+    documentHighlightProvider = false
+    documentSymbolProvider = false
+    workspaceSymbolProvider = false
+    codeActionProvider = false
+    codeLensProvider = None
+    documentFormattingProvider = false
+    documentRangeFormattingProvider = false
+    documentOnTypeFormattingProvider = None
+    renameProvider = false
+    documentLinkProvider = None
+    executeCommandProvider = None
+}
+
+type InitializeResult = {
+    capabilities: ServerCapabilities
+}
+
+type CompletionList = {
+    isIncomplete: bool 
+    items: list<CompletionItem>
+}
+
+type MarkedString = 
+| HighlightedString of value: string * language: string 
+| PlainString of string
+
+type Hover = {
+    contents: list<MarkedString>
+    range: option<Range>
+}
+
+type ParameterInformation = {
+    label: string 
+    documentation: option<string>
+}
+
+type SignatureInformation = {
+    label: string 
+    documentation: option<string>
+    parameters: list<ParameterInformation>
+}
+
+type SignatureHelp = {
+    signatures: list<SignatureInformation>
+    activeSignature: option<int>
+    activeParameter: option<int>
+}
+
+[<RequireQualifiedAccess>]
+type DocumentHighlightKind = 
+| Text 
+| Read 
+| Write 
+
+type DocumentHighlight = {
+    range: Range 
+    kind: DocumentHighlightKind
+}
+
+[<RequireQualifiedAccess>]
+type SymbolKind = 
+| File
+| Module
+| Namespace
+| Package
+| Class
+| Method
+| Property
+| Field
+| Constructor
+| Enum
+| Interface
+| Function
+| Variable
+| Constant
+| String
+| Number
+| Boolean
+| Array
+
+type SymbolInformation = {
+    name: string 
+    kind: SymbolKind 
+    location: Location
+    containerName: option<string>
+}
+
+type ILanguageServer = 
+    abstract member Initialize: InitializeParams -> InitializeResult
+    abstract member Initialized: unit -> unit 
+    abstract member Shutdown: unit -> Unit 
+    abstract member Exit: unit -> unit 
+    abstract member DidChangeConfiguration: DidChangeConfigurationParams -> unit 
+    abstract member DidOpenTextDocument: DidOpenTextDocumentParams -> unit 
+    abstract member DidChangeTextDocument: DidChangeTextDocumentParams -> unit 
+    abstract member WillSaveTextDocument: WillSaveTextDocumentParams -> unit
+    abstract member WillSaveWaitUntilTextDocument: WillSaveTextDocumentParams -> list<TextEdit>
+    abstract member DidSaveTextDocument: DidSaveTextDocumentParams -> unit
+    abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> unit
+    abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> unit
+    abstract member Completion: TextDocumentPositionParams -> CompletionList
+    abstract member Hover: TextDocumentPositionParams -> Hover
+    abstract member ResolveCompletionItem: CompletionItem -> CompletionItem
+    abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp
+    abstract member GotoDefinition: TextDocumentPositionParams -> list<Location>
+    abstract member FindReferences: ReferenceParams -> list<Location>
+    abstract member DocumentHighlight: TextDocumentPositionParams -> list<DocumentHighlight>
+    abstract member DocumentSymbols: DocumentSymbolParams -> list<SymbolInformation>
+    abstract member WorkspaceSymbols: WorkspaceSymbolParams -> list<SymbolInformation>
+    abstract member CodeActions: CodeActionParams -> list<Command>
+    abstract member CodeLens: CodeLensParams -> List<CodeLens>
+    abstract member ResolveCodeLens: CodeLens -> CodeLens
+    abstract member DocumentLink: DocumentLinkParams -> list<DocumentLink>
+    abstract member ResolveDocumentLink: DocumentLink -> DocumentLink -> DocumentLink
+    abstract member DocumentFormatting: DocumentFormattingParams -> list<TextEdit>
+    abstract member DocumentRangeFormatting: DocumentRangeFormattingParams -> list<TextEdit>
+    abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> list<TextEdit>
+    abstract member Rename: RenameParams -> WorkspaceEdit
+    abstract member ExecuteCommand: ExecuteCommandParams -> unit
