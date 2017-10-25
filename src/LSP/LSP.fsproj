@@ -28,6 +28,7 @@
     <Compile Include="Types.fs" />
     <Compile Include="Tokenizer.fs" />
     <Compile Include="Parser.fs" />
+    <Compile Include="LanguageServer.fs" />
   </ItemGroup>
   
   <ItemGroup>

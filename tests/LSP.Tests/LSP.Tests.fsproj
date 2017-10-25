@@ -29,6 +29,7 @@
   <ItemGroup>
     <Compile Include="TokenizerTests.fs" />
     <Compile Include="ParserTests.fs" />
+    <Compile Include="LanguageServerTests.fs" />
   </ItemGroup>
 
   <ItemGroup>

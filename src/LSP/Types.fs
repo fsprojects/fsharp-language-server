@@ -500,3 +500,5 @@ type ILanguageServer =
     abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> list<TextEdit>
     abstract member Rename: RenameParams -> WorkspaceEdit
     abstract member ExecuteCommand: ExecuteCommandParams -> unit
+
+// TODO IAsyncLanguageServer that supports request cancellation
