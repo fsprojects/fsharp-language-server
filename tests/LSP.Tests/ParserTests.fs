@@ -1,5 +1,6 @@
 namespace LSP
 
+open Types
 open System
 open Parser
 open NUnit.Framework
