@@ -20,7 +20,18 @@ let escapeStr (text:string) =
 let rec serializerFactory<'T> (): 'T -> string = 
     let wrap (p: 'a -> string) = unbox<'T -> string> p
     match shapeof<'T> with 
-        | Shape.Bool -> wrap(sprintf "%b")
-        | Shape.Int32 -> wrap(sprintf "%d")
-        | Shape.String -> wrap(escapeStr)
-        | other -> raise (Exception (sprintf "Don't know how to serialize %s to JSON" (other.ToString())))
+    | Shape.Bool -> wrap(sprintf "%b")
+    | Shape.Int32 -> wrap(sprintf "%d")
+    | Shape.String -> wrap(escapeStr)
+    | Shape.FSharpOption s ->
+        s.Accept {
+            new IFSharpOptionVisitor<'T -> string> with
+                member this.Visit<'a> () =
+                    let serializeContents = serializerFactory<'a>()
+                    let serializeOption maybe = 
+                        match maybe with 
+                        | None -> "null"
+                        | Some value -> serializeContents value 
+                    wrap(serializeOption)
+        }
+    | other -> raise (Exception (sprintf "Don't know how to serialize %s to JSON" (other.ToString())))

@@ -19,15 +19,18 @@
     <FscToolPath>/usr/bin</FscToolPath>
     <FscToolExe>fsharpc</FscToolExe>
   </PropertyGroup>
+
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="Types.fs" />
     <Compile Include="Tokenizer.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="LanguageServer.fs" />
   </ItemGroup>
+  
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="2.4.2" />
     <PackageReference Include="TypeShape" Version="2.19.0" />
