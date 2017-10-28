@@ -1,8 +1,8 @@
-module LSP.LanguageServerTests
+module LSP.JsonTests
 
 open Types
 open Parser
-open LanguageServer
+open Json
 open System.Runtime.Serialization
 open NUnit.Framework
 open System.Text.RegularExpressions
