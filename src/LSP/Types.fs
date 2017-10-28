@@ -48,6 +48,7 @@ type TextDocumentIdentifier = {
     uri: Uri
 }
 
+[<RequireQualifiedAccess>]
 type TextDocumentSaveReason = 
 | Manual
 | AfterDelay
@@ -67,6 +68,7 @@ type DidCloseTextDocumentParams = {
     textDocument: TextDocumentIdentifier
 }
 
+[<RequireQualifiedAccess>]
 type FileChangeType = 
 | Created
 | Changed 
@@ -99,6 +101,7 @@ type Location = {
     range: Range 
 }
 
+[<RequireQualifiedAccess>]
 type DiagnosticSeverity = 
 | Error 
 | Warning 
@@ -147,7 +150,11 @@ type DocumentFilter = {
 
 type DocumentSelector = list<DocumentFilter>
 
-type Trace = Off | Messages | Verbose
+[<RequireQualifiedAccess>]
+type Trace = 
+| Off 
+| Messages 
+| Verbose
 
 type InitializeParams = {
     processId: option<int>
@@ -157,10 +164,12 @@ type InitializeParams = {
     trace: option<Trace>
 }
 
+[<RequireQualifiedAccess>]
 type InsertTextFormat = 
 | PlainText 
 | Snippet 
 
+[<RequireQualifiedAccess>]
 type CompletionItemKind = 
 | Text
 | Method
@@ -280,6 +289,29 @@ type ExecuteCommandParams = {
     command: string 
     arguments: list<JsonValue>
 }
+
+type Request = 
+| Initialize of InitializeParams
+| WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
+| Completion of TextDocumentPositionParams
+| Hover of TextDocumentPositionParams
+| ResolveCompletionItem of CompletionItem
+| SignatureHelp of TextDocumentPositionParams
+| GotoDefinition of TextDocumentPositionParams
+| FindReferences of ReferenceParams
+| DocumentHighlight of TextDocumentPositionParams
+| DocumentSymbols of DocumentSymbolParams
+| WorkspaceSymbols of WorkspaceSymbolParams
+| CodeActions of CodeActionParams
+| CodeLens of CodeLensParams
+| ResolveCodeLens of CodeLens
+| DocumentLink of DocumentLinkParams
+| ResolveDocumentLink of DocumentLink
+| DocumentFormatting of DocumentFormattingParams
+| DocumentRangeFormatting of DocumentRangeFormattingParams
+| DocumentOnTypeFormatting of DocumentOnTypeFormattingParams
+| Rename of RenameParams
+| ExecuteCommand of ExecuteCommandParams
 
 [<RequireQualifiedAccess>]
 type TextDocumentSyncKind = 

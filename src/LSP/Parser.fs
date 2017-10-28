@@ -78,9 +78,9 @@ module Parser =
 
     let parseTextDocumentSaveReason (i: int): TextDocumentSaveReason = 
         match i with 
-        | 1 -> Manual 
-        | 2 -> AfterDelay 
-        | 3 -> FocusOut
+        | 1 -> TextDocumentSaveReason.Manual 
+        | 2 -> TextDocumentSaveReason.AfterDelay 
+        | 3 -> TextDocumentSaveReason.FocusOut
 
     let parseWillSaveTextDocumentParams (json: JsonValue): WillSaveTextDocumentParams = 
         {
@@ -101,9 +101,9 @@ module Parser =
 
     let parseFileChangeType (i: int): FileChangeType = 
         match i with 
-        | 1 -> Created 
-        | 2 -> Changed 
-        | 3 -> Deleted
+        | 1 -> FileChangeType.Created 
+        | 2 -> FileChangeType.Changed 
+        | 3 -> FileChangeType.Deleted
 
     let parseFileEvent (json: JsonValue): FileEvent = 
         {
@@ -130,29 +130,6 @@ module Parser =
         | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
         | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
 
-    type Request = 
-    | Initialize of InitializeParams
-    | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
-    | Completion of TextDocumentPositionParams
-    | Hover of TextDocumentPositionParams
-    | ResolveCompletionItem of CompletionItem
-    | SignatureHelp of TextDocumentPositionParams
-    | GotoDefinition of TextDocumentPositionParams
-    | FindReferences of ReferenceParams
-    | DocumentHighlight of TextDocumentPositionParams
-    | DocumentSymbols of DocumentSymbolParams
-    | WorkspaceSymbols of WorkspaceSymbolParams
-    | CodeActions of CodeActionParams
-    | CodeLens of CodeLensParams
-    | ResolveCodeLens of CodeLens
-    | DocumentLink of DocumentLinkParams
-    | ResolveDocumentLink of DocumentLink
-    | DocumentFormatting of DocumentFormattingParams
-    | DocumentRangeFormatting of DocumentRangeFormattingParams
-    | DocumentOnTypeFormatting of DocumentOnTypeFormattingParams
-    | Rename of RenameParams
-    | ExecuteCommand of ExecuteCommandParams
-
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
         | Some value -> value 
@@ -165,9 +142,9 @@ module Parser =
 
     let parseTrace (text: string): Trace = 
         match text with 
-        | "off" -> Off 
-        | "messages" -> Messages 
-        | "verbose" -> Verbose
+        | "off" -> Trace.Off 
+        | "messages" -> Trace.Messages 
+        | "verbose" -> Trace.Verbose
         | _ -> raise (Exception (sprintf "Unexpected trace %s" text))
 
     let pathString (pathReversed: list<string>): string = 
@@ -206,24 +183,24 @@ module Parser =
 
     let parseCompletionItemKind (i: int): CompletionItemKind = 
         match i with 
-        | 1 -> Text
-        | 2 -> Method
-        | 3 -> Function
-        | 4 -> Constructor
-        | 5 -> Field
-        | 6 -> Variable
-        | 7 -> Class
-        | 8 -> Interface
-        | 9 -> Module
-        | 10 -> Property
-        | 11 -> Unit
-        | 12 -> Value
-        | 13 -> Enum
-        | 14 -> Keyword
-        | 15 -> Snippet
-        | 16 -> Color
-        | 17 -> File
-        | 18 -> Reference
+        | 1 -> CompletionItemKind.Text
+        | 2 -> CompletionItemKind.Method
+        | 3 -> CompletionItemKind.Function
+        | 4 -> CompletionItemKind.Constructor
+        | 5 -> CompletionItemKind.Field
+        | 6 -> CompletionItemKind.Variable
+        | 7 -> CompletionItemKind.Class
+        | 8 -> CompletionItemKind.Interface
+        | 9 -> CompletionItemKind.Module
+        | 10 -> CompletionItemKind.Property
+        | 11 -> CompletionItemKind.Unit
+        | 12 -> CompletionItemKind.Value
+        | 13 -> CompletionItemKind.Enum
+        | 14 -> CompletionItemKind.Keyword
+        | 15 -> CompletionItemKind.Snippet
+        | 16 -> CompletionItemKind.Color
+        | 17 -> CompletionItemKind.File
+        | 18 -> CompletionItemKind.Reference
 
     let parseInsertTextFormat (i: int): InsertTextFormat = 
         match i with 
@@ -284,10 +261,10 @@ module Parser =
 
     let parseDiagnosticSeverity (i: int): DiagnosticSeverity = 
         match i with 
-        | 1 -> Error 
-        | 2 -> Warning 
-        | 3 -> Information 
-        | 4 -> Hint
+        | 1 -> DiagnosticSeverity.Error 
+        | 2 -> DiagnosticSeverity.Warning 
+        | 3 -> DiagnosticSeverity.Information 
+        | 4 -> DiagnosticSeverity.Hint
 
     let parseDiagnostic (json: JsonValue): Diagnostic = 
         {

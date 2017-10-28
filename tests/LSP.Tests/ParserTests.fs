@@ -171,7 +171,7 @@ module ParserTests =
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
                 }
-                reason = AfterDelay
+                reason = TextDocumentSaveReason.AfterDelay
             }))
 
     [<Test>]
@@ -188,7 +188,7 @@ module ParserTests =
                 textDocument = {
                     uri = Uri("file://workspace/Main.fs")
                 }
-                reason = AfterDelay
+                reason = TextDocumentSaveReason.AfterDelay
             }))
 
     [<Test>]
@@ -252,7 +252,7 @@ module ParserTests =
             Is.EqualTo (DidChangeWatchedFiles {
                 changes = [{
                     uri = Uri("file://workspace/Main.fs")
-                    _type = Changed
+                    _type = FileChangeType.Changed
                 }]
             }))
 
