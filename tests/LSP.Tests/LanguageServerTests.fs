@@ -6,6 +6,7 @@ open LanguageServer
 open System.Runtime.Serialization
 open NUnit.Framework
 open System.Text.RegularExpressions
+
 let removeSpace (expected: string) = 
     Regex.Replace(expected, @"\s", "")
 
@@ -29,3 +30,9 @@ let ``serialize primitive types to JSON`` () =
 let ``serialize option to JSON`` () = 
     Assert.That(serializerFactory<option<int>>() (Some 1), Is.EqualTo("1"))
     Assert.That(serializerFactory<option<int>>() (None), Is.EqualTo("null"))
+
+type SimpleRecord = {simpleMember: int}
+
+[<Test>]
+let ``serialize record to JSON`` () = 
+    Assert.That(serializerFactory<SimpleRecord>() {simpleMember = 1}, Is.EqualTo("""{"simpleMember":1}"""))

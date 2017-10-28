@@ -33,6 +33,5 @@
   
   <ItemGroup>
     <PackageReference Include="FSharp.Data" Version="2.4.2" />
-    <PackageReference Include="TypeShape" Version="2.19.0" />
   </ItemGroup>
 </Project>
