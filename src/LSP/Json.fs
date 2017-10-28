@@ -54,3 +54,5 @@ and fieldSerializer (field: PropertyInfo): obj -> string =
         sprintf "%s:%s" name inner
 
 let serializerFactory<'T> () = serializer typeof<'T>
+
+// TODO deserializer that works the same way
