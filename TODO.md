@@ -8,3 +8,5 @@
   - to
   - downto
   - type
+  - not
+  - done

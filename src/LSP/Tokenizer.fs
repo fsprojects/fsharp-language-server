@@ -1,7 +1,7 @@
 namespace LSP
 
 open System
-open System.Net.Sockets
+open System.IO
 open System.Text
 open System.Collections.Generic
 
@@ -17,43 +17,38 @@ module Tokenizer =
         elif header = "" then EmptyHeader
         else OtherHeader
 
-    let takeChar (client: IEnumerator<char>) (expected: char): bool = 
-        if not (client.MoveNext()) then 
-            false
-        elif expected <> client.Current then 
-            raise (Exception (sprintf "Expected %c but found %c" expected client.Current))
-        else true
+    let readLength (byteLength: int) (client: BinaryReader): string = 
+        let bytes = client.ReadBytes(byteLength)
+        Encoding.UTF8.GetString bytes
+        
+    let readLine (client: BinaryReader): option<string> = 
+        let buffer = new StringBuilder()
+        try
+            let mutable endOfLine = false
+            while not endOfLine do 
+                let nextChar = client.ReadChar()
+                if nextChar = '\r' then do 
+                    assert (client.ReadChar() = '\n')
+                    endOfLine <- true
+                else do 
+                    buffer.Append nextChar
+            buffer.ToString() |> Some 
+        with 
+        | EndOfStreamException -> 
+            if buffer.Length > 0
+                then buffer.ToString() |> Some 
+            else
+                None
 
-    let takeHeader (client: IEnumerator<char>): option<string> = 
-        let acc = StringBuilder()
-        while client.MoveNext() && client.Current <> '\r' do 
-            acc.Append(client.Current) |> ignore
-        if takeChar client '\n' then
-            Some (acc.ToString())
-        else
-            None
-
-
-    let takeMessage (client: IEnumerator<char>) (contentLength: int): string =
-        let acc = StringBuilder()
-        for remaining = contentLength downto 1 do 
-            if not (client.MoveNext()) then 
-                raise (Exception(sprintf "Expected %d more characters in message but input ended" remaining))
-            acc.Append(client.Current) |> ignore
-        takeChar client '\r' |> ignore
-        takeChar client '\n' |> ignore
-        acc.ToString()
-
-    let tokenize (client: seq<char>): seq<string> = 
+    let tokenize (client: BinaryReader): seq<string> = 
         seq {
-            let enum = client.GetEnumerator()
             let mutable contentLength = -1
             let mutable endOfInput = false
             while not endOfInput do 
-                let next = Option.map parseHeader (takeHeader enum)
+                let next = readLine client |> Option.map parseHeader
                 match next with 
                     | None -> endOfInput <- true 
                     | Some (ContentLength l) -> contentLength <- l 
-                    | Some (EmptyHeader) -> yield takeMessage enum contentLength 
+                    | Some (EmptyHeader) -> yield readLength contentLength client
                     | _ -> ()
         }
