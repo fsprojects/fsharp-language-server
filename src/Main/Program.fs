@@ -1,6 +1,5 @@
 ﻿// Learn more about F# at http://fsharp.org
 
-open System
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
 let file = "MyScript.fsx"
@@ -13,7 +12,7 @@ let parsingOptions, parsingOptionsErrors = checker.GetParsingOptionsFromProjectO
 let parseFileResults = checker.ParseFile(file, input, parsingOptions) |> Async.RunSynchronously
 
 [<EntryPoint>]
-let main argv =
+let main (argv: array<string>): int =
     for error in parseFileResults.Errors do 
         printfn "%d:%d %s" error.StartLineAlternate error.StartColumn error.Message
     printfn "Finished %s" parseFileResults.FileName
