@@ -81,6 +81,7 @@ module Parser =
         | 1 -> TextDocumentSaveReason.Manual 
         | 2 -> TextDocumentSaveReason.AfterDelay 
         | 3 -> TextDocumentSaveReason.FocusOut
+        | _ -> raise (Exception (sprintf "%d is not a known TextDocumentSaveReason" i))
 
     let parseWillSaveTextDocumentParams (json: JsonValue): WillSaveTextDocumentParams = 
         {
@@ -104,6 +105,7 @@ module Parser =
         | 1 -> FileChangeType.Created 
         | 2 -> FileChangeType.Changed 
         | 3 -> FileChangeType.Deleted
+        | _ -> raise (Exception (sprintf "%d is not a known FileChangeType" i))
 
     let parseFileEvent (json: JsonValue): FileEvent = 
         {
@@ -129,6 +131,8 @@ module Parser =
         | "textDocument/didSave", Some json -> DidSaveTextDocument (parseDidSaveTextDocumentParams json)
         | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
         | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
+        | _, Some _ -> raise (Exception (sprintf "%s is not a known notification, or it is not expected to contain a body" method))
+        | _, None -> raise (Exception (sprintf "%s is not a known notification, or it is expected to contain a body" method))
 
     let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
         match maybe with 
@@ -201,11 +205,13 @@ module Parser =
         | 16 -> CompletionItemKind.Color
         | 17 -> CompletionItemKind.File
         | 18 -> CompletionItemKind.Reference
+        | _ -> raise (Exception (sprintf "%d is not a known CompletionItemKind" i))
 
     let parseInsertTextFormat (i: int): InsertTextFormat = 
         match i with 
         | 1 -> InsertTextFormat.PlainText
         | 2 -> InsertTextFormat.Snippet
+        | _ -> raise (Exception (sprintf "%d is not a known InsertTextFormat" i))
 
     let parseTextEdit (json: JsonValue): TextEdit = 
         {
@@ -265,6 +271,7 @@ module Parser =
         | 2 -> DiagnosticSeverity.Warning 
         | 3 -> DiagnosticSeverity.Information 
         | 4 -> DiagnosticSeverity.Hint
+        | _ -> raise (Exception (sprintf "%d is not a known DiagnosticSeverity" i))
 
     let parseDiagnostic (json: JsonValue): Diagnostic = 
         {
