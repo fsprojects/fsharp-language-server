@@ -12,11 +12,12 @@ module ParserTests =
         let json = """{
             "jsonrpc": "2.0",
             "id": 1,
-            "method": "helloWorld"
+            "method": "helloWorld",
+            "params": {"hello": "world"}
         }"""
         Assert.That(
             parseMessage json, 
-            Is.EqualTo (RequestMessage (1, "helloWorld", None)))
+            Is.EqualTo (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}""")))
 
     [<Test>]
     let ``parse a RequestMessage with params`` () = 
@@ -28,7 +29,7 @@ module ParserTests =
         }"""
         Assert.That(
             parseMessage json, 
-            Is.EqualTo (RequestMessage (1, "helloWorld", Some (JsonValue.Parse """{"hello":"world"}"""))))
+            Is.EqualTo (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}""")))
 
     [<Test>]
     let ``parse a NotificationMessage`` () = 
