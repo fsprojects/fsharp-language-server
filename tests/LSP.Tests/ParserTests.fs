@@ -91,12 +91,13 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/didOpen" (Some json),
             Is.EqualTo (DidOpenTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                    languageId = "fsharp"
-                    version = 1
-                    text = "let x = 1"
-                }
+                textDocument = 
+                    {
+                        uri = Uri("file://workspace/Main.fs")
+                        languageId = "fsharp"
+                        version = 1
+                        text = "let x = 1"
+                    }
             }))
 
     [<Test>]
@@ -113,15 +114,19 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/didChange" (Some json),
             Is.EqualTo (DidChangeTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                    version = 1
-                }
-                contentChanges = [{
-                    range = None 
-                    rangeLength = None
-                    text = "let x = 1"
-                }]
+                textDocument = 
+                    {
+                        uri = Uri("file://workspace/Main.fs")
+                        version = 1
+                    }
+                contentChanges = 
+                [
+                    {
+                        range = None 
+                        rangeLength = None
+                        text = "let x = 1"
+                    }
+                ]
             }))
 
     [<Test>]
@@ -143,11 +148,13 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/didChange" (Some json),
             Is.EqualTo (DidChangeTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                    version = 1
-                }
-                contentChanges = [{
+                textDocument = 
+                    {
+                        uri = Uri("file://workspace/Main.fs")
+                        version = 1
+                    }
+                contentChanges = 
+                [{
                     range = Some {
                         start = {line = 0; character = 0}
                         _end = {line = 0; character = 3}
@@ -168,9 +175,7 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/willSave" (Some json),
             Is.EqualTo (WillSaveTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
                 reason = TextDocumentSaveReason.AfterDelay
             }))
 
@@ -185,9 +190,7 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/willSaveWaitUntil" json,
             Is.EqualTo (WillSaveWaitUntilTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
                 reason = TextDocumentSaveReason.AfterDelay
             }))
 
@@ -201,9 +204,7 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/didSave" (Some json),
             Is.EqualTo (DidSaveTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
                 text = None
             }))
 
@@ -218,9 +219,7 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/didSave" (Some json),
             Is.EqualTo (DidSaveTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
                 text = Some "let x = 1"
             }))
 
@@ -234,9 +233,7 @@ module ParserTests =
         Assert.That(
             parseNotification "textDocument/didClose" (Some json),
             Is.EqualTo (DidCloseTextDocument {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
 
     [<Test>]
@@ -250,10 +247,11 @@ module ParserTests =
         Assert.That(
             parseNotification "workspace/didChangeWatchedFiles" (Some json),
             Is.EqualTo (DidChangeWatchedFiles {
-                changes = [{
-                    uri = Uri("file://workspace/Main.fs")
-                    _type = FileChangeType.Changed
-                }]
+                changes = 
+                    [{
+                        uri = Uri("file://workspace/Main.fs")
+                        _type = FileChangeType.Changed
+                    }]
             }))
 
     [<Test>]
@@ -267,13 +265,15 @@ module ParserTests =
         let (Initialize i) = parseRequest "initialize" json
         Assert.That(
             i, 
-            Is.EqualTo({
-                processId = Some 1;
-                rootUri = Some (Uri("file://workspace"));
-                initializationOptions = None;
-                capabilitiesMap = Map.empty;
-                trace = None
-            }))
+            Is.EqualTo(
+                {
+                    processId = Some 1;
+                    rootUri = Some (Uri("file://workspace"));
+                    initializationOptions = None;
+                    capabilitiesMap = Map.empty;
+                    trace = None
+                }
+            ))
     
     [<Test>]
     let ``processId can be null`` () = 
@@ -318,13 +318,15 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/completion" json,
             Is.EqualTo(Completion {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                position = {
-                    line = 0
-                    character = 5
-                }
+                textDocument = 
+                    {
+                        uri = Uri("file://workspace/Main.fs")
+                    }
+                position = 
+                    {
+                        line = 0
+                        character = 5
+                    }
             }))
 
     [<Test>]
@@ -395,19 +397,22 @@ module ParserTests =
                 insertText = Some "foo()" 
                 insertTextFormat = Some InsertTextFormat.PlainText 
                 textEdit = Some {
-                    range = {
-                        start = {line = 0; character = 0}
-                        _end = {line = 0; character = 2}
-                    }
+                    range = 
+                        {
+                            start = {line = 0; character = 0}
+                            _end = {line = 0; character = 2}
+                        }
                     newText = "foo()"
                 } 
-                additionalTextEdits = [{
-                    range = {
-                        start = {line = 1; character = 0}
-                        _end = {line = 1; character = 0}
-                    }
-                    newText = "foo()"
-                }]
+                additionalTextEdits = 
+                    [{
+                        range = 
+                            {
+                                start = {line = 1; character = 0}
+                                _end = {line = 1; character = 0}
+                            }
+                        newText = "foo()"
+                    }]
                 commitCharacters = ['\t']
                 command = Some {
                     title = "eval"
@@ -431,13 +436,12 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/signatureHelp" json,
             Is.EqualTo(SignatureHelp {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                position = {
-                    line = 0
-                    character = 5
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                position = 
+                    {
+                        line = 0
+                        character = 5
+                    }
             }))
 
     [<Test>]
@@ -454,13 +458,12 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/definition" json,
             Is.EqualTo(GotoDefinition {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                position = {
-                    line = 0
-                    character = 5
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                position = 
+                    {
+                        line = 0
+                        character = 5
+                    }
             }))
 
     [<Test>]
@@ -480,16 +483,9 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/references" json,
             Is.EqualTo(FindReferences {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                position = {
-                    line = 0
-                    character = 5
-                }
-                context = {
-                    includeDeclaration = true
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                position = { line = 0; character = 5 }
+                context = { includeDeclaration = true }
             }))
 
     [<Test>]
@@ -506,13 +502,8 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/documentHighlight" json,
             Is.EqualTo(DocumentHighlight {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                position = {
-                    line = 0
-                    character = 5
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                position = { line = 0; character = 5 }
             }))
 
     [<Test>]
@@ -525,9 +516,7 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/documentSymbol" json,
             Is.EqualTo(DocumentSymbols {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
 
     [<Test>]
@@ -564,25 +553,27 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/codeAction" json,
             Is.EqualTo(CodeActions {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
-                context = {
-                    diagnostics = [{
-                        range = {
-                            start = {line = 1; character = 0}
-                            _end = {line = 1; character = 0}
-                        }
-                        severity = None
-                        code = None
-                        source = None
-                        message = "Some error"
-                    }]
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                range = 
+                    {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
+                context = 
+                    {
+                        diagnostics = 
+                            [{
+                                range = 
+                                    {
+                                        start = {line = 1; character = 0}
+                                        _end = {line = 1; character = 0}
+                                    }
+                                severity = None
+                                code = None
+                                source = None
+                                message = "Some error"
+                            }]
+                    }
             }))
 
     [<Test>]
@@ -611,25 +602,27 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/codeAction" json,
             Is.EqualTo(CodeActions {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
-                context = {
-                    diagnostics = [{
-                        range = {
-                            start = {line = 1; character = 0}
-                            _end = {line = 1; character = 0}
-                        }
-                        severity = Some DiagnosticSeverity.Error
-                        code = Some "SomeError"
-                        source = Some "compiler"
-                        message = "Some error"
-                    }]
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                range = 
+                    { 
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0} 
+                    }
+                context = 
+                    {
+                        diagnostics = 
+                            [{
+                                range = 
+                                    { 
+                                        start = {line = 1; character = 0}
+                                        _end = {line = 1; character = 0} 
+                                    }
+                                severity = Some DiagnosticSeverity.Error
+                                code = Some "SomeError"
+                                source = Some "compiler"
+                                message = "Some error"
+                            }]
+                    }
             }))
 
     [<Test>]
@@ -656,25 +649,27 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/codeAction" json,
             Is.EqualTo(CodeActions {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
-                context = {
-                    diagnostics = [{
-                        range = {
-                            start = {line = 1; character = 0}
-                            _end = {line = 1; character = 0}
-                        }
-                        severity = None
-                        code = Some "1"
-                        source = None
-                        message = "Some error"
-                    }]
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                range = 
+                    {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
+                context = 
+                    {
+                        diagnostics = 
+                            [{
+                                range = 
+                                    {
+                                        start = {line = 1; character = 0}
+                                        _end = {line = 1; character = 0}
+                                    }
+                                severity = None
+                                code = Some "1"
+                                source = None
+                                message = "Some error"
+                            }]
+                    }
             }))
 
     [<Test>]
@@ -687,9 +682,7 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/codeLens" json,
             Is.EqualTo(Request.CodeLens {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
 
     [<Test>]
@@ -703,10 +696,11 @@ module ParserTests =
         Assert.That(
             parseRequest "codeLens/resolve" json,
             Is.EqualTo(ResolveCodeLens {
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
+                range = 
+                    {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
                 command = None 
                 data = JsonValue.Null
             }))
@@ -728,10 +722,11 @@ module ParserTests =
         Assert.That(
             parseRequest "codeLens/resolve" json,
             Is.EqualTo(ResolveCodeLens {
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
+                range = 
+                    {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
                 command = Some {
                     title = "save"
                     command = "doSave"
@@ -750,9 +745,7 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/documentLink" json,
             Is.EqualTo(DocumentLink {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
     
     [<Test>]
@@ -766,10 +759,11 @@ module ParserTests =
         Assert.That(
             parseRequest "documentLink/resolve" json,
             Is.EqualTo(ResolveDocumentLink {
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
+                range = 
+                    {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
                 target = None
             }))
     
@@ -790,20 +784,20 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/formatting" json,
             Is.EqualTo(DocumentFormatting {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                options = {
-                    tabSize = 1
-                    insertSpaces = true 
-                }
-                optionsMap = Map.ofSeq [
-                    "tabSize", "1";
-                    "insertSpaces", "true";
-                    "boolOption", "true";
-                    "intOption", "1";
-                    "stringOption", "foo"
-                ]
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                options = 
+                    {
+                        tabSize = 1
+                        insertSpaces = true 
+                    }
+                optionsMap = Map.ofSeq 
+                    [
+                        "tabSize", "1";
+                        "insertSpaces", "true";
+                        "boolOption", "true";
+                        "intOption", "1";
+                        "stringOption", "foo"
+                    ]
             }))
     
     [<Test>]
@@ -827,24 +821,25 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/rangeFormatting" json,
             Is.EqualTo(DocumentRangeFormatting {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                options = {
-                    tabSize = 1
-                    insertSpaces = true 
-                }
-                optionsMap = Map.ofSeq [
-                    "tabSize", "1";
-                    "insertSpaces", "true";
-                    "boolOption", "true";
-                    "intOption", "1";
-                    "stringOption", "foo"
-                ]
-                range = {
-                    start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                options = 
+                    {
+                        tabSize = 1
+                        insertSpaces = true 
+                    }
+                optionsMap = Map.ofSeq 
+                    [
+                        "tabSize", "1";
+                        "insertSpaces", "true";
+                        "boolOption", "true";
+                        "intOption", "1";
+                        "stringOption", "foo"
+                    ]
+                range = 
+                    {
+                        start = {line = 1; character = 0}
+                        _end = {line = 1; character = 0}
+                    }
             }))
     
     [<Test>]
@@ -869,24 +864,25 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/onTypeFormatting" json,
             Is.EqualTo(DocumentOnTypeFormatting {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                options = {
-                    tabSize = 1
-                    insertSpaces = true 
-                }
-                optionsMap = Map.ofSeq [
-                    "tabSize", "1";
-                    "insertSpaces", "true";
-                    "boolOption", "true";
-                    "intOption", "1";
-                    "stringOption", "foo"
-                ]
-                position = {
-                    line = 0
-                    character = 0
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                options = 
+                    {
+                        tabSize = 1
+                        insertSpaces = true 
+                    }
+                optionsMap = Map.ofSeq 
+                    [
+                        "tabSize", "1";
+                        "insertSpaces", "true";
+                        "boolOption", "true";
+                        "intOption", "1";
+                        "stringOption", "foo"
+                    ]
+                position = 
+                    {
+                        line = 0
+                        character = 0
+                    }
                 ch = 'a'
             }))
     
@@ -905,13 +901,12 @@ module ParserTests =
         Assert.That(
             parseRequest "textDocument/rename" json,
             Is.EqualTo(Rename {
-                textDocument = {
-                    uri = Uri("file://workspace/Main.fs")
-                }
-                position = {
-                    line = 0
-                    character = 0
-                }
+                textDocument = { uri = Uri("file://workspace/Main.fs") }
+                position = 
+                    {
+                        line = 0
+                        character = 0
+                    }
                 newName = "foo"
             }))
     
