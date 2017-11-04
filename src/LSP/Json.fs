@@ -53,6 +53,6 @@ and fieldSerializer (field: PropertyInfo): obj -> string =
         let inner = field.GetValue outer |> innerSerializer
         sprintf "%s:%s" name inner
 
-let serializerFactory<'T> () = serializer typeof<'T>
+let serializerFactory<'T> (): 'T -> string = serializer typeof<'T>
 
 // TODO deserializer that works the same way
