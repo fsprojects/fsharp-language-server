@@ -133,7 +133,6 @@ type TextDocumentEdit = {
 }
 
 type WorkspaceEdit = {
-    changes: Map<string, list<TextEdit>>
     documentChanges: list<TextDocumentEdit>
 }
 
@@ -526,7 +525,7 @@ type ILanguageServer =
     abstract member CodeLens: CodeLensParams -> List<CodeLens>
     abstract member ResolveCodeLens: CodeLens -> CodeLens
     abstract member DocumentLink: DocumentLinkParams -> list<DocumentLink>
-    abstract member ResolveDocumentLink: DocumentLink -> DocumentLink -> DocumentLink
+    abstract member ResolveDocumentLink: DocumentLink -> DocumentLink
     abstract member DocumentFormatting: DocumentFormattingParams -> list<TextEdit>
     abstract member DocumentRangeFormatting: DocumentRangeFormattingParams -> list<TextEdit>
     abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> list<TextEdit>
