@@ -3,11 +3,10 @@ namespace LSP
 open System
 open System.IO
 open System.Text
-open System.Collections.Generic
 
 module Tokenizer = 
     type Header = ContentLength of int | EmptyHeader | OtherHeader
-
+    
     let parseHeader (header: string): Header = 
         let contentLength = "Content-Length: "
         if header.StartsWith contentLength then
@@ -22,7 +21,7 @@ module Tokenizer =
         Encoding.UTF8.GetString bytes
         
     let readLine (client: BinaryReader): option<string> = 
-        let buffer = new StringBuilder()
+        let buffer = StringBuilder()
         try
             let mutable endOfLine = false
             while not endOfLine do 
@@ -31,10 +30,10 @@ module Tokenizer =
                     assert (client.ReadChar() = '\n')
                     endOfLine <- true
                 else do 
-                    buffer.Append nextChar
+                    buffer.Append nextChar |> ignore
             buffer.ToString() |> Some 
         with 
-        | EndOfStreamException -> 
+        | :? EndOfStreamException -> 
             if buffer.Length > 0
                 then buffer.ToString() |> Some 
             else
