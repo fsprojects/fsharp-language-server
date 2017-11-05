@@ -9,6 +9,7 @@
     <Compile Include="JsonTests.fs" />
     <Compile Include="TokenizerTests.fs" />
     <Compile Include="ParserTests.fs" />
+    <Compile Include="DocumentStoreTests.fs" />
     <Compile Include="LanguageServerTests.fs" />
   </ItemGroup>
 
