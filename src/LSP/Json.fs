@@ -31,7 +31,7 @@ let defaultJsonWriteOptions: JsonWriteOptions = {
 
 let private matchWriter (t: Type) (w: obj): bool = 
     let domain, _ = w.GetType() |> FSharpType.GetFunctionElements 
-    domain = t
+    domain.IsAssignableFrom(t)
 
 let private findWriter (t: Type) (customWriters: list<obj>): option<obj> = 
     Seq.tryFind (matchWriter t) customWriters 

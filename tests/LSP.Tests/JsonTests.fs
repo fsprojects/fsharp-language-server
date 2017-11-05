@@ -56,3 +56,18 @@ let ``serialize a union with a custom writer`` () =
     | Doh -> 20
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     Assert.That(serializerFactory<FooRecord> options record, Is.EqualTo("""{"foo":10}"""))
+
+type IFoo =
+    abstract member Foo: unit -> string 
+type MyFoo() = 
+    interface IFoo with 
+        member this.Foo() = "foo"
+
+[<Test>]
+let ``serialize an interface with a custom writer`` () = 
+    let customWriter (foo: IFoo): string = 
+        foo.Foo()
+    let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
+    let example = MyFoo()
+    Assert.That(serializerFactory<IFoo> options example, Is.EqualTo("\"foo\""))
+    Assert.That(serializerFactory<MyFoo> options example, Is.EqualTo("\"foo\""))
