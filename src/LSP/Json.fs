@@ -58,6 +58,8 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
         fun o -> sprintf "%b" (unbox<bool> o)
     elif t = typeof<int> then 
         fun o -> sprintf "%d" (unbox<int> o)
+    elif t = typeof<char> then 
+        fun o -> sprintf "%c" (unbox<char> o) |> escapeStr
     elif t = typeof<string> then 
         fun o -> escapeStr (o :?> string)
     elif FSharpType.IsRecord t then 

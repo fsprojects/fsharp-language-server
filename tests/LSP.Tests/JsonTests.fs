@@ -25,6 +25,7 @@ let ``serialize primitive types to JSON`` () =
     Assert.That(serializerFactory<bool> defaultJsonWriteOptions true, Is.EqualTo("true"))
     Assert.That(serializerFactory<int> defaultJsonWriteOptions 1, Is.EqualTo("1"))
     Assert.That(serializerFactory<string> defaultJsonWriteOptions "foo", Is.EqualTo("\"foo\""))
+    Assert.That(serializerFactory<char> defaultJsonWriteOptions 'f', Is.EqualTo("\"f\""))
 
 [<Test>]
 let ``serialize option to JSON`` () = 
