@@ -5,6 +5,7 @@ open System.Reflection
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Reflection.FSharpReflectionExtensions
 open System.Text.RegularExpressions
+open FSharp.Data
 
 let private escapeChars = Regex("[\n\r\"]", RegexOptions.Compiled)
 let private replaceChars = 
@@ -62,6 +63,10 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
         fun o -> sprintf "%c" (unbox<char> o) |> escapeStr
     elif t = typeof<string> then 
         fun o -> escapeStr (o :?> string)
+    elif t = typeof<JsonValue> then 
+        fun o -> 
+            let asJson = o :?> JsonValue
+            asJson.ToString()
     elif FSharpType.IsRecord t then 
         let fields = FSharpType.GetRecordFields t 
         let serializers = Array.map (fieldSerializer options) fields 

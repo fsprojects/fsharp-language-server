@@ -1,9 +1,7 @@
 module LSP.JsonTests
 
-open Types
-open Parser
+open FSharp.Data
 open Json
-open System.Runtime.Serialization
 open NUnit.Framework
 open System.Text.RegularExpressions
 
@@ -26,6 +24,11 @@ let ``serialize primitive types to JSON`` () =
     Assert.That(serializerFactory<int> defaultJsonWriteOptions 1, Is.EqualTo("1"))
     Assert.That(serializerFactory<string> defaultJsonWriteOptions "foo", Is.EqualTo("\"foo\""))
     Assert.That(serializerFactory<char> defaultJsonWriteOptions 'f', Is.EqualTo("\"f\""))
+
+[<Test>]
+let ``serialize JsonValue to JSON`` () = 
+    let example = JsonValue.Parse "{}"
+    Assert.That(serializerFactory<JsonValue> defaultJsonWriteOptions example, Is.EqualTo("{}"))
 
 [<Test>]
 let ``serialize option to JSON`` () = 
