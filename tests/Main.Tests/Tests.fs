@@ -15,5 +15,5 @@ let ``check errors in some text`` () =
     let parsingOptions, parsingOptionsErrors = checker.GetParsingOptionsFromProjectOptions(projOptions)
     let parseFileResults = checker.ParseFile(file, input, parsingOptions) |> Async.RunSynchronously
     for error in parseFileResults.Errors do 
-        eprintfn "%d:%d %s" error.StartLineAlternate error.StartColumn error.Message
-    eprintfn "Finished %s" parseFileResults.FileName
+        Log.info "%d:%d %s" error.StartLineAlternate error.StartColumn error.Message
+    Log.info "Finished %s" parseFileResults.FileName

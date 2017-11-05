@@ -89,7 +89,7 @@ let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (req
 let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notification) = 
     match n with 
     | Cancel id ->
-        eprintfn "Cancel request %d is not yet supported" id
+        Log.info "Cancel request %d is not yet supported" id
     | Initialized ->
         server.Initialized()
     | Shutdown ->
@@ -115,10 +115,10 @@ let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notif
 let processMessage (server: ILanguageServer) (send: BinaryWriter) (m: Parser.Message) = 
     match m with 
     | Parser.RequestMessage (id, method, json) -> 
-        eprintf "Request %d %s" id method
+        Log.info "Request %d %s" id method
         processRequest server send id (Parser.parseRequest method json) 
     | Parser.NotificationMessage (method, json) -> 
-        eprintf "Notify %s" method
+        Log.info "Notify %s" method
         processNotification server send (Parser.parseNotification method json)
 
 let readMessages (receive: BinaryReader): seq<Parser.Message> = 
