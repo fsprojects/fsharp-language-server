@@ -44,3 +44,15 @@ let ``serialize a record with a custom writer`` () =
     let customWriter (r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     Assert.That(serializerFactory<SimpleRecord> options record, Is.EqualTo("\"simpleMember=1\""))
+
+type Foo = Bar | Doh 
+type FooRecord = {foo: Foo}
+
+[<Test>]
+let ``serialize a union with a custom writer`` () = 
+    let record = {foo = Bar}
+    let customWriter = function 
+    | Bar -> 10
+    | Doh -> 20
+    let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
+    Assert.That(serializerFactory<FooRecord> options record, Is.EqualTo("""{"foo":10}"""))
