@@ -21,8 +21,6 @@ type Server() =
             ()
         member this.Shutdown(): unit = 
             ()
-        member this.Exit(): unit = 
-            ()
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit =
             Log.info "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 

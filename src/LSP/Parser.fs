@@ -123,7 +123,7 @@ let parseNotification (method: string) (maybeBody: option<JsonValue>): Notificat
     | "cancel", Some json -> Cancel (json?id.AsInteger())
     | "initialized", _ -> Initialized
     | "shutdown", _ -> Shutdown 
-    | "exit", _ -> Exit 
+    | "exit", _ -> raise (Exception "exit message should terminated stream before reaching this point") 
     | "workspace/didChangeConfiguration", Some json -> DidChangeConfiguration (parseDidChangeConfigurationParams json)
     | "textDocument/didOpen", Some json -> DidOpenTextDocument (parseDidOpenTextDocumentParams json)
     | "textDocument/didChange", Some json -> DidChangeTextDocument (parseDidChangeTextDocumentParams json)

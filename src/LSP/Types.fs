@@ -87,7 +87,6 @@ type Notification =
 | Cancel of id: int 
 | Initialized
 | Shutdown 
-| Exit 
 | DidChangeConfiguration of DidChangeConfigurationParams
 | DidOpenTextDocument of DidOpenTextDocumentParams
 | DidChangeTextDocument of DidChangeTextDocumentParams
@@ -576,7 +575,6 @@ type ILanguageServer =
     abstract member Initialize: InitializeParams -> InitializeResult
     abstract member Initialized: unit -> unit 
     abstract member Shutdown: unit -> Unit 
-    abstract member Exit: unit -> unit 
     abstract member DidChangeConfiguration: DidChangeConfigurationParams -> unit 
     abstract member DidOpenTextDocument: DidOpenTextDocumentParams -> unit 
     abstract member DidChangeTextDocument: DidChangeTextDocumentParams -> unit 

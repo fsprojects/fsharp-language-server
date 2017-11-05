@@ -94,9 +94,6 @@ let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notif
         server.Initialized()
     | Shutdown ->
         server.Shutdown()
-    | Exit ->
-        server.Exit()
-        raise (Exception "Exited normally")
     | DidChangeConfiguration p -> 
         server.DidChangeConfiguration p
     | DidOpenTextDocument p -> 
@@ -119,8 +116,13 @@ let processMessage (server: ILanguageServer) (send: BinaryWriter) (m: Parser.Mes
     | Parser.NotificationMessage (method, json) -> 
         processNotification server send (Parser.parseNotification method json)
 
+let private notExit (message: Parser.Message) = 
+    match message with 
+    | Parser.NotificationMessage ("exit", _) -> false 
+    | _ -> true
+
 let readMessages (receive: BinaryReader): seq<Parser.Message> = 
-    Tokenizer.tokenize receive |> Seq.map Parser.parseMessage
+    Tokenizer.tokenize receive |> Seq.map Parser.parseMessage |> Seq.takeWhile notExit
 
 let connect (server: ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
     let doProcessMessage = processMessage server send 

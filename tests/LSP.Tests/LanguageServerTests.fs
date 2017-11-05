@@ -46,7 +46,6 @@ type MockServer() =
             { capabilities = defaultServerCapabilities }
         member this.Initialized(): unit = TODO() 
         member this.Shutdown(): unit = TODO() 
-        member this.Exit(): unit = TODO() 
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit  = TODO()
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit  = TODO()
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit  = TODO()
@@ -85,18 +84,31 @@ let messageStream (messages: list<string>): BinaryReader =
     stdin.Seek(int64 0, SeekOrigin.Begin) |> ignore
     new BinaryReader(stdin)
 
+let initializeMessage = """
+{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {}
+}
+"""
 
 [<Test>]
 let ``read messages from a stream``() = 
-    let message = """
-    {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }
-    """
-    let stdin = messageStream [message]
+    let stdin = messageStream [initializeMessage]
+    let messages = LanguageServer.readMessages stdin
+    Assert.That(messages, Is.EquivalentTo [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
+
+let exitMessage = """
+{
+    "jsonrpc": "2.0",
+    "method": "exit"
+}
+"""
+    
+[<Test>]
+let ``exit message terminates stream``() = 
+    let stdin = messageStream [initializeMessage; exitMessage; initializeMessage]
     let messages = LanguageServer.readMessages stdin
     Assert.That(messages, Is.EquivalentTo [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
 
