@@ -1,9 +1,10 @@
 module LSP.JsonTests
 
+open System
+open System.Text.RegularExpressions
 open FSharp.Data
 open Json
 open NUnit.Framework
-open System.Text.RegularExpressions
 
 let removeSpace (expected: string) = 
     Regex.Replace(expected, @"\s", "")
@@ -24,6 +25,11 @@ let ``serialize primitive types to JSON`` () =
     Assert.That(serializerFactory<int> defaultJsonWriteOptions 1, Is.EqualTo("1"))
     Assert.That(serializerFactory<string> defaultJsonWriteOptions "foo", Is.EqualTo("\"foo\""))
     Assert.That(serializerFactory<char> defaultJsonWriteOptions 'f', Is.EqualTo("\"f\""))
+
+[<Test>]
+let ``serialize URI to JSON`` () = 
+    let example = Uri("https://google.com")
+    Assert.That(serializerFactory<Uri> defaultJsonWriteOptions example, Is.EqualTo("\"https://google.com/\""))
 
 [<Test>]
 let ``serialize JsonValue to JSON`` () = 

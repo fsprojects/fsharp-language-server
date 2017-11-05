@@ -63,6 +63,10 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
         fun o -> sprintf "%c" (unbox<char> o) |> escapeStr
     elif t = typeof<string> then 
         fun o -> escapeStr (o :?> string)
+    elif t = typeof<Uri> then 
+        fun o -> 
+            let uri = o :?> Uri 
+            uri.ToString() |> escapeStr
     elif t = typeof<JsonValue> then 
         fun o -> 
             let asJson = o :?> JsonValue
