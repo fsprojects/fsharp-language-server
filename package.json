@@ -1,0 +1,59 @@
+{
+	"name": "fsharp-language-server",
+	"description": "F# Language Support using FSharp Compiler Services",
+	"author": "George Fraser",
+	"license": "MIT",
+	"version": "0.0.1",
+	"publisher": "georgewfraser",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/georgewfraser/fsharp-language-server"
+	},
+	"engines": {
+		"vscode": "^1.16.0"
+	},
+	"categories": [
+		"Languages",
+		"Linters"
+	],
+	"activationEvents": [
+		"onLanguage:fsharp"
+	],
+	"main": "./out/client/extension",
+	"files": [
+		"./src/Main/bin/Debug/netcoreapp2.0/Main.dll"
+	],
+	"contributes": {
+		"configuration": {
+			"type": "object",
+			"title": "FSharp configuration",
+			"properties": {
+				"fsharp.trace.server": {
+					"scope": "window",
+					"type": "string",
+					"enum": [
+						"off",
+						"messages",
+						"verbose"
+					],
+					"default": "off",
+					"description": "Traces the communication between VSCode and the language server."
+				}
+			}
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "tsc -p ./",
+		"compile": "tsc -p ./",
+		"watch": "tsc -w -p ./",
+		"update-vscode": "node ./node_modules/vscode/bin/install",
+		"postinstall": "node ./node_modules/vscode/bin/install"
+	},
+	"dependencies": {
+		"vscode": "^1.1.6",
+		"vscode-languageclient": "^3.4.5"
+	},
+	"devDependencies": {
+		"@types/node": "^8.0.47"
+	}
+}

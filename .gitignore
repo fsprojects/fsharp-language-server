@@ -1,5 +1,8 @@
 bin/
 obj/
+out/
 packages/
+node_modules/
 .idea/
+build.vsix
 Scratch.*

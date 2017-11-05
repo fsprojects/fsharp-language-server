@@ -405,24 +405,20 @@ type SaveOptions = {
     includeText: bool
 }
 
-let defaultSaveOptions = {
-    includeText = false
-}
-
 type TextDocumentSyncOptions = {
     openClose: bool
     change: TextDocumentSyncKind
     willSave: bool
     willSaveWaitUntil: bool
-    save: SaveOptions
+    save: option<SaveOptions>
 }
 
 let defaultTextDocumentSyncOptions = {
     openClose = false
-    change = TextDocumentSyncKind.Incremental
+    change = TextDocumentSyncKind.None
     willSave = false 
     willSaveWaitUntil = false
-    save = defaultSaveOptions
+    save = None
 }
 
 type ServerCapabilities = {

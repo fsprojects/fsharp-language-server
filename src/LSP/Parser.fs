@@ -121,9 +121,9 @@ let parseDidChangeWatchedFilesParams (json: JsonValue): DidChangeWatchedFilesPar
 let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
     match method, maybeBody with 
     | "cancel", Some json -> Cancel (json?id.AsInteger())
-    | "initialized", None -> Initialized
-    | "shutdown", None -> Shutdown 
-    | "exit", None -> Exit 
+    | "initialized", _ -> Initialized
+    | "shutdown", _ -> Shutdown 
+    | "exit", _ -> Exit 
     | "workspace/didChangeConfiguration", Some json -> DidChangeConfiguration (parseDidChangeConfigurationParams json)
     | "textDocument/didOpen", Some json -> DidOpenTextDocument (parseDidOpenTextDocumentParams json)
     | "textDocument/didChange", Some json -> DidChangeTextDocument (parseDidChangeTextDocumentParams json)
@@ -131,8 +131,8 @@ let parseNotification (method: string) (maybeBody: option<JsonValue>): Notificat
     | "textDocument/didSave", Some json -> DidSaveTextDocument (parseDidSaveTextDocumentParams json)
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
-    | _, Some _ -> raise (Exception (sprintf "%s is not a known notification, or it is not expected to contain a body" method))
     | _, None -> raise (Exception (sprintf "%s is not a known notification, or it is expected to contain a body" method))
+    | _, _ -> raise (Exception (sprintf "%s is not a known notification" method))
 
 let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
     match maybe with 

@@ -9,17 +9,32 @@ let TODO() = raise (Exception "TODO")
 
 type Server() = 
     interface ILanguageServer with 
-        member this.Initialize(p: InitializeParams): InitializeResult = TODO()
-        member this.Initialized(): unit = TODO() 
-        member this.Shutdown(): unit = TODO() 
-        member this.Exit(): unit = TODO() 
-        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit  = TODO()
-        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit  = TODO()
-        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit  = TODO()
+        member this.Initialize(p: InitializeParams): InitializeResult = 
+            { capabilities = 
+                { defaultServerCapabilities with 
+                    textDocumentSync = 
+                        { defaultTextDocumentSyncOptions with 
+                            openClose = true 
+                            save = Some { includeText = false }
+                            change = TextDocumentSyncKind.Incremental } } }
+        member this.Initialized(): unit = 
+            ()
+        member this.Shutdown(): unit = 
+            ()
+        member this.Exit(): unit = 
+            ()
+        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit =
+            Log.info "New configuration %s" (p.ToString())
+        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
+            Log.info "%s" (p.ToString())
+        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
+            Log.info "%s" (p.ToString())
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): list<TextEdit> = TODO()
-        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = TODO()
-        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = TODO()
+        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
+            Log.info "%s" (p.ToString())
+        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
+            Log.info "%s" (p.ToString())
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = TODO()
         member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()
         member this.Hover(p: TextDocumentPositionParams): Hover = TODO()
