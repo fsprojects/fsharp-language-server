@@ -3,6 +3,7 @@ module LSP.Json
 open System
 open System.Reflection
 open Microsoft.FSharp.Reflection
+open Microsoft.FSharp.Reflection.FSharpReflectionExtensions
 open System.Text.RegularExpressions
 
 let private escapeChars = Regex("[\n\r\"]", RegexOptions.Compiled)
@@ -20,8 +21,34 @@ let private escapeStr (text:string) =
 let private isOption (t: Type) = 
     t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<option<_>>
 
-let rec private serializer (t: Type): obj -> string = 
-    if t = typeof<bool> then 
+type JsonWriteOptions = {
+    customWriters: list<obj>
+}
+
+let defaultJsonWriteOptions: JsonWriteOptions = {
+    customWriters = []
+}
+
+let private matchWriter (t: Type) (w: obj): bool = 
+    let domain, _ = w.GetType() |> FSharpType.GetFunctionElements 
+    domain = t
+
+let private findWriter (t: Type) (customWriters: list<obj>): option<obj> = 
+    Seq.tryFind (matchWriter t) customWriters 
+
+let asFun (w: obj): obj -> obj = 
+    let invoke = w.GetType().GetMethod("Invoke")
+    fun x -> invoke.Invoke(w, [|x|])
+
+let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string = 
+    let custom = findWriter t options.customWriters 
+    if custom.IsSome then 
+        let fObj = custom.Value
+        let _, range = fObj.GetType() |> FSharpType.GetFunctionElements 
+        let g = serializer options range
+        let f = asFun fObj
+        f >> g
+    else if t = typeof<bool> then 
         fun o -> sprintf "%b" (unbox<bool> o)
     elif t = typeof<int> then 
         fun o -> sprintf "%d" (unbox<int> o)
@@ -29,7 +56,7 @@ let rec private serializer (t: Type): obj -> string =
         fun o -> escapeStr (o :?> string)
     elif FSharpType.IsRecord t then 
         let fields = FSharpType.GetRecordFields t 
-        let serializers = Array.map fieldSerializer fields 
+        let serializers = Array.map (fieldSerializer options) fields 
         fun outer ->
             let fieldStrings = Array.map (fun f -> f outer) serializers
             let innerString = String.concat "," fieldStrings
@@ -39,20 +66,20 @@ let rec private serializer (t: Type): obj -> string =
         let isSomeProp = t.GetProperty "IsSome"
         let isSome outer = isSomeProp.GetValue(None, [|outer|]) :?> bool
         let valueProp = t.GetProperty "Value"
-        let serializeInner = serializer innerType
+        let serializeInner = serializer options innerType
         fun outer ->
             if isSome outer then 
                 valueProp.GetValue outer |> serializeInner
             else "null"
     else 
         raise (Exception (sprintf "Don't know how to serialize %s to JSON" (t.ToString())))
-and fieldSerializer (field: PropertyInfo): obj -> string = 
+and fieldSerializer (options: JsonWriteOptions) (field: PropertyInfo): obj -> string = 
     let name = escapeStr field.Name
-    let innerSerializer = serializer field.PropertyType
+    let innerSerializer = serializer options field.PropertyType
     fun outer -> 
         let inner = field.GetValue outer |> innerSerializer
         sprintf "%s:%s" name inner
 
-let serializerFactory<'T> (): 'T -> string = serializer typeof<'T>
+let serializerFactory<'T> (options: JsonWriteOptions): 'T -> string = serializer options typeof<'T>
 
 // TODO deserializer that works the same way

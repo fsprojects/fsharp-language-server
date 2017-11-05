@@ -22,17 +22,25 @@ let ``remove newline from string`` () =
 
 [<Test>]
 let ``serialize primitive types to JSON`` () = 
-    Assert.That(serializerFactory<bool>() true, Is.EqualTo("true"))
-    Assert.That(serializerFactory<int>() 1, Is.EqualTo("1"))
-    Assert.That(serializerFactory<string>() "foo", Is.EqualTo("\"foo\""))
+    Assert.That(serializerFactory<bool> defaultJsonWriteOptions true, Is.EqualTo("true"))
+    Assert.That(serializerFactory<int> defaultJsonWriteOptions 1, Is.EqualTo("1"))
+    Assert.That(serializerFactory<string> defaultJsonWriteOptions "foo", Is.EqualTo("\"foo\""))
 
 [<Test>]
 let ``serialize option to JSON`` () = 
-    Assert.That(serializerFactory<option<int>>() (Some 1), Is.EqualTo("1"))
-    Assert.That(serializerFactory<option<int>>() (None), Is.EqualTo("null"))
+    Assert.That(serializerFactory<option<int>> defaultJsonWriteOptions (Some 1), Is.EqualTo("1"))
+    Assert.That(serializerFactory<option<int>> defaultJsonWriteOptions (None), Is.EqualTo("null"))
 
 type SimpleRecord = {simpleMember: int}
 
 [<Test>]
 let ``serialize record to JSON`` () = 
-    Assert.That(serializerFactory<SimpleRecord>() {simpleMember = 1}, Is.EqualTo("""{"simpleMember":1}"""))
+    let record = {simpleMember = 1}
+    Assert.That(serializerFactory<SimpleRecord> defaultJsonWriteOptions record, Is.EqualTo("""{"simpleMember":1}"""))
+
+[<Test>]
+let ``serialize a record with a custom writer`` () = 
+    let record = {simpleMember = 1}
+    let customWriter (r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
+    let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
+    Assert.That(serializerFactory<SimpleRecord> options record, Is.EqualTo("\"simpleMember=1\""))
