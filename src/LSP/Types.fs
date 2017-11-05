@@ -163,6 +163,14 @@ type InitializeParams = {
     trace: option<Trace>
 }
 
+let defaultInitializeParams: InitializeParams = {
+    processId = None 
+    rootUri = None 
+    initializationOptions = None 
+    capabilitiesMap = Map.empty 
+    trace = None
+}
+
 [<RequireQualifiedAccess>]
 type InsertTextFormat = 
 | PlainText 

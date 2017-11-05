@@ -31,7 +31,7 @@ let respond (client: BinaryWriter) (requestId: int) (jsonText: string) =
     client.Write headerBytes
     client.Write messageBytes
 
-let processRequest (id: int) (request: Request) (send: BinaryWriter) (server: ILanguageServer) = 
+let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (request: Request) = 
     match request with 
     | Initialize p -> 
         server.Initialize p |> serializeInitializeResult |> respond send id
@@ -76,10 +76,10 @@ let processRequest (id: int) (request: Request) (send: BinaryWriter) (server: IL
     | ExecuteCommand p -> 
         server.ExecuteCommand p 
 
-let processNotification (n: Notification) (send: BinaryWriter) (server: ILanguageServer) = 
+let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notification) = 
     match n with 
     | Cancel id ->
-        printfn "Cancel request %d is not yet supported" id
+        eprintfn "Cancel request %d is not yet supported" id
     | Initialized ->
         server.Initialized()
     | Shutdown ->
@@ -102,11 +102,18 @@ let processNotification (n: Notification) (send: BinaryWriter) (server: ILanguag
     | DidChangeWatchedFiles p -> 
         server.DidChangeWatchedFiles p
 
-let connect (receive: BinaryReader) (send: BinaryWriter) (server: ILanguageServer) = 
-    let messages = Tokenizer.tokenize receive |> Seq.map Parser.parseMessage
-    for m in messages do 
-        match m with 
-        | Parser.RequestMessage (id, method, json) -> 
-            processRequest id (Parser.parseRequest method json) send server
-        | Parser.NotificationMessage (method, json) -> 
-            processNotification (Parser.parseNotification method json) send server
+let processMessage (server: ILanguageServer) (send: BinaryWriter) (m: Parser.Message) = 
+    match m with 
+    | Parser.RequestMessage (id, method, json) -> 
+        eprintf "Request %d %s" id method
+        processRequest server send id (Parser.parseRequest method json) 
+    | Parser.NotificationMessage (method, json) -> 
+        eprintf "Notify %s" method
+        processNotification server send (Parser.parseNotification method json)
+
+let readMessages (receive: BinaryReader): seq<Parser.Message> = 
+    Tokenizer.tokenize receive |> Seq.map Parser.parseMessage
+
+let connect (server: ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
+    let doProcessMessage = processMessage server send 
+    readMessages receive |> Seq.iter doProcessMessage
