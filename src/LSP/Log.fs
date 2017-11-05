@@ -8,3 +8,5 @@ let private consoleWriteLine (message: string) =
     ()
 let info (format: Printf.StringFormat<'Then, unit>): 'Then = 
     Printf.kprintf consoleWriteLine format
+let warn (format: Printf.StringFormat<'Then, unit>): 'Then = 
+    Printf.kprintf consoleWriteLine format
