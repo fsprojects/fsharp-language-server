@@ -70,7 +70,7 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
     elif t = typeof<JsonValue> then 
         fun o -> 
             let asJson = o :?> JsonValue
-            asJson.ToString()
+            asJson.ToString(JsonSaveOptions.DisableFormatting)
     elif FSharpType.IsRecord t then 
         let fields = FSharpType.GetRecordFields t 
         let serializers = Array.map (fieldSerializer options) fields 

@@ -42,7 +42,8 @@ let TODO() = raise (Exception "TODO")
 
 type MockServer() = 
     interface ILanguageServer with 
-        member this.Initialize(p: InitializeParams): InitializeResult = TODO()
+        member this.Initialize(p: InitializeParams): InitializeResult = 
+            { capabilities = defaultServerCapabilities }
         member this.Initialized(): unit = TODO() 
         member this.Shutdown(): unit = TODO() 
         member this.Exit(): unit = TODO() 
