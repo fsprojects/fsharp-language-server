@@ -2,7 +2,7 @@ module LSP.Log
 
 open System
 
-let consoleWriteLine (message: string) = 
+let private consoleWriteLine (message: string) = 
     Console.Error.Write message 
     Console.Error.WriteLine()
     ()
