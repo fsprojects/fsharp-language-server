@@ -1,5 +1,6 @@
 module Main.Tests
 
+open LSP
 open System
 open NUnit.Framework
 open Microsoft.FSharp.Compiler.SourceCodeServices

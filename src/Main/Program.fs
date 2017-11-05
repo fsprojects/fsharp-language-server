@@ -1,13 +1,16 @@
-﻿// Learn more about F# at http://fsharp.org
+﻿module Main.Program
 
 open LSP
 open LSP.Types
 open System
 open System.IO
+open Microsoft.FSharp.Compiler.SourceCodeServices
 
-let TODO() = raise (Exception "TODO")
+let private TODO() = raise (Exception "TODO")
 
 type Server() = 
+    let docs = DocumentStore()
+    let checker = FSharpChecker.Create()
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
             { capabilities = 
@@ -24,16 +27,18 @@ type Server() =
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit =
             Log.info "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
-            Log.info "%s" (p.ToString())
+            docs.Open p
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
-            Log.info "%s" (p.ToString())
+            docs.Change p
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): list<TextEdit> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
             Log.info "%s" (p.ToString())
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
-            Log.info "%s" (p.ToString())
-        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = TODO()
+            docs.Close p
+        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
+            for change in p.changes do 
+                Log.info "Watched file %s %s" (change.uri.ToString()) (change._type.ToString())
         member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()
         member this.Hover(p: TextDocumentPositionParams): Hover = TODO()
         member this.ResolveCompletionItem(p: CompletionItem): CompletionItem = TODO()

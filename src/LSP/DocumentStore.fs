@@ -76,3 +76,6 @@ type DocumentStore() =
     member this.GetText(uri: Uri): option<string> = 
         let found, value = activeDocuments.TryGetValue(uri)
         if found then Some (value.text.ToString()) else None 
+
+    member this.Close(doc: DidCloseTextDocumentParams): unit = 
+        activeDocuments.Remove doc.textDocument.uri |> ignore
