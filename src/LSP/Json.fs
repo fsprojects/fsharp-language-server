@@ -21,6 +21,12 @@ let private escapeStr (text:string) =
 let private isOption (t: Type) = 
     t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<option<_>>
 
+let private isEnum (t: Type) = 
+    t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<seq<_>>
+let private implementsEnum (t: Type) = 
+    let is = t.GetInterfaces()
+    Seq.exists isEnum is
+
 type JsonWriteOptions = {
     customWriters: list<obj>
 }
@@ -61,6 +67,14 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
             let fieldStrings = Array.map (fun f -> f outer) serializers
             let innerString = String.concat "," fieldStrings
             sprintf "{%s}" innerString
+    elif implementsEnum t then 
+        let [|innerType|] = t.GetGenericArguments() 
+        let serializeInner = serializer options innerType
+        fun outer -> 
+            let asSeq = outer :?> System.Collections.IEnumerable |> Seq.cast<obj>
+            let inners = Seq.map serializeInner asSeq 
+            let join = String.Join(',', inners) 
+            sprintf "[%s]" join
     elif isOption t then 
         let [|innerType|] = t.GetGenericArguments() 
         let isSomeProp = t.GetProperty "IsSome"

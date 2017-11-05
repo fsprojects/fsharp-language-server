@@ -39,6 +39,16 @@ let ``serialize record to JSON`` () =
     Assert.That(serializerFactory<SimpleRecord> defaultJsonWriteOptions record, Is.EqualTo("""{"simpleMember":1}"""))
 
 [<Test>]
+let ``serialize list of ints to JSON`` () = 
+    let example = [1; 2]
+    Assert.That(serializerFactory<list<int>> defaultJsonWriteOptions example, Is.EqualTo("""[1,2]"""))
+
+[<Test>]
+let ``serialize list of strings to JSON`` () = 
+    let example = ["foo"; "bar"]
+    Assert.That(serializerFactory<list<string>> defaultJsonWriteOptions example, Is.EqualTo("""["foo","bar"]"""))
+
+[<Test>]
 let ``serialize a record with a custom writer`` () = 
     let record = {simpleMember = 1}
     let customWriter (r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
