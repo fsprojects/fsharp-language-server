@@ -47,5 +47,5 @@ let main (argv: array<string>): int =
     let write = new BinaryWriter(Console.OpenStandardOutput())
     let server = Server()
     eprintfn "Listening on stdin"
-    LanguageServer.connect read write server
+    LanguageServer.connect server read write
     0 // return an integer exit code

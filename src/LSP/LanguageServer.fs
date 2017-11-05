@@ -7,21 +7,31 @@ open System.Text
 open Types 
 open Json
 
-let private serializeInitializeResult = serializerFactory<InitializeResult> defaultJsonWriteOptions
-let private serializeTextEditList = serializerFactory<list<TextEdit>> defaultJsonWriteOptions
-let private serializeCompletionList = serializerFactory<CompletionList> defaultJsonWriteOptions
-let private serializeHover = serializerFactory<Hover> defaultJsonWriteOptions
-let private serializeCompletionItem = serializerFactory<CompletionItem> defaultJsonWriteOptions
-let private serializeSignatureHelp = serializerFactory<SignatureHelp> defaultJsonWriteOptions
-let private serializeLocationList = serializerFactory<list<Location>> defaultJsonWriteOptions
-let private serializeDocumentHighlightList = serializerFactory<list<DocumentHighlight>> defaultJsonWriteOptions
-let private serializeSymbolInformationList = serializerFactory<list<SymbolInformation>> defaultJsonWriteOptions
-let private serializeCommandList = serializerFactory<list<Command>> defaultJsonWriteOptions
-let private serializeCodeLensList = serializerFactory<list<CodeLens>> defaultJsonWriteOptions
-let private serializeCodeLens = serializerFactory<CodeLens> defaultJsonWriteOptions
-let private serializeDocumentLinkList = serializerFactory<list<DocumentLink>> defaultJsonWriteOptions
-let private serializeDocumentLink = serializerFactory<DocumentLink> defaultJsonWriteOptions
-let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> defaultJsonWriteOptions
+let jsonWriteOptions = 
+    { defaultJsonWriteOptions with 
+        customWriters = 
+            [ writeTextDocumentSyncKind;
+              writeInsertTextFormat;
+              writeCompletionItemKind;
+              writeMarkedString;
+              writeDocumentHighlightKind;
+              writeSymbolKind ] }
+
+let private serializeInitializeResult = serializerFactory<InitializeResult> jsonWriteOptions
+let private serializeTextEditList = serializerFactory<list<TextEdit>> jsonWriteOptions
+let private serializeCompletionList = serializerFactory<CompletionList> jsonWriteOptions
+let private serializeHover = serializerFactory<Hover> jsonWriteOptions
+let private serializeCompletionItem = serializerFactory<CompletionItem> jsonWriteOptions
+let private serializeSignatureHelp = serializerFactory<SignatureHelp> jsonWriteOptions
+let private serializeLocationList = serializerFactory<list<Location>> jsonWriteOptions
+let private serializeDocumentHighlightList = serializerFactory<list<DocumentHighlight>> jsonWriteOptions
+let private serializeSymbolInformationList = serializerFactory<list<SymbolInformation>> jsonWriteOptions
+let private serializeCommandList = serializerFactory<list<Command>> jsonWriteOptions
+let private serializeCodeLensList = serializerFactory<list<CodeLens>> jsonWriteOptions
+let private serializeCodeLens = serializerFactory<CodeLens> jsonWriteOptions
+let private serializeDocumentLinkList = serializerFactory<list<DocumentLink>> jsonWriteOptions
+let private serializeDocumentLink = serializerFactory<DocumentLink> jsonWriteOptions
+let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteOptions
 
 let respond (client: BinaryWriter) (requestId: int) (jsonText: string) = 
     let messageText = sprintf """{"id":%d,"result":%s}""" requestId jsonText

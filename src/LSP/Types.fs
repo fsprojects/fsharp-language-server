@@ -176,6 +176,11 @@ type InsertTextFormat =
 | PlainText 
 | Snippet 
 
+let writeInsertTextFormat (i: InsertTextFormat) = 
+    match i with 
+    | InsertTextFormat.PlainText -> 1
+    | InsertTextFormat.Snippet -> 2
+
 [<RequireQualifiedAccess>]
 type CompletionItemKind = 
 | Text
@@ -196,6 +201,27 @@ type CompletionItemKind =
 | Color
 | File
 | Reference
+
+let writeCompletionItemKind (i: CompletionItemKind) = 
+    match i with 
+    | CompletionItemKind.Text -> 1
+    | CompletionItemKind.Method -> 2
+    | CompletionItemKind.Function -> 3
+    | CompletionItemKind.Constructor -> 4
+    | CompletionItemKind.Field -> 5
+    | CompletionItemKind.Variable -> 6
+    | CompletionItemKind.Class -> 7
+    | CompletionItemKind.Interface -> 8
+    | CompletionItemKind.Module -> 9
+    | CompletionItemKind.Property -> 10
+    | CompletionItemKind.Unit -> 11
+    | CompletionItemKind.Value -> 12
+    | CompletionItemKind.Enum -> 13
+    | CompletionItemKind.Keyword -> 14
+    | CompletionItemKind.Snippet -> 15
+    | CompletionItemKind.Color -> 16
+    | CompletionItemKind.File -> 17
+    | CompletionItemKind.Reference -> 18
 
 type CompletionItem = {
     label: string 
@@ -326,6 +352,12 @@ type TextDocumentSyncKind =
 | Full
 | Incremental
 
+let writeTextDocumentSyncKind (i: TextDocumentSyncKind) = 
+    match i with 
+    | TextDocumentSyncKind.None -> 0
+    | TextDocumentSyncKind.Full -> 1
+    | TextDocumentSyncKind.Incremental -> 2
+
 type CompletionOptions = {
     resolveProvider: bool 
     triggerCharacters: list<char>
@@ -446,6 +478,15 @@ type MarkedString =
 | HighlightedString of value: string * language: string 
 | PlainString of string
 
+let writeMarkedString (s: MarkedString): JsonValue = 
+    match s with 
+    | HighlightedString (value, language) -> 
+        JsonValue.Record 
+            [| "language", (JsonValue.String language);
+               "value", (JsonValue.String value) |]
+    | PlainString value -> 
+        JsonValue.String value
+
 type Hover = {
     contents: list<MarkedString>
     range: option<Range>
@@ -474,6 +515,13 @@ type DocumentHighlightKind =
 | Read 
 | Write 
 
+let writeDocumentHighlightKind (i: DocumentHighlightKind) = 
+    match i with 
+    | DocumentHighlightKind.Text -> 1
+    | DocumentHighlightKind.Read -> 2
+    | DocumentHighlightKind.Write -> 3 
+
+
 type DocumentHighlight = {
     range: Range 
     kind: DocumentHighlightKind
@@ -499,6 +547,27 @@ type SymbolKind =
 | Number
 | Boolean
 | Array
+
+let writeSymbolKind (i: SymbolKind) = 
+    match i with
+    | SymbolKind.File -> 1
+    | SymbolKind.Module -> 2
+    | SymbolKind.Namespace -> 3
+    | SymbolKind.Package -> 4
+    | SymbolKind.Class -> 5
+    | SymbolKind.Method -> 6
+    | SymbolKind.Property -> 7
+    | SymbolKind.Field -> 8
+    | SymbolKind.Constructor -> 9
+    | SymbolKind.Enum -> 10
+    | SymbolKind.Interface -> 11
+    | SymbolKind.Function -> 12
+    | SymbolKind.Variable -> 13
+    | SymbolKind.Constant -> 14
+    | SymbolKind.String -> 15
+    | SymbolKind.Number -> 16
+    | SymbolKind.Boolean -> 17
+    | SymbolKind.Array -> 18
 
 type SymbolInformation = {
     name: string 
