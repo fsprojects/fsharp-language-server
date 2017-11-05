@@ -25,7 +25,9 @@ let readLine (client: BinaryReader): option<string> =
         let mutable endOfLine = false
         while not endOfLine do 
             let nextChar = client.ReadChar()
-            if nextChar = '\r' then do 
+            if nextChar = '\n' then do 
+                endOfLine <- true
+            elif nextChar = '\r' then do 
                 assert (client.ReadChar() = '\n')
                 endOfLine <- true
             else do 

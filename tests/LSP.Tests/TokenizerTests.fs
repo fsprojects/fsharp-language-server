@@ -39,6 +39,14 @@ module TokenizerTests =
             Is.EqualTo (Some "Line 1"))
 
     [<Test>]
+    let ``allow newline without carriage-return`` () = 
+        let sample = "Line 1\n\
+                      Line 2"
+        Assert.That(
+            Tokenizer.readLine (binaryReader sample), 
+            Is.EqualTo (Some "Line 1"))
+
+    [<Test>]
     let ``take message token`` () = 
         let sample = "{}\r\n\
                       next line..."
