@@ -131,8 +131,12 @@ let parseNotification (method: string) (maybeBody: option<JsonValue>): Notificat
     | "textDocument/didSave", Some json -> DidSaveTextDocument (parseDidSaveTextDocumentParams json)
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
-    | _, None -> raise (Exception (sprintf "%s is not a known notification, or it is expected to contain a body" method))
-    | _, _ -> raise (Exception (sprintf "%s is not a known notification" method))
+    | _, None -> 
+        Log.warn "%s is not a known notification, or it is expected to contain a body" method
+        OtherNotification method
+    | _, _ -> 
+        Log.warn "%s is not a known notification" method
+        OtherNotification method
 
 let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 
     match maybe with 

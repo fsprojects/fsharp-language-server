@@ -108,6 +108,8 @@ let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notif
         server.DidCloseTextDocument p
     | DidChangeWatchedFiles p -> 
         server.DidChangeWatchedFiles p
+    | OtherNotification _ ->
+        ()
 
 let processMessage (server: ILanguageServer) (send: BinaryWriter) (m: Parser.Message) = 
     match m with 

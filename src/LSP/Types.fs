@@ -94,6 +94,7 @@ type Notification =
 | DidSaveTextDocument of DidSaveTextDocumentParams
 | DidCloseTextDocument of DidCloseTextDocumentParams
 | DidChangeWatchedFiles of DidChangeWatchedFilesParams
+| OtherNotification of method: string
 
 type Location = {
     uri: Uri 
