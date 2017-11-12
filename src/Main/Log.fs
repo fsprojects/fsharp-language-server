@@ -1,4 +1,4 @@
-module internal LSP.Log 
+module internal Main.Log 
 
 open System
 
