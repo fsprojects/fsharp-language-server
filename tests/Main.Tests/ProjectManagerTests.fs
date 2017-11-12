@@ -45,9 +45,11 @@ let ``parse project file JSON`` () =
     Assert.True(Map.containsKey "FSharp.Compiler.Service/16.0.2" parsed.libraries)
     Assert.That(parsed.packageFolders, Contains.Item "/Users/george/.nuget/packages/")
 
-
 [<Test>]
 let ``parse a project file`` () = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectManagerUtils.parseBoth file
-    Assert.That(parsed.sources, Is.EqualTo "")
+    let name (f: FileInfo): string = f.Name
+    Assert.That(parsed.sources |> Seq.map name, Contains.Item "ProjectManager.fs")
+    Assert.That(parsed.projectReferences |> Seq.map name, Contains.Item "LSP.fsproj")
+    Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
