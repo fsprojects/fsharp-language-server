@@ -10,7 +10,26 @@ let private TODO() = raise (Exception "TODO")
 
 type Server() = 
     let docs = DocumentStore()
+    let projects = ProjectManager()
     let checker = FSharpChecker.Create()
+    let emptyProjectOptions = checker.GetProjectOptionsFromCommandLineArgs("NotFound.fsproj", [||])
+    let notFound (doc: Uri) (): 'Any = 
+        raise (Exception (sprintf "%s does not exist" (doc.ToString())))
+    let lint (doc: Uri): Async<unit> = TODO()
+        // async {
+        //     let name = doc.AbsolutePath.ToString()
+        //     let version = docs.GetVersion doc |> Option.defaultWith (notFound doc)
+        //     let source = docs.GetText doc |> Option.defaultWith (notFound doc)
+        //     let compilerOptions = projects.FindProjectOptions doc |> Option.defaultValue emptyCompilerOptions
+        //     let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(name, version, source, projectOptions)
+        //     for error in parseResults.Errors do 
+        //         Log.warn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+        //     match checkAnswer with 
+        //     | FSharpCheckFileAnswer.Aborted -> Log.warn "Aborted checking %s" name 
+        //     | FSharpCheckFileAnswer.Succeeded checkResults -> 
+        //         for error in checkResults.Errors do 
+        //             Log.warn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+        // }
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
             { capabilities = 
@@ -28,8 +47,10 @@ type Server() =
             Log.info "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
             docs.Open p
+            lint p.textDocument.uri |> Async.RunSynchronously
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
             docs.Change p
+            lint p.textDocument.uri |> Async.RunSynchronously
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): list<TextEdit> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
@@ -39,6 +60,8 @@ type Server() =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
                 Log.info "Watched file %s %s" (change.uri.ToString()) (change._type.ToString())
+                if change.uri.AbsolutePath.EndsWith ".fsproj" then
+                    projects.UpdateProjectFile change.uri 
         member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()
         member this.Hover(p: TextDocumentPositionParams): Hover = TODO()
         member this.ResolveCompletionItem(p: CompletionItem): CompletionItem = TODO()
