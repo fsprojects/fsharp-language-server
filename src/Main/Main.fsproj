@@ -6,7 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Log.fs" />
     <Compile Include="ProjectManager.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

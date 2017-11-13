@@ -89,7 +89,7 @@ let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (req
 let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notification) = 
     match n with 
     | Cancel id ->
-        Log.info "Cancel request %d is not yet supported" id
+        eprintfn "Cancel request %d is not yet supported" id
     | Initialized ->
         server.Initialized()
     | Shutdown ->

@@ -62,7 +62,7 @@ type DocumentStore() =
     member this.Change(doc: DidChangeTextDocumentParams): unit = 
         let existing = activeDocuments.[doc.textDocument.uri]
         if doc.textDocument.version <= existing.version then 
-            Log.warn 
+            eprintfn
                 "Change %d to doc %s is earlier than existing version %d" 
                 doc.textDocument.version 
                 (doc.textDocument.uri.ToString())

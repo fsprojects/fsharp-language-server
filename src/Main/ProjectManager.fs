@@ -97,7 +97,7 @@ module ProjectManagerUtils =
                                 yield resolved.Value 
                             else 
                                 let packageFolders = String.concat ", " assets.packageFolders
-                                Log.warn "Couldn't find %s in %s" dll packageFolders
+                                eprintfn "Couldn't find %s in %s" dll packageFolders
         })
     // Parse fsproj
     let private parseProject (fsproj: FileInfo): XmlElement = 
@@ -159,10 +159,10 @@ type ProjectManager() =
     let tryFindAndCache (sourceFile: FileInfo): option<CompilerOptions> = 
         match findProjectFileInParents sourceFile with 
         | None -> 
-            Log.warn "No project file for %s" sourceFile.Name
+            eprintfn "No project file for %s" sourceFile.Name
             None
         | Some projectFile -> 
-            Log.info "Found project file %s for %s" projectFile.FullName sourceFile.Name
+            eprintfn "Found project file %s for %s" projectFile.FullName sourceFile.Name
             Some (addToCache projectFile)
     member this.UpdateProjectFile(project: Uri): unit = 
         let file = FileInfo(project.AbsolutePath)

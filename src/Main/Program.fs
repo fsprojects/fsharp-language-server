@@ -23,12 +23,12 @@ type Server() =
         //     let compilerOptions = projects.FindProjectOptions doc |> Option.defaultValue emptyCompilerOptions
         //     let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(name, version, source, projectOptions)
         //     for error in parseResults.Errors do 
-        //         Log.warn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+        //         eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
         //     match checkAnswer with 
-        //     | FSharpCheckFileAnswer.Aborted -> Log.warn "Aborted checking %s" name 
+        //     | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" name 
         //     | FSharpCheckFileAnswer.Succeeded checkResults -> 
         //         for error in checkResults.Errors do 
-        //             Log.warn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+        //             eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
         // }
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
@@ -44,7 +44,7 @@ type Server() =
         member this.Shutdown(): unit = 
             ()
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit =
-            Log.info "New configuration %s" (p.ToString())
+            eprintfn "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
             docs.Open p
             lint p.textDocument.uri |> Async.RunSynchronously
@@ -54,12 +54,12 @@ type Server() =
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): list<TextEdit> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
-            Log.info "%s" (p.ToString())
+            eprintfn "%s" (p.ToString())
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
             docs.Close p
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
-                Log.info "Watched file %s %s" (change.uri.ToString()) (change._type.ToString())
+                eprintfn "Watched file %s %s" (change.uri.ToString()) (change._type.ToString())
                 if change.uri.AbsolutePath.EndsWith ".fsproj" then
                     projects.UpdateProjectFile change.uri 
         member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()
@@ -87,6 +87,6 @@ let main (argv: array<string>): int =
     let read = new BinaryReader(Console.OpenStandardInput())
     let write = new BinaryWriter(Console.OpenStandardOutput())
     let server = Server()
-    Log.info "Listening on stdin"
+    eprintfn "Listening on stdin"
     LanguageServer.connect server read write
     0 // return an integer exit code

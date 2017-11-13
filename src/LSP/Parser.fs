@@ -132,10 +132,10 @@ let parseNotification (method: string) (maybeBody: option<JsonValue>): Notificat
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
     | _, None -> 
-        Log.warn "%s is not a known notification, or it is expected to contain a body" method
+        eprintfn "%s is not a known notification, or it is expected to contain a body" method
         OtherNotification method
     | _, _ -> 
-        Log.warn "%s is not a known notification" method
+        eprintfn "%s is not a known notification" method
         OtherNotification method
 
 let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T = 

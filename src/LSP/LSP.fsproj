@@ -4,7 +4,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Log.fs" />
     <Compile Include="Json.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Tokenizer.fs" />
