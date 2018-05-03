@@ -64,3 +64,15 @@ let ``parse a project file recursively`` () =
     Assert.That(parsed.SourceFiles |> Seq.map name, Contains.Item "ProjectManager.fs")
     Assert.That(parsed.ReferencedProjects |> Seq.map (fun (x, _) -> x) |> Seq.map name, Contains.Item "LSP.fsproj")
     // Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
+
+[<Test>]
+let ``find an fsproj in a parent dir`` () = 
+    let projects = ProjectManager()
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Program.fs"|])
+    let parsed = projects.FindProjectOptions(Uri(file.FullName)) |> Option.get
+    let name (f: string) = 
+      let parts = f.Split('/')
+      parts.[parts.Length - 1]
+    Assert.That(parsed.SourceFiles |> Seq.map name, Contains.Item "ProjectManager.fs")
+    Assert.That(parsed.ReferencedProjects |> Seq.map (fun (x, _) -> x) |> Seq.map name, Contains.Item "LSP.fsproj")
+    // Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")

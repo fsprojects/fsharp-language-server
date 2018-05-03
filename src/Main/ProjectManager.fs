@@ -158,9 +158,9 @@ module ProjectManagerUtils =
 open ProjectManagerUtils
 
 type ProjectManager() = 
-    let cache = new Dictionary<DirectoryInfo, CompilerOptions>()
-    let addToCache (projectFile: FileInfo): CompilerOptions = 
-        let parsed = parseBoth projectFile
+    let cache = new Dictionary<DirectoryInfo, FSharpProjectOptions>()
+    let addToCache (projectFile: FileInfo): FSharpProjectOptions = 
+        let parsed = parseProjectOptions projectFile
         cache.[projectFile.Directory] <- parsed
         parsed
     // Scan the parent directories looking for a file *.fsproj
@@ -172,7 +172,7 @@ type ProjectManager() =
                     yield proj
                 dir <- dir.Parent
         } |> Seq.tryHead
-    let tryFindAndCache (sourceFile: FileInfo): option<CompilerOptions> = 
+    let tryFindAndCache (sourceFile: FileInfo): option<FSharpProjectOptions> = 
         match findProjectFileInParents sourceFile with 
         | None -> 
             eprintfn "No project file for %s" sourceFile.Name
@@ -183,7 +183,7 @@ type ProjectManager() =
     member this.UpdateProjectFile(project: Uri): unit = 
         let file = FileInfo(project.AbsolutePath)
         addToCache file |> ignore
-    member this.FindProjectOptions(sourceFile: Uri): option<CompilerOptions> = 
+    member this.FindProjectOptions(sourceFile: Uri): option<FSharpProjectOptions> = 
         let file = FileInfo(sourceFile.AbsolutePath)
         match tryFindAndCache file  with 
         | Some cachedProject -> Some cachedProject
