@@ -3,7 +3,7 @@ module LSP.LanguageServerTests
 open System
 open System.IO 
 open System.Text
-open NUnit.Framework
+open Xunit
 open FSharp.Data
 open LSP.Types
 
@@ -15,27 +15,27 @@ let binaryWriter () =
         Encoding.UTF8.GetString bytes
     (writer, toString)
 
-[<Test>]
+[<Fact>]
 let ``write text``() = 
     let (writer, toString) = binaryWriter() 
     writer.Write (Encoding.UTF8.GetBytes "foo")
-    Assert.That(toString(), Is.EqualTo "foo")
+    Assert.Equal(toString(), "foo")
 
-[<Test>]
+[<Fact>]
 let ``write response``() = 
     let (writer, toString) = binaryWriter() 
     LanguageServer.respond writer 1 "2"
     let expected = "Content-Length: 19\r\n\r\n\
                     {\"id\":1,\"result\":2}"
-    Assert.That(toString(), Is.EqualTo expected)
+    Assert.Equal(toString(), expected)
 
-[<Test>]
+[<Fact>]
 let ``write multibyte characters``() = 
     let (writer, toString) = binaryWriter() 
     LanguageServer.respond writer 1 "🔥"
     let expected = "Content-Length: 22\r\n\r\n\
                     {\"id\":1,\"result\":🔥}"
-    Assert.That(toString(), Is.EqualTo expected)
+    Assert.Equal(toString(), expected)
 
 
 let TODO() = raise (Exception "TODO")
@@ -93,11 +93,11 @@ let initializeMessage = """
 }
 """
 
-[<Test>]
+[<Fact>]
 let ``read messages from a stream``() = 
     let stdin = messageStream [initializeMessage]
     let messages = LanguageServer.readMessages stdin
-    Assert.That(messages, Is.EquivalentTo [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
+    Assert.True(Seq.toList messages = [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
 
 let exitMessage = """
 {
@@ -106,11 +106,11 @@ let exitMessage = """
 }
 """
     
-[<Test>]
+[<Fact>]
 let ``exit message terminates stream``() = 
     let stdin = messageStream [initializeMessage; exitMessage; initializeMessage]
     let messages = LanguageServer.readMessages stdin
-    Assert.That(messages, Is.EquivalentTo [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
+    Assert.True(Seq.toList messages = [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
 
 let mock (server: ILanguageServer) (messages: list<string>): string = 
     let stdout = new MemoryStream()
@@ -119,7 +119,7 @@ let mock (server: ILanguageServer) (messages: list<string>): string =
     LanguageServer.connect server readIn writeOut
     Encoding.UTF8.GetString(stdout.ToArray())
 
-[<Test>]
+[<Fact>]
 let ``send Initialize``() = 
     let message = """
     {
@@ -131,4 +131,4 @@ let ``send Initialize``() =
     """
     let server = MockServer()
     let result = mock server [message]
-    Assert.That(result, Contains.Substring "capabilities")
+    Assert.True(result.Contains("capabilities"))

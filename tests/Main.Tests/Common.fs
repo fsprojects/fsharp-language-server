@@ -2,7 +2,7 @@ module Main.Tests.Common
 
 open System
 open System.IO
-open NUnit.Framework
+open Xunit
 
 let private findProjectRoot (start: DirectoryInfo): DirectoryInfo = 
     seq {
@@ -12,5 +12,5 @@ let private findProjectRoot (start: DirectoryInfo): DirectoryInfo =
                 yield dir
             dir <- dir.Parent
     } |> Seq.head
-let private testDirectory = DirectoryInfo(TestContext.CurrentContext.TestDirectory)
+let private testDirectory = DirectoryInfo(Directory.GetCurrentDirectory())
 let projectRoot = findProjectRoot testDirectory

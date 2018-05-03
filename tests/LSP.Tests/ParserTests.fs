@@ -3,11 +3,11 @@ namespace LSP
 open Types
 open System
 open Parser
-open NUnit.Framework
+open Xunit
 open FSharp.Data
 
 module ParserTests =
-    [<Test>]
+    [<Fact>]
     let ``parse a RequestMessage`` () = 
         let json = """{
             "jsonrpc": "2.0",
@@ -15,11 +15,11 @@ module ParserTests =
             "method": "helloWorld",
             "params": {"hello": "world"}
         }"""
-        Assert.That(
+        Assert.Equal(
             parseMessage json, 
-            Is.EqualTo (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}""")))
+            (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}""")))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a RequestMessage with params`` () = 
         let json = """{
             "jsonrpc": "2.0",
@@ -27,59 +27,59 @@ module ParserTests =
             "method": "helloWorld",
             "params": {"hello": "world"}
         }"""
-        Assert.That(
+        Assert.Equal(
             parseMessage json, 
-            Is.EqualTo (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}""")))
+            (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}""")))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a NotificationMessage`` () = 
         let json = """{
             "jsonrpc": "2.0",
             "method": "helloNotification"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseMessage json, 
-            Is.EqualTo (NotificationMessage ("helloNotification", None)))
+            (NotificationMessage ("helloNotification", None)))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a NotificationMessage with params`` () = 
         let json = """{
             "jsonrpc": "2.0",
             "method": "helloNotification",
             "params": {"hello": "world"}
         }"""
-        Assert.That(
+        Assert.Equal(
             parseMessage json, 
-            Is.EqualTo (NotificationMessage ("helloNotification", Some (JsonValue.Parse """{"hello":"world"}"""))))
+            (NotificationMessage ("helloNotification", Some (JsonValue.Parse """{"hello":"world"}"""))))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a Cancel notification`` () = 
         let json = JsonValue.Parse """{
             "id": 1
         }""" 
-        Assert.That(
+        Assert.Equal(
             parseNotification "cancel" (Some json), 
-            Is.EqualTo (Cancel 1))
+            (Cancel 1))
 
-    [<Test>]
+    [<Fact>]
     let ``parse an Initialized notification`` () = 
-        Assert.That(
+        Assert.Equal(
             parseNotification "initialized" None,
-            Is.EqualTo Initialized)
+            Initialized)
 
     
-    [<Test>]
+    [<Fact>]
     let ``parse a DidChangeConfiguration notification`` () = 
         let json = JsonValue.Parse """{
             "settings": {"hello": "world"}
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "workspace/didChangeConfiguration" (Some json),
-            Is.EqualTo (DidChangeConfiguration {
+            (DidChangeConfiguration {
                 settings = JsonValue.Parse """{"hello":"world"}"""
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidOpenTextDocument notification`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -89,9 +89,9 @@ module ParserTests =
                 "text": "let x = 1"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/didOpen" (Some json),
-            Is.EqualTo (DidOpenTextDocument {
+            (DidOpenTextDocument {
                 textDocument = 
                     {
                         uri = Uri("file://workspace/Main.fs")
@@ -101,7 +101,7 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidChangeTextDocument notification`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -112,9 +112,9 @@ module ParserTests =
                 "text": "let x = 1"
             }]
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/didChange" (Some json),
-            Is.EqualTo (DidChangeTextDocument {
+            (DidChangeTextDocument {
                 textDocument = 
                     {
                         uri = Uri("file://workspace/Main.fs")
@@ -130,7 +130,7 @@ module ParserTests =
                 ]
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidChangeTextDocument notification with range`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -146,9 +146,9 @@ module ParserTests =
                 "text": "let x = 1"
             }]
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/didChange" (Some json),
-            Is.EqualTo (DidChangeTextDocument {
+            (DidChangeTextDocument {
                 textDocument = 
                     {
                         uri = Uri("file://workspace/Main.fs")
@@ -165,7 +165,7 @@ module ParserTests =
                 }]
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a WillSaveTextDocument notification`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -173,14 +173,14 @@ module ParserTests =
             },
             "reason": 2
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/willSave" (Some json),
-            Is.EqualTo (WillSaveTextDocument {
+            (WillSaveTextDocument {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 reason = TextDocumentSaveReason.AfterDelay
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a WillSaveWaitUntilTextDocument request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -188,28 +188,28 @@ module ParserTests =
             },
             "reason": 2
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/willSaveWaitUntil" json,
-            Is.EqualTo (WillSaveWaitUntilTextDocument {
+            (WillSaveWaitUntilTextDocument {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 reason = TextDocumentSaveReason.AfterDelay
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidSaveTextDocument notification`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
                 "uri": "file://workspace/Main.fs"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/didSave" (Some json),
-            Is.EqualTo (DidSaveTextDocument {
+            (DidSaveTextDocument {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 text = None
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidSaveTextDocument notification with text`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -217,27 +217,27 @@ module ParserTests =
             },
             "text": "let x = 1"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/didSave" (Some json),
-            Is.EqualTo (DidSaveTextDocument {
+            (DidSaveTextDocument {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 text = Some "let x = 1"
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidCloseTextDocument notification`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
                 "uri": "file://workspace/Main.fs"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "textDocument/didClose" (Some json),
-            Is.EqualTo (DidCloseTextDocument {
+            (DidCloseTextDocument {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a DidChangeWatchedFiles notification`` () = 
         let json = JsonValue.Parse """{
             "changes": [{
@@ -245,9 +245,9 @@ module ParserTests =
                 "type": 2
             }]
         }"""
-        Assert.That(
+        Assert.Equal(
             parseNotification "workspace/didChangeWatchedFiles" (Some json),
-            Is.EqualTo (DidChangeWatchedFiles {
+            (DidChangeWatchedFiles {
                 changes = 
                     [{
                         uri = Uri("file://workspace/Main.fs")
@@ -255,7 +255,7 @@ module ParserTests =
                     }]
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse a minimal Initialize request`` () = 
         let json = JsonValue.Parse """{
             "processId": 1,
@@ -264,9 +264,9 @@ module ParserTests =
             }
         }"""
         let (Initialize i) = parseRequest "initialize" json
-        Assert.That(
+        Assert.Equal(
             i, 
-            Is.EqualTo(
+            (
                 {
                     processId = Some 1;
                     rootUri = Some (Uri("file://workspace"));
@@ -276,7 +276,7 @@ module ParserTests =
                 }
             ))
     
-    [<Test>]
+    [<Fact>]
     let ``processId can be null`` () = 
         let json = JsonValue.Parse """{
             "processId": null,
@@ -285,9 +285,9 @@ module ParserTests =
             }
         }"""
         let (Initialize i) = parseRequest "initialize" json 
-        Assert.That(i.processId, Is.EqualTo(None))
+        Assert.Equal(i.processId, (None))
 
-    [<Test>]
+    [<Fact>]
     let ``parse capabilities as map`` () = 
         let json = JsonValue.Parse """{
             "processId": 1,
@@ -301,11 +301,10 @@ module ParserTests =
             }
         }"""
         let (Initialize i) = parseRequest "initialize" json 
-        Assert.That(
-            i.capabilitiesMap, 
-            Is.EquivalentTo(Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
+        Assert.True(
+            i.capabilitiesMap = (Map.empty.Add("workspace.workspaceEdit.documentChanges", true)))
 
-    [<Test>]
+    [<Fact>]
     let ``parse Completion request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -316,9 +315,9 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/completion" json,
-            Is.EqualTo(Completion {
+            (Completion {
                 textDocument = 
                     {
                         uri = Uri("file://workspace/Main.fs")
@@ -330,14 +329,14 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse minimal ResolveCompletionItem request`` () = 
         let json = JsonValue.Parse """{
             "label": "foo"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "completionItem/resolve" json,
-            Is.EqualTo(ResolveCompletionItem {
+            (ResolveCompletionItem {
                 label = "foo"
                 kind = None 
                 detail = None 
@@ -353,7 +352,7 @@ module ParserTests =
                 data = JsonValue.Null
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse maximal ResolveCompletionItem request`` () = 
         let json = JsonValue.Parse """{
             "label": "foo",
@@ -386,9 +385,9 @@ module ParserTests =
             },
             "data": {"hello":"world"}
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "completionItem/resolve" json,
-            Is.EqualTo(ResolveCompletionItem {
+            (ResolveCompletionItem {
                 label = "foo"
                 kind = Some CompletionItemKind.Text
                 detail = Some "foo(): string" 
@@ -423,7 +422,7 @@ module ParserTests =
                 data = JsonValue.Parse """{"hello":"world"}"""
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse SignatureHelp request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -434,9 +433,9 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/signatureHelp" json,
-            Is.EqualTo(SignatureHelp {
+            (SignatureHelp {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 position = 
                     {
@@ -445,7 +444,7 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse GotoDefinition request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -456,9 +455,9 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/definition" json,
-            Is.EqualTo(GotoDefinition {
+            (GotoDefinition {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 position = 
                     {
@@ -467,7 +466,7 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse FindReferences request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -481,15 +480,15 @@ module ParserTests =
                 "includeDeclaration": true
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/references" json,
-            Is.EqualTo(FindReferences {
+            (FindReferences {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 position = { line = 0; character = 5 }
                 context = { includeDeclaration = true }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse DocumentHighlight request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -500,38 +499,38 @@ module ParserTests =
                 "character": 5
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/documentHighlight" json,
-            Is.EqualTo(DocumentHighlight {
+            (DocumentHighlight {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 position = { line = 0; character = 5 }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse DocumentSymbols request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
                 "uri": "file://workspace/Main.fs"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/documentSymbol" json,
-            Is.EqualTo(DocumentSymbols {
+            (DocumentSymbols {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse WorkspaceSymbols request`` () = 
         let json = JsonValue.Parse """{
             "query": "foo"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "workspace/symbol" json,
-            Is.EqualTo(WorkspaceSymbols {
+            (WorkspaceSymbols {
                 query = "foo"
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse minimal CodeActions request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -551,9 +550,9 @@ module ParserTests =
                 }]
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/codeAction" json,
-            Is.EqualTo(CodeActions {
+            (CodeActions {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 range = 
                     {
@@ -577,7 +576,7 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse maximal CodeActions request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -600,9 +599,9 @@ module ParserTests =
                 }]
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/codeAction" json,
-            Is.EqualTo(CodeActions {
+            (CodeActions {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 range = 
                     { 
@@ -626,7 +625,7 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse CodeActions request with an integer code`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -647,9 +646,9 @@ module ParserTests =
                 }]
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/codeAction" json,
-            Is.EqualTo(CodeActions {
+            (CodeActions {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 range = 
                     {
@@ -673,20 +672,20 @@ module ParserTests =
                     }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse CodeLens request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
                 "uri": "file://workspace/Main.fs"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/codeLens" json,
-            Is.EqualTo(Request.CodeLens {
+            (Request.CodeLens {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse minimal ResolveCodeLens request`` () = 
         let json = JsonValue.Parse """{
             "range": {
@@ -694,9 +693,9 @@ module ParserTests =
                 "end": {"line": 1, "character": 0}
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "codeLens/resolve" json,
-            Is.EqualTo(ResolveCodeLens {
+            (ResolveCodeLens {
                 range = 
                     {
                         start = {line = 1; character = 0}
@@ -706,7 +705,7 @@ module ParserTests =
                 data = JsonValue.Null
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse maximal ResolveCodeLens request`` () = 
         let json = JsonValue.Parse """{
             "range": {
@@ -720,9 +719,9 @@ module ParserTests =
             },
             "data": "hi"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "codeLens/resolve" json,
-            Is.EqualTo(ResolveCodeLens {
+            (ResolveCodeLens {
                 range = 
                     {
                         start = {line = 1; character = 0}
@@ -736,20 +735,20 @@ module ParserTests =
                 data = JsonValue.String "hi"
             }))
 
-    [<Test>]
+    [<Fact>]
     let ``parse DocumentLink request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
                 "uri": "file://workspace/Main.fs"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/documentLink" json,
-            Is.EqualTo(DocumentLink {
+            (DocumentLink {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse ResolveDocumentLink request`` () = 
         let json = JsonValue.Parse """{
             "range": {
@@ -757,9 +756,9 @@ module ParserTests =
                 "end": {"line": 1, "character": 0}
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "documentLink/resolve" json,
-            Is.EqualTo(ResolveDocumentLink {
+            (ResolveDocumentLink {
                 range = 
                     {
                         start = {line = 1; character = 0}
@@ -768,7 +767,7 @@ module ParserTests =
                 target = None
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse DocumentFormatting request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -782,9 +781,9 @@ module ParserTests =
                 "stringOption": "foo"
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/formatting" json,
-            Is.EqualTo(DocumentFormatting {
+            (DocumentFormatting {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 options = 
                     {
@@ -801,7 +800,7 @@ module ParserTests =
                     ]
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse DocumentRangeFormatting request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -819,9 +818,9 @@ module ParserTests =
                 "end": {"line": 1, "character": 0}
             }
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/rangeFormatting" json,
-            Is.EqualTo(DocumentRangeFormatting {
+            (DocumentRangeFormatting {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 options = 
                     {
@@ -843,7 +842,7 @@ module ParserTests =
                     }
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse DocumentOnTypeFormatting request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -862,9 +861,9 @@ module ParserTests =
             },
             "ch": "a"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/onTypeFormatting" json,
-            Is.EqualTo(DocumentOnTypeFormatting {
+            (DocumentOnTypeFormatting {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 options = 
                     {
@@ -887,7 +886,7 @@ module ParserTests =
                 ch = 'a'
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse Rename request`` () = 
         let json = JsonValue.Parse """{
             "textDocument": {
@@ -899,9 +898,9 @@ module ParserTests =
             },
             "newName": "foo"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "textDocument/rename" json,
-            Is.EqualTo(Rename {
+            (Rename {
                 textDocument = { uri = Uri("file://workspace/Main.fs") }
                 position = 
                     {
@@ -911,27 +910,27 @@ module ParserTests =
                 newName = "foo"
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse ExecuteCommand request with no arguments`` () = 
         let json = JsonValue.Parse """{
             "command": "foo"
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "workspace/executeCommand" json,
-            Is.EqualTo(ExecuteCommand {
+            (ExecuteCommand {
                 command = "foo"
                 arguments = []
             }))
     
-    [<Test>]
+    [<Fact>]
     let ``parse ExecuteCommand request with arguments`` () = 
         let json = JsonValue.Parse """{
             "command": "foo",
             "arguments": ["bar"]
         }"""
-        Assert.That(
+        Assert.Equal(
             parseRequest "workspace/executeCommand" json,
-            Is.EqualTo(ExecuteCommand {
+            (ExecuteCommand {
                 command = "foo"
                 arguments = [JsonValue.String "bar"]
             }))

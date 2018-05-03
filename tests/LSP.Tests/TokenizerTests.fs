@@ -2,59 +2,59 @@ namespace LSP
 
 open System.IO
 open System.Text
-open NUnit.Framework
+open Xunit
 
 module TokenizerTests =
-    [<Test>]
+    [<Fact>]
     let ``parse content length header`` () = 
         let sample = "Content-Length: 10"
-        Assert.That(
+        Assert.Equal(
             Tokenizer.parseHeader sample, 
-            Is.EqualTo (Tokenizer.ContentLength 10))
+            (Tokenizer.ContentLength 10))
 
-    [<Test>]
+    [<Fact>]
     let ``parse content type header`` () = 
         let sample = "Content-Type: application/vscode-jsonrpc; charset=utf-8"
-        Assert.That(
+        Assert.Equal(
             Tokenizer.parseHeader sample, 
-            Is.EqualTo Tokenizer.OtherHeader)
+            Tokenizer.OtherHeader)
 
-    [<Test>]
+    [<Fact>]
     let ``parse empty line indicating start of message`` () = 
-        Assert.That(
+        Assert.Equal(
             Tokenizer.parseHeader "", 
-            Is.EqualTo Tokenizer.EmptyHeader)
+            Tokenizer.EmptyHeader)
 
     let binaryReader (sample: string): BinaryReader = 
         let bytes = Encoding.UTF8.GetBytes(sample)
         let stream = new MemoryStream(bytes)
         new BinaryReader(stream, Encoding.UTF8)
 
-    [<Test>]
+    [<Fact>]
     let ``take header token`` () = 
         let sample = "Line 1\r\n\
                       Line 2"
-        Assert.That(
+        Assert.Equal(
             Tokenizer.readLine (binaryReader sample), 
-            Is.EqualTo (Some "Line 1"))
+            (Some "Line 1"))
 
-    [<Test>]
+    [<Fact>]
     let ``allow newline without carriage-return`` () = 
         let sample = "Line 1\n\
                       Line 2"
-        Assert.That(
+        Assert.Equal(
             Tokenizer.readLine (binaryReader sample), 
-            Is.EqualTo (Some "Line 1"))
+            (Some "Line 1"))
 
-    [<Test>]
+    [<Fact>]
     let ``take message token`` () = 
         let sample = "{}\r\n\
                       next line..."
-        Assert.That(
+        Assert.Equal(
             Tokenizer.readLength 2 (binaryReader sample),
-            Is.EqualTo "{}")
+            "{}")
 
-    [<Test>]
+    [<Fact>]
     let ``tokenize stream`` () = 
         let sample = "Content-Length: 2\r\n\
                       \r\n\
@@ -62,11 +62,10 @@ module TokenizerTests =
                       Content-Length: 1\r\n\
                       \r\n\
                       1"
-        Assert.That(
-            Tokenizer.tokenize (binaryReader sample), 
-            Is.EquivalentTo ["{}"; "1"])
+        let found = Tokenizer.tokenize (binaryReader sample) |> Seq.toList
+        Assert.True(["{}"; "1"] = found)
 
-    [<Test>]
+    [<Fact>]
     let ``tokenize stream with multibyte characters`` () = 
         let sample = "Content-Length: 4\r\n\
                       \r\n\
@@ -74,7 +73,6 @@ module TokenizerTests =
                       Content-Length: 4\r\n\
                       \r\n\
                       🐼"
-        Assert.That(
-            Tokenizer.tokenize (binaryReader sample), 
-            Is.EquivalentTo ["🔥"; "🐼"])
+        let found = Tokenizer.tokenize (binaryReader sample) |> Seq.toList
+        Assert.True(["🔥"; "🐼"] = found)
     

@@ -4,9 +4,10 @@ open Main
 open Main.Tests.Common
 open System
 open System.IO
-open NUnit.Framework
+open Xunit
+open Microsoft.FSharp.Compiler.SourceCodeServices
 
-[<Test>]
+[<Fact>]
 let ``parse project file JSON`` () = 
     let json = """
     {
@@ -34,36 +35,41 @@ let ``parse project file JSON`` () =
     let parsed = ProjectManagerUtils.parseAssetsJson json
     Assert.True(Map.containsKey ".NETCoreApp,Version=v2.0" parsed.targets)
     Assert.True(Map.containsKey "FSharp.Compiler.Service/16.0.2" parsed.libraries)
-    Assert.That(parsed.packageFolders, Contains.Item "/Users/george/.nuget/packages/")
+    Assert.True(Seq.exists ((=) "/Users/george/.nuget/packages/") parsed.packageFolders)
 
-[<Test>]
+[<Fact>]
 let ``parse a project file`` () = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectManagerUtils.parseBoth file
-    let name (f: FileInfo): string = f.Name
-    Assert.That(parsed.sources |> Seq.map name, Contains.Item "ProjectManager.fs")
-    Assert.That(parsed.projectReferences |> Seq.map name, Contains.Item "LSP.fsproj")
-    Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
+    let hasName (name: string) (f: FileInfo) = name = f.Name
+    Assert.True(Seq.exists (hasName "ProjectManager.fs") parsed.sources)
+    Assert.True(Seq.exists (hasName "LSP.fsproj") parsed.projectReferences)
+    Assert.True(Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
 
-[<Test>]
+let private fileHasName (name: string) (f: string) =
+    let parts = f.Split('/')
+    let fName = parts.[parts.Length - 1]
+    name = fName 
+
+let private projectHasName (name: string) (project: string * FSharpProjectOptions) = 
+  let (f, _) = project
+  let parts = f.Split('/')
+  let fName = parts.[parts.Length - 1]
+  name = fName
+
+[<Fact>]
 let ``parse a project file recursively`` () = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectManagerUtils.parseProjectOptions file
-    let name (f: string) = 
-      let parts = f.Split('/')
-      parts.[parts.Length - 1]
-    Assert.That(parsed.SourceFiles |> Seq.map name, Contains.Item "ProjectManager.fs")
-    Assert.That(parsed.ReferencedProjects |> Seq.map (fun (x, _) -> x) |> Seq.map name, Contains.Item "LSP.fsproj")
-    // Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
+    Assert.True(Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles)
+    Assert.True(Seq.exists (projectHasName "LSP.fsproj") parsed.ReferencedProjects)
+    // Assert.True(Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
 
-[<Test>]
+[<Fact>]
 let ``find an fsproj in a parent dir`` () = 
     let projects = ProjectManager()
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Program.fs"|])
     let parsed = projects.FindProjectOptions(Uri(file.FullName)) |> Option.get
-    let name (f: string) = 
-      let parts = f.Split('/')
-      parts.[parts.Length - 1]
-    Assert.That(parsed.SourceFiles |> Seq.map name, Contains.Item "ProjectManager.fs")
-    Assert.That(parsed.ReferencedProjects |> Seq.map (fun (x, _) -> x) |> Seq.map name, Contains.Item "LSP.fsproj")
-    // Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
+    Assert.True(Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles)
+    Assert.True(Seq.exists (projectHasName "LSP.fsproj") parsed.ReferencedProjects)
+    // Assert.True(Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)

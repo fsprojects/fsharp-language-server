@@ -4,78 +4,78 @@ open System
 open System.Text.RegularExpressions
 open FSharp.Data
 open Json
-open NUnit.Framework
+open Xunit
 
 let removeSpace (expected: string) = 
     Regex.Replace(expected, @"\s", "")
 
-[<Test>]
+[<Fact>]
 let ``remove space from string`` () = 
-    Assert.That(removeSpace "foo bar", Is.EqualTo "foobar")
+    Assert.Equal(removeSpace "foo bar", "foobar")
 
-[<Test>]
+[<Fact>]
 let ``remove newline from string`` () = 
     let actual = """foo 
     bar"""
-    Assert.That(removeSpace actual, Is.EqualTo "foobar")
+    Assert.Equal(removeSpace actual, "foobar")
 
-[<Test>]
+[<Fact>]
 let ``serialize primitive types to JSON`` () = 
-    Assert.That(serializerFactory<bool> defaultJsonWriteOptions true, Is.EqualTo("true"))
-    Assert.That(serializerFactory<int> defaultJsonWriteOptions 1, Is.EqualTo("1"))
-    Assert.That(serializerFactory<string> defaultJsonWriteOptions "foo", Is.EqualTo("\"foo\""))
-    Assert.That(serializerFactory<char> defaultJsonWriteOptions 'f', Is.EqualTo("\"f\""))
+    Assert.Equal(serializerFactory<bool> defaultJsonWriteOptions true, ("true"))
+    Assert.Equal(serializerFactory<int> defaultJsonWriteOptions 1, ("1"))
+    Assert.Equal(serializerFactory<string> defaultJsonWriteOptions "foo", ("\"foo\""))
+    Assert.Equal(serializerFactory<char> defaultJsonWriteOptions 'f', ("\"f\""))
 
-[<Test>]
+[<Fact>]
 let ``serialize URI to JSON`` () = 
     let example = Uri("https://google.com")
-    Assert.That(serializerFactory<Uri> defaultJsonWriteOptions example, Is.EqualTo("\"https://google.com/\""))
+    Assert.Equal(serializerFactory<Uri> defaultJsonWriteOptions example, ("\"https://google.com/\""))
 
-[<Test>]
+[<Fact>]
 let ``serialize JsonValue to JSON`` () = 
     let example = JsonValue.Parse "{}"
-    Assert.That(serializerFactory<JsonValue> defaultJsonWriteOptions example, Is.EqualTo("{}"))
+    Assert.Equal(serializerFactory<JsonValue> defaultJsonWriteOptions example, ("{}"))
 
-[<Test>]
+[<Fact>]
 let ``serialize option to JSON`` () = 
-    Assert.That(serializerFactory<option<int>> defaultJsonWriteOptions (Some 1), Is.EqualTo("1"))
-    Assert.That(serializerFactory<option<int>> defaultJsonWriteOptions (None), Is.EqualTo("null"))
+    Assert.Equal(serializerFactory<option<int>> defaultJsonWriteOptions (Some 1), ("1"))
+    Assert.Equal(serializerFactory<option<int>> defaultJsonWriteOptions (None), ("null"))
 
 type SimpleRecord = {simpleMember: int}
 
-[<Test>]
+[<Fact>]
 let ``serialize record to JSON`` () = 
     let record = {simpleMember = 1}
-    Assert.That(serializerFactory<SimpleRecord> defaultJsonWriteOptions record, Is.EqualTo("""{"simpleMember":1}"""))
+    Assert.Equal(serializerFactory<SimpleRecord> defaultJsonWriteOptions record, ("""{"simpleMember":1}"""))
 
-[<Test>]
+[<Fact>]
 let ``serialize list of ints to JSON`` () = 
     let example = [1; 2]
-    Assert.That(serializerFactory<list<int>> defaultJsonWriteOptions example, Is.EqualTo("""[1,2]"""))
+    Assert.Equal(serializerFactory<list<int>> defaultJsonWriteOptions example, ("""[1,2]"""))
 
-[<Test>]
+[<Fact>]
 let ``serialize list of strings to JSON`` () = 
     let example = ["foo"; "bar"]
-    Assert.That(serializerFactory<list<string>> defaultJsonWriteOptions example, Is.EqualTo("""["foo","bar"]"""))
+    Assert.Equal(serializerFactory<list<string>> defaultJsonWriteOptions example, ("""["foo","bar"]"""))
 
-[<Test>]
+[<Fact>]
 let ``serialize a record with a custom writer`` () = 
     let record = {simpleMember = 1}
     let customWriter (r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
-    Assert.That(serializerFactory<SimpleRecord> options record, Is.EqualTo("\"simpleMember=1\""))
+    Assert.Equal(serializerFactory<SimpleRecord> options record, ("\"simpleMember=1\""))
 
 type Foo = Bar | Doh 
 type FooRecord = {foo: Foo}
 
-[<Test>]
+[<Fact>]
 let ``serialize a union with a custom writer`` () = 
     let record = {foo = Bar}
     let customWriter = function 
     | Bar -> 10
     | Doh -> 20
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
-    Assert.That(serializerFactory<FooRecord> options record, Is.EqualTo("""{"foo":10}"""))
+    Assert.Equal(serializerFactory<FooRecord> options record, ("""{"foo":10}"""))
 
 type IFoo =
     abstract member Foo: unit -> string 
@@ -83,11 +83,11 @@ type MyFoo() =
     interface IFoo with 
         member this.Foo() = "foo"
 
-[<Test>]
+[<Fact>]
 let ``serialize an interface with a custom writer`` () = 
     let customWriter (foo: IFoo): string = 
         foo.Foo()
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     let example = MyFoo()
-    Assert.That(serializerFactory<IFoo> options example, Is.EqualTo("\"foo\""))
-    Assert.That(serializerFactory<MyFoo> options example, Is.EqualTo("\"foo\""))
+    Assert.Equal(serializerFactory<IFoo> options example, ("\"foo\""))
+    Assert.Equal(serializerFactory<MyFoo> options example, ("\"foo\""))

@@ -6,10 +6,11 @@ open LSP.Types
 open LSP
 open System
 open System.IO
-open NUnit.Framework
+open Xunit
+open Xunit.Abstractions
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
-[<Test>]
+[<Fact>]
 let ``check errors in some text`` () = 
     let file = "MyScript.fsx"
     let input = """
@@ -21,7 +22,7 @@ let ``check errors in some text`` () =
     let parseFileResults = checker.ParseFile(file, input, parsingOptions) |> Async.RunSynchronously
     ()
 
-[<Test>]
+[<Fact>]
 let ``report a type error when a file is opened`` () = 
     let server = Server() :> ILanguageServer
     let file = Path.Combine [|projectRoot.FullName; "sample"; "WrongType.fs"|]
