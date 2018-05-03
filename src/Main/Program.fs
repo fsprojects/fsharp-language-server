@@ -15,21 +15,21 @@ type Server() =
     let emptyProjectOptions = checker.GetProjectOptionsFromCommandLineArgs("NotFound.fsproj", [||])
     let notFound (doc: Uri) (): 'Any = 
         raise (Exception (sprintf "%s does not exist" (doc.ToString())))
-    let lint (doc: Uri): Async<unit> = TODO()
-        // async {
-        //     let name = doc.AbsolutePath.ToString()
-        //     let version = docs.GetVersion doc |> Option.defaultWith (notFound doc)
-        //     let source = docs.GetText doc |> Option.defaultWith (notFound doc)
-        //     let compilerOptions = projects.FindProjectOptions doc |> Option.defaultValue emptyCompilerOptions
-        //     let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(name, version, source, projectOptions)
-        //     for error in parseResults.Errors do 
-        //         eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
-        //     match checkAnswer with 
-        //     | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" name 
-        //     | FSharpCheckFileAnswer.Succeeded checkResults -> 
-        //         for error in checkResults.Errors do 
-        //             eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
-        // }
+    let lint (doc: Uri): Async<unit> = 
+        async {
+            let name = doc.AbsolutePath.ToString()
+            let version = docs.GetVersion doc |> Option.defaultWith (notFound doc)
+            let source = docs.GetText doc |> Option.defaultWith (notFound doc)
+            let projectOptions = projects.FindProjectOptions doc |> Option.defaultValue emptyProjectOptions
+            let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(name, version, source, projectOptions)
+            for error in parseResults.Errors do 
+                eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+            match checkAnswer with 
+            | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" name 
+            | FSharpCheckFileAnswer.Succeeded checkResults -> 
+                for error in checkResults.Errors do 
+                    eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+        }
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
             { capabilities = 
