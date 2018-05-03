@@ -9,6 +9,7 @@ open System.Xml
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
+open Microsoft.FSharp.Compiler.SourceCodeServices
 
 type CompilerOptions = {
     sources: list<FileInfo>
@@ -116,7 +117,7 @@ module ProjectManagerUtils =
                     let absolutePath = Path.Combine(path.DirectoryName, relativePath)
                     yield FileInfo(absolutePath)
             })
-       // Find all <ProjectReference Include=?> elements in fsproj
+        // Find all <ProjectReference Include=?> elements in fsproj
         let projectReferences (fsproj: XmlNode): list<FileInfo> = 
             List.ofSeq(seq {
                 for n in fsproj.SelectNodes "//ProjectReference[@Include]" do 
@@ -138,6 +139,21 @@ module ProjectManagerUtils =
                 projectReferences = projectReferences project
                 references = [] 
             }
+    let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
+        let c = parseBoth(fsproj)
+        {
+            ExtraProjectInfo = None 
+            IsIncompleteTypeCheckEnvironment = false 
+            LoadTime = DateTime.Now
+            OriginalLoadReferences = []
+            OtherOptions = [||]
+            ProjectFileName = fsproj.FullName 
+            ReferencedProjects = c.projectReferences |> List.map (fun f -> (f.FullName, parseProjectOptions f)) |> List.toArray
+            SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
+            Stamp = None 
+            UnresolvedReferences = None 
+            UseScriptResolutionRules = false
+        }
 
 open ProjectManagerUtils
 

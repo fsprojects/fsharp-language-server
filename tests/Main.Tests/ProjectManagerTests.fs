@@ -53,3 +53,14 @@ let ``parse a project file`` () =
     Assert.That(parsed.sources |> Seq.map name, Contains.Item "ProjectManager.fs")
     Assert.That(parsed.projectReferences |> Seq.map name, Contains.Item "LSP.fsproj")
     Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
+
+[<Test>]
+let ``parse a project file recursively`` () = 
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
+    let parsed = ProjectManagerUtils.parseProjectOptions file
+    let name (f: string) = 
+      let parts = f.Split('/')
+      parts.[parts.Length - 1]
+    Assert.That(parsed.SourceFiles |> Seq.map name, Contains.Item "ProjectManager.fs")
+    Assert.That(parsed.ReferencedProjects |> Seq.map (fun (x, _) -> x) |> Seq.map name, Contains.Item "LSP.fsproj")
+    // Assert.That(parsed.references |> Seq.map name, Contains.Item "FSharp.Compiler.Service.dll")
