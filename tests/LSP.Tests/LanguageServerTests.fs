@@ -3,7 +3,7 @@ module LSP.LanguageServerTests
 open System
 open System.IO 
 open System.Text
-open Xunit
+open SimpleTest
 open FSharp.Data
 open LSP.Types
 
@@ -15,28 +15,27 @@ let binaryWriter () =
         Encoding.UTF8.GetString bytes
     (writer, toString)
 
-[<Fact>]
-let ``write text``() = 
+let ``test write text`` (t: TestContext) = 
     let (writer, toString) = binaryWriter() 
     writer.Write (Encoding.UTF8.GetBytes "foo")
-    Assert.Equal(toString(), "foo")
+    let found = toString()
+    if found <> "foo" then Fail(found)
 
-[<Fact>]
-let ``write response``() = 
+let ``test write response`` (t: TestContext) = 
     let (writer, toString) = binaryWriter() 
     LanguageServer.respond writer 1 "2"
     let expected = "Content-Length: 19\r\n\r\n\
                     {\"id\":1,\"result\":2}"
-    Assert.Equal(toString(), expected)
+    let found = toString()
+    if found <> expected then Fail(found)
 
-[<Fact>]
-let ``write multibyte characters``() = 
+let ``test write multibyte characters`` (t: TestContext) = 
     let (writer, toString) = binaryWriter() 
     LanguageServer.respond writer 1 "🔥"
     let expected = "Content-Length: 22\r\n\r\n\
                     {\"id\":1,\"result\":🔥}"
-    Assert.Equal(toString(), expected)
-
+    let found = toString()
+    if found <> expected then Fail(found)
 
 let TODO() = raise (Exception "TODO")
 
@@ -93,11 +92,11 @@ let initializeMessage = """
 }
 """
 
-[<Fact>]
-let ``read messages from a stream``() = 
+let ``test read messages from a stream`` (t: TestContext) = 
     let stdin = messageStream [initializeMessage]
     let messages = LanguageServer.readMessages stdin
-    Assert.True(Seq.toList messages = [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
+    let found = Seq.toList messages
+    if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
 
 let exitMessage = """
 {
@@ -106,11 +105,11 @@ let exitMessage = """
 }
 """
     
-[<Fact>]
-let ``exit message terminates stream``() = 
+let ``test exit message terminates stream`` (t: TestContext) = 
     let stdin = messageStream [initializeMessage; exitMessage; initializeMessage]
     let messages = LanguageServer.readMessages stdin
-    Assert.True(Seq.toList messages = [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")])
+    let found = Seq.toList messages
+    if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
 
 let mock (server: ILanguageServer) (messages: list<string>): string = 
     let stdout = new MemoryStream()
@@ -119,8 +118,7 @@ let mock (server: ILanguageServer) (messages: list<string>): string =
     LanguageServer.connect server readIn writeOut
     Encoding.UTF8.GetString(stdout.ToArray())
 
-[<Fact>]
-let ``send Initialize``() = 
+let ``test send Initialize`` (t: TestContext) = 
     let message = """
     {
         "jsonrpc": "2.0",
@@ -131,4 +129,4 @@ let ``send Initialize``() =
     """
     let server = MockServer()
     let result = mock server [message]
-    Assert.True(result.Contains("capabilities"))
+    if not (result.Contains("capabilities")) then Fail(result)

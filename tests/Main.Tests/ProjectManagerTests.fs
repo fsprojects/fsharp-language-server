@@ -4,11 +4,10 @@ open Main
 open Main.Tests.Common
 open System
 open System.IO
-open Xunit
 open Microsoft.FSharp.Compiler.SourceCodeServices
+open SimpleTest
 
-[<Fact>]
-let ``parse project file JSON`` () = 
+let ``test parsing a JSON project file`` (t: TestContext) = 
     let json = """
     {
       "version": 3,
@@ -33,18 +32,17 @@ let ``parse project file JSON`` () =
       }
     }"""
     let parsed = ProjectManagerUtils.parseAssetsJson json
-    Assert.True(Map.containsKey ".NETCoreApp,Version=v2.0" parsed.targets)
-    Assert.True(Map.containsKey "FSharp.Compiler.Service/16.0.2" parsed.libraries)
-    Assert.True(Seq.exists ((=) "/Users/george/.nuget/packages/") parsed.packageFolders)
+    if not (Map.containsKey ".NETCoreApp,Version=v2.0" parsed.targets) then Fail("Failed")
+    if not (Map.containsKey "FSharp.Compiler.Service/16.0.2" parsed.libraries) then Fail("Failed")
+    if not (Seq.exists ((=) "/Users/george/.nuget/packages/") parsed.packageFolders) then Fail("Failed")
 
-[<Fact>]
-let ``parse a project file`` () = 
+let ``test parsing a project file`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectManagerUtils.parseBoth file
     let hasName (name: string) (f: FileInfo) = name = f.Name
-    Assert.True(Seq.exists (hasName "ProjectManager.fs") parsed.sources)
-    Assert.True(Seq.exists (hasName "LSP.fsproj") parsed.projectReferences)
-    Assert.True(Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
+    if not (Seq.exists (hasName "ProjectManager.fs") parsed.sources) then Fail("Failed")
+    if not (Seq.exists (hasName "LSP.fsproj") parsed.projectReferences) then Fail("Failed")
+    if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references) then Fail("Failed")
 
 let private fileHasName (name: string) (f: string) =
     let parts = f.Split('/')
@@ -57,19 +55,17 @@ let private projectHasName (name: string) (project: string * FSharpProjectOption
   let fName = parts.[parts.Length - 1]
   name = fName
 
-[<Fact>]
-let ``parse a project file recursively`` () = 
+let ``test parse a project file recursively`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectManagerUtils.parseProjectOptions file
-    Assert.True(Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles)
-    Assert.True(Seq.exists (projectHasName "LSP.fsproj") parsed.ReferencedProjects)
-    // Assert.True(Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
+    if not (Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles) then Fail("Failed")
+    if not (Seq.exists (projectHasName "LSP.fsproj") parsed.ReferencedProjects) then Fail("Failed")
+    // if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
 
-[<Fact>]
-let ``find an fsproj in a parent dir`` () = 
+let ``test find an fsproj in a parent dir`` (t: TestContext) = 
     let projects = ProjectManager()
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Program.fs"|])
     let parsed = projects.FindProjectOptions(Uri(file.FullName)) |> Option.get
-    Assert.True(Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles)
-    Assert.True(Seq.exists (projectHasName "LSP.fsproj") parsed.ReferencedProjects)
-    // Assert.True(Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
+    if not (Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles) then Fail("Failed")
+    if not (Seq.exists (projectHasName "LSP.fsproj") parsed.ReferencedProjects) then Fail("Failed")
+    // if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)

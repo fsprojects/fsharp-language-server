@@ -11,16 +11,16 @@
     <Compile Include="ParserTests.fs" />
     <Compile Include="DocumentStoreTests.fs" />
     <Compile Include="LanguageServerTests.fs" />
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.3.0-preview-20170628-02" />
-    <PackageReference Include="xunit" Version="2.2.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\LSP\LSP.fsproj" />
+    <ProjectReference Include="..\..\src\SimpleTest\SimpleTest.fsproj" />
   </ItemGroup>
 
 </Project>

@@ -2,7 +2,7 @@ module Main.Tests.Common
 
 open System
 open System.IO
-open Xunit
+open SimpleTest
 
 let private findProjectRoot (start: DirectoryInfo): DirectoryInfo = 
     seq {
