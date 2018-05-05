@@ -15,6 +15,12 @@ let private asRange (err: FSharpErrorInfo): Range =
         ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
     }
 
+let private hasNoLocation (err: FSharpErrorInfo): bool = 
+    err.StartLineAlternate-1 = 0 && 
+    err.StartColumn = 0 &&
+    err.EndLineAlternate-1 = 0 &&
+    err.EndColumn = 0
+
 let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
     match s with 
     | FSharpErrorSeverity.Warning -> DiagnosticSeverity.Warning 
@@ -39,7 +45,12 @@ type Server(client: ILanguageClient) =
     let publishDiagnostics (doc: Uri) (errors: FSharpErrorInfo[]) =
         let diags = {
             uri = doc 
-            diagnostics = [ for err in errors do yield asDiagnostic(err) ]
+            diagnostics = 
+                [ for err in errors do 
+                    if hasNoLocation err then 
+                        eprintfn "Error with no position file:%s number:%d subcategory:%s message:'%s'" err.FileName err.ErrorNumber err.Subcategory err.Message
+                    else
+                        yield asDiagnostic(err) ]
         }
         client.PublishDiagnostics(diags)
     let lint (doc: Uri): unit = 
