@@ -1,35 +1,60 @@
 ﻿module Main.Program
 
-open LSP
-open LSP.Types
+open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
 open System.IO
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open LSP
+open LSP.Types
 
 let private TODO() = raise (Exception "TODO")
 
-type Server() = 
+let private asRange (err: FSharpErrorInfo): Range = 
+    {
+        // Got error "The field, constructor or member 'StartLine' is not defined"
+        start = {line=err.StartLineAlternate-1; character=err.StartColumn}
+        _end = {line=err.EndLineAlternate-1; character=err.EndColumn}
+    }
+
+let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
+    match s with 
+    | FSharpErrorSeverity.Warning -> DiagnosticSeverity.Warning 
+    | FSharpErrorSeverity.Error -> DiagnosticSeverity.Error 
+
+let private asDiagnostic (err: FSharpErrorInfo): Diagnostic = 
+    {
+        range = asRange(err)
+        severity = Some (asDiagnosticSeverity err.Severity)
+        code = Some (sprintf "%d: %s" err.ErrorNumber err.Subcategory)
+        source = Some "F#"
+        message = err.Message
+    }
+
+type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
     let emptyProjectOptions = checker.GetProjectOptionsFromCommandLineArgs("NotFound.fsproj", [||])
     let notFound (doc: Uri) (): 'Any = 
         raise (Exception (sprintf "%s does not exist" (doc.ToString())))
-    let lint (doc: Uri): Async<unit> = 
+    let publishDiagnostics (doc: Uri) (errors: FSharpErrorInfo[]) =
+        let diags = {
+            uri = doc 
+            diagnostics = [ for err in errors do yield asDiagnostic(err) ]
+        }
+        client.PublishDiagnostics(diags)
+    let lint (doc: Uri): unit = 
         async {
             let name = doc.AbsolutePath.ToString()
             let version = docs.GetVersion doc |> Option.defaultWith (notFound doc)
             let source = docs.GetText doc |> Option.defaultWith (notFound doc)
             let projectOptions = projects.FindProjectOptions doc |> Option.defaultValue emptyProjectOptions
             let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(name, version, source, projectOptions)
-            for error in parseResults.Errors do 
-                eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
+            publishDiagnostics doc parseResults.Errors
             match checkAnswer with 
             | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" name 
             | FSharpCheckFileAnswer.Succeeded checkResults -> 
-                for error in checkResults.Errors do 
-                    eprintfn "%s %d:%d %s" error.FileName error.StartLineAlternate error.StartColumn error.Message
-        }
+                publishDiagnostics doc checkResults.Errors
+        } |> Async.RunSynchronously
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
             { capabilities = 
@@ -47,14 +72,13 @@ type Server() =
             eprintfn "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
             docs.Open p
-            lint p.textDocument.uri |> Async.RunSynchronously
+            lint p.textDocument.uri
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
             docs.Change p
-            lint p.textDocument.uri |> Async.RunSynchronously
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): list<TextEdit> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
-            eprintfn "%s" (p.ToString())
+            lint p.textDocument.uri
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
             docs.Close p
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
@@ -86,7 +110,7 @@ type Server() =
 let main (argv: array<string>): int =
     let read = new BinaryReader(Console.OpenStandardInput())
     let write = new BinaryWriter(Console.OpenStandardOutput())
-    let server = Server()
+    let serverFactory = fun client -> Server(client) :> ILanguageServer
     eprintfn "Listening on stdin"
-    LanguageServer.connect server read write
+    LanguageServer.connect serverFactory read write
     0 // return an integer exit code

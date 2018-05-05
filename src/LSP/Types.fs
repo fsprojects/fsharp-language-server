@@ -605,3 +605,11 @@ type ILanguageServer =
     abstract member ExecuteCommand: ExecuteCommandParams -> unit
 
 // TODO IAsyncLanguageServer that supports request cancellation
+
+type PublishDiagnosticsParams = {
+    uri: Uri 
+    diagnostics: list<Diagnostic>
+}
+
+type ILanguageClient =
+    abstract member PublishDiagnostics: PublishDiagnosticsParams -> unit 

@@ -32,14 +32,22 @@ let private serializeCodeLens = serializerFactory<CodeLens> jsonWriteOptions
 let private serializeDocumentLinkList = serializerFactory<list<DocumentLink>> jsonWriteOptions
 let private serializeDocumentLink = serializerFactory<DocumentLink> jsonWriteOptions
 let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteOptions
+let private serializePublishDiagnostics = serializerFactory<PublishDiagnosticsParams> jsonWriteOptions
 
-let respond (client: BinaryWriter) (requestId: int) (jsonText: string) = 
-    let messageText = sprintf """{"id":%d,"result":%s}""" requestId jsonText
+let private writeClient (client: BinaryWriter) (messageText: string) =
     let messageBytes = Encoding.UTF8.GetBytes messageText
     let headerText = sprintf "Content-Length: %d\r\n\r\n" messageBytes.Length
     let headerBytes = Encoding.UTF8.GetBytes headerText
     client.Write headerBytes
     client.Write messageBytes
+
+let respond (client: BinaryWriter) (requestId: int) (jsonText: string) = 
+    let messageText = sprintf """{"id":%d,"result":%s}""" requestId jsonText
+    writeClient client messageText
+
+let notifyClient (client: BinaryWriter) (method: string) (jsonText: string) = 
+    let messageText = sprintf """{"method":"%s","result":%s}""" method jsonText
+    writeClient client messageText
 
 let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (request: Request) = 
     match request with 
@@ -126,6 +134,12 @@ let private notExit (message: Parser.Message) =
 let readMessages (receive: BinaryReader): seq<Parser.Message> = 
     Tokenizer.tokenize receive |> Seq.map Parser.parseMessage |> Seq.takeWhile notExit
 
-let connect (server: ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
+type RealClient (send: BinaryWriter) = 
+    interface ILanguageClient with 
+        member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
+            p |> serializePublishDiagnostics |> notifyClient send "textDocument/publishDiagnostics"
+
+let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
+    let server = serverFactory(RealClient(send))
     let doProcessMessage = processMessage server send 
     readMessages receive |> Seq.iter doProcessMessage
