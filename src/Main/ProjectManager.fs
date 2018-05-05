@@ -150,11 +150,10 @@ module ProjectManagerUtils =
                 eprintfn "    %s" f.FullName
     let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
-        let options = 
-            [|  yield "--noframework" 
-                for r in c.references do 
-                    yield sprintf "-r:%O" r |]
-        let projectRefs = c.projectReferences |> List.map (fun f -> (f.FullName, parseProjectOptions f))
+        // Generate fake .dll for each project
+        // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
+        let projectDll(fsproj: FileInfo) = 
+            Path.Combine [| fsproj.Directory.FullName; "bin"; "fake"; sprintf "%s.dll" fsproj.Name |]
         eprintfn "Project %s" fsproj.FullName
         eprintfn "  References:"
         printList c.references "references"
@@ -167,9 +166,14 @@ module ProjectManagerUtils =
             IsIncompleteTypeCheckEnvironment = false 
             LoadTime = DateTime.Now
             OriginalLoadReferences = []
-            OtherOptions = options
+            OtherOptions = [| yield "--noframework" 
+                              // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
+                              for f in c.projectReferences do
+                                  yield sprintf "-r:%O" (projectDll f)
+                              for f in c.references do 
+                                  yield sprintf "-r:%O" f |]
             ProjectFileName = fsproj.FullName 
-            ReferencedProjects = projectRefs |> List.toArray
+            ReferencedProjects = c.projectReferences |> List.map (fun f -> (projectDll f, parseProjectOptions f)) |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
             Stamp = None 
             UnresolvedReferences = None 
