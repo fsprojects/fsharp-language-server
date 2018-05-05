@@ -81,8 +81,9 @@ module ProjectManagerUtils =
             seq {
                 for packageFolder in assets.packageFolders do 
                     let absolutePath = Path.Combine(packageFolder, dependencyPath)
-                    if File.Exists absolutePath then
-                        yield FileInfo(absolutePath)
+                    let normalizePath = Path.GetFullPath(absolutePath)
+                    if File.Exists normalizePath then
+                        yield FileInfo(normalizePath)
             } |> Seq.tryHead
         let resolveInLibrary (library: string) (dll: string): option<FileInfo> = 
             let libraryPath = assets.libraries.[library].path
@@ -115,7 +116,8 @@ module ProjectManagerUtils =
                 for n in fsproj.SelectNodes "//Compile[@Include]" do 
                     let relativePath = n.Attributes.["Include"].Value |> fixPath
                     let absolutePath = Path.Combine(path.DirectoryName, relativePath)
-                    yield FileInfo(absolutePath)
+                    let normalizePath = Path.GetFullPath(absolutePath)
+                    yield FileInfo(normalizePath)
             })
         // Find all <ProjectReference Include=?> elements in fsproj
         let projectReferences (fsproj: XmlNode): list<FileInfo> = 
@@ -123,7 +125,8 @@ module ProjectManagerUtils =
                 for n in fsproj.SelectNodes "//ProjectReference[@Include]" do 
                     let relativePath = n.Attributes.["Include"].Value |> fixPath
                     let absolutePath = Path.Combine(path.DirectoryName, relativePath)
-                    yield FileInfo(absolutePath)
+                    let normalizePath = Path.GetFullPath(absolutePath)
+                    yield FileInfo(normalizePath)
             })
         let assetsFile = Path.Combine(path.DirectoryName, "obj", "project.assets.json") |> FileInfo
         let rs = 
@@ -139,13 +142,26 @@ module ProjectManagerUtils =
             projectReferences = projectReferences project
             references = rs
         }
+    let private printList (files: FileInfo list) (describe: string) =
+        if List.length files > 10 then 
+            eprintfn "    (%d %s)" (List.length files) describe 
+        else 
+            for f in files do 
+                eprintfn "    %s" f.FullName
     let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
         let options = 
             [|  yield "--noframework" 
                 for r in c.references do 
                     yield sprintf "-r:%O" r |]
-        eprintfn "fsc %s" (String.concat " " options)
+        let projectRefs = c.projectReferences |> List.map (fun f -> (f.FullName, parseProjectOptions f))
+        eprintfn "Project %s" fsproj.FullName
+        eprintfn "  References:"
+        printList c.references "references"
+        eprintfn "  Projects:"
+        printList c.projectReferences "projects"
+        eprintfn "  Sources:"
+        printList c.sources "sources"
         {
             ExtraProjectInfo = None 
             IsIncompleteTypeCheckEnvironment = false 
@@ -153,7 +169,7 @@ module ProjectManagerUtils =
             OriginalLoadReferences = []
             OtherOptions = options
             ProjectFileName = fsproj.FullName 
-            ReferencedProjects = c.projectReferences |> List.map (fun f -> (f.FullName, parseProjectOptions f)) |> List.toArray
+            ReferencedProjects = projectRefs |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
             Stamp = None 
             UnresolvedReferences = None 

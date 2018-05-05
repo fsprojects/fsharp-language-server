@@ -94,3 +94,8 @@ let ``test report a type error when a file is saved`` (t: TestContext) =
     server.DidSaveTextDocument(save "CreateTypeError.fs")
     let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
+
+let ``test reference other file in same project`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "Reference.fs"
+    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
