@@ -123,5 +123,9 @@ let main (argv: array<string>): int =
     let write = new BinaryWriter(Console.OpenStandardOutput())
     let serverFactory = fun client -> Server(client) :> ILanguageServer
     eprintfn "Listening on stdin"
-    LanguageServer.connect serverFactory read write
-    0 // return an integer exit code
+    try 
+        LanguageServer.connect serverFactory read write
+        0 // return an integer exit code
+    with e -> 
+        eprintfn "Exception in language server %O" e
+        1
