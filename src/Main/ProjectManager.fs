@@ -146,7 +146,10 @@ module ProjectManagerUtils =
             IsIncompleteTypeCheckEnvironment = false 
             LoadTime = DateTime.Now
             OriginalLoadReferences = []
-            OtherOptions = [||]
+            OtherOptions = 
+                [|  yield "--noframework" 
+                    for r in c.references do 
+                        yield sprintf "-r:%O" r |]
             ProjectFileName = fsproj.FullName 
             ReferencedProjects = c.projectReferences |> List.map (fun f -> (f.FullName, parseProjectOptions f)) |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
