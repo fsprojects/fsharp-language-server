@@ -35,6 +35,12 @@ let private asDiagnostic (err: FSharpErrorInfo): Diagnostic =
         message = err.Message
     }
 
+let private alreadyLogged = System.Collections.Generic.HashSet<string>()
+let logOnce (message: string): unit = 
+    if not (alreadyLogged.Contains message) then 
+        eprintfn "%s" message 
+        alreadyLogged.Add(message) |> ignore
+
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
@@ -48,13 +54,14 @@ type Server(client: ILanguageClient) =
             diagnostics = 
                 [ for err in errors do 
                     if hasNoLocation err then 
-                        eprintfn "Error with no position file:%s number:%d subcategory:%s message:'%s'" err.FileName err.ErrorNumber err.Subcategory err.Message
+                        logOnce(sprintf "NOPOS %s %d %s '%s'" err.FileName err.ErrorNumber err.Subcategory err.Message)
                     else
                         yield asDiagnostic(err) ]
         }
         client.PublishDiagnostics(diags)
     let lint (doc: Uri): unit = 
         async {
+            eprintfn "Lint %O" doc
             let name = doc.AbsolutePath.ToString()
             let version = docs.GetVersion doc |> Option.defaultWith (notFound doc)
             let source = docs.GetText doc |> Option.defaultWith (notFound doc)
