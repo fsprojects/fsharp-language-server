@@ -10,7 +10,7 @@
 		"url": "https://github.com/georgewfraser/fsharp-language-server"
 	},
 	"engines": {
-		"vscode": "^1.16.0"
+		"vscode": "^1.21.0"
 	},
 	"categories": [
 		"Languages",
@@ -24,6 +24,21 @@
 		"./src/Main/bin/Debug/netcoreapp2.0/Main.dll"
 	],
 	"contributes": {
+		"languages": [
+			{
+				"id": "fsharp",
+				"aliases": [
+					"F#",
+					"FSharp"
+				],
+				"extensions": [
+					".fs",
+					".fsi",
+					".fsx"
+				],
+				"configuration": "./syntaxes/kotlin.configuration.json"
+			}
+		],
 		"configuration": {
 			"type": "object",
 			"title": "FSharp configuration",
@@ -43,17 +58,18 @@
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "tsc -p ./",
+		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
-		"watch": "tsc -w -p ./",
-		"update-vscode": "node ./node_modules/vscode/bin/install",
-		"postinstall": "node ./node_modules/vscode/bin/install"
+		"watch": "tsc -watch -p ./",
+		"postinstall": "node ./node_modules/vscode/bin/install",
+		"test": "npm run compile && node ./node_modules/vscode/bin/test"
 	},
 	"dependencies": {
-		"vscode": "^1.1.6",
-		"vscode-languageclient": "^3.4.5"
+		"vscode-languageclient": "^4.0.0"
 	},
 	"devDependencies": {
+		"typescript": "^2.6.1",
+		"vscode": "^1.1.6",
 		"@types/node": "^8.0.47"
 	}
 }

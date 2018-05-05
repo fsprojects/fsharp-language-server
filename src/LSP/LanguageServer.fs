@@ -10,7 +10,11 @@ open Json
 let jsonWriteOptions = 
     { defaultJsonWriteOptions with 
         customWriters = 
-            [ writeTextDocumentSyncKind;
+            [ writeTextDocumentSaveReason;
+              writeFileChangeType;
+              writeTextDocumentSyncKind;
+              writeDiagnosticSeverity;
+              writeTrace;
               writeInsertTextFormat;
               writeCompletionItemKind;
               writeMarkedString;
@@ -46,7 +50,7 @@ let respond (client: BinaryWriter) (requestId: int) (jsonText: string) =
     writeClient client messageText
 
 let notifyClient (client: BinaryWriter) (method: string) (jsonText: string) = 
-    let messageText = sprintf """{"method":"%s","result":%s}""" method jsonText
+    let messageText = sprintf """{"method":"%s","params":%s}""" method jsonText
     writeClient client messageText
 
 let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (request: Request) = 

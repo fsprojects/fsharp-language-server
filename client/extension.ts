@@ -5,7 +5,6 @@
 'use strict';
 
 import * as path from 'path';
-
 import { workspace, ExtensionContext } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient';
 
@@ -34,7 +33,7 @@ export function activate(context: ExtensionContext) {
 	}
 	
 	// Create the language client and start the client.
-	let disposable = new LanguageClient('fsharp', 'FSharp Language Server', serverOptions, clientOptions).start();
+	let disposable = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions).start();
 	
 	// Push the disposable to the context's subscriptions so that the 
 	// client can be deactivated on extension deactivation

@@ -54,6 +54,12 @@ type TextDocumentSaveReason =
 | AfterDelay
 | FocusOut
 
+let writeTextDocumentSaveReason i =
+    match i with 
+    | TextDocumentSaveReason.Manual -> 1
+    | TextDocumentSaveReason.AfterDelay -> 2
+    | TextDocumentSaveReason.FocusOut -> 3
+
 type WillSaveTextDocumentParams = {
     textDocument: TextDocumentIdentifier
     reason: TextDocumentSaveReason
@@ -73,6 +79,12 @@ type FileChangeType =
 | Created
 | Changed 
 | Deleted
+
+let writeFileChangeType i = 
+    match i with 
+    | FileChangeType.Created -> 1
+    | FileChangeType.Changed -> 2
+    | FileChangeType.Deleted -> 3
 
 type FileEvent = {
     uri: Uri 
@@ -107,6 +119,13 @@ type DiagnosticSeverity =
 | Warning 
 | Information 
 | Hint
+
+let writeDiagnosticSeverity i = 
+    match i with 
+    | DiagnosticSeverity.Error -> 1 
+    | DiagnosticSeverity.Warning -> 2
+    | DiagnosticSeverity.Information -> 3
+    | DiagnosticSeverity.Hint -> 4
 
 type Diagnostic = {
     range: Range
@@ -154,6 +173,12 @@ type Trace =
 | Off 
 | Messages 
 | Verbose
+
+let writeTrace i = 
+    match i with 
+    | Trace.Off -> "off"
+    | Trace.Messages -> "messages"
+    | Trace.Verbose -> "verbose"
 
 type InitializeParams = {
     processId: option<int>
