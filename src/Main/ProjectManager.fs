@@ -131,7 +131,6 @@ module ProjectManagerUtils =
         let assetsFile = Path.Combine(path.DirectoryName, "obj", "project.assets.json") |> FileInfo
         let rs = 
             if assetsFile.Exists then 
-                eprintfn "Found %O" assetsFile
                 let assets = parseAssets assetsFile
                 references assets
             else 
