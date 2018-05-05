@@ -29,6 +29,3 @@ let ``test report a type error when a file is opened`` (t: TestContext) =
     let fileText = File.ReadAllText(file)
     let openParams: DidOpenTextDocumentParams = {textDocument={uri=Uri(file); languageId="fsharp"; version=0; text=fileText}}
     server.DidOpenTextDocument openParams
-
-let ``test that we can find tests`` (t: TestContext) = 
-    Fail("Failed!")

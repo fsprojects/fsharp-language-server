@@ -6,6 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="Program.fs" />
+    <Compile Include="WrongType.fs" />
   </ItemGroup>
 </Project>

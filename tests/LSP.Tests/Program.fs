@@ -5,5 +5,5 @@ open System.Reflection
 
 [<EntryPoint>]
 let main (argv: array<string>): int =
-    runAllTests(Assembly.GetExecutingAssembly())
+    runAllTests(Assembly.GetExecutingAssembly(), argv)
     0

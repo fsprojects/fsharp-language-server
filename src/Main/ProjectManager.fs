@@ -126,19 +126,19 @@ module ProjectManagerUtils =
                     yield FileInfo(absolutePath)
             })
         let assetsFile = Path.Combine(path.DirectoryName, "obj", "project.assets.json") |> FileInfo
-        if assetsFile.Exists then 
-            let assets = parseAssets assetsFile
-            {
-                sources = sources project 
-                projectReferences = projectReferences project
-                references = references assets 
-            }
-        else 
-            {
-                sources = sources project 
-                projectReferences = projectReferences project
-                references = [] 
-            }
+        let rs = 
+            if assetsFile.Exists then 
+                eprintfn "Found %O" assetsFile
+                let assets = parseAssets assetsFile
+                references assets
+            else 
+                eprintfn "No assets file at %O" assetsFile
+                []
+        {
+            sources = sources project 
+            projectReferences = projectReferences project
+            references = rs
+        }
     let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
         {

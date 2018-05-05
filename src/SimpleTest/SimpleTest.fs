@@ -22,11 +22,16 @@ let private isTest(m: MethodInfo) =
     let ps = m.GetParameters()
     m.Name.StartsWith("test") && ps.Length = 1 && ps.[0].ParameterType = typeof<TestContext>
 
-let runAllTests(assembly: Assembly): unit =
+let private matchesArgs (argv: array<string>) (m: MethodInfo) = 
+    Array.isEmpty argv || Array.exists (fun arg -> m.Name.Contains(arg)) argv
+
+let runAllTests(assembly: Assembly, argv: array<string>): unit =
+    if not (Array.isEmpty argv) then 
+        eprintf "Looking for tests that match %A" argv
     let mutable countSucceeded, countFailed = 0, 0
     for t in assembly.GetTypes() do 
         for m in t.GetMethods() do 
-            if isTest(m) then 
+            if isTest(m) && (matchesArgs argv m) then 
                 let context = { new TestContext with 
                     member this.Placeholder = ()}
                 try 

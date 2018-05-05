@@ -2,7 +2,9 @@
     "files.exclude": {
         ".git/**": true,
         ".idea/": true,
-        "**/bin/": true,
-        "**/obj/": true
+        "src/**/bin/": true,
+        "src/**/obj/": true,
+        "tests/**/bin/": true,
+        "tests/**/obj/": true
     }
 }
