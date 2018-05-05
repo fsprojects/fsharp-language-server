@@ -148,17 +148,30 @@ module ProjectManagerUtils =
         else 
             for f in files do 
                 eprintfn "    %s" f.FullName
+    // Generate fake .dll for each project
+    // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
+    let private projectDll (fsproj: FileInfo) = 
+        Path.Combine [| fsproj.Directory.FullName; "bin"; "fake"; sprintf "%s.dll" fsproj.Name |]
+    // Traverse the tree of project references
+    let private ancestors (fsproj: FileInfo): list<FileInfo> = 
+        let all = List<FileInfo>()
+        let rec traverse (fsproj: FileInfo) = 
+            let head = parseBoth fsproj
+            for r in head.projectReferences do 
+                traverse r 
+            all.Add(fsproj)
+        let head = parseBoth fsproj 
+        for r in head.projectReferences do 
+            traverse r
+        List.ofSeq all
     let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
-        // Generate fake .dll for each project
-        // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-        let projectDll(fsproj: FileInfo) = 
-            Path.Combine [| fsproj.Directory.FullName; "bin"; "fake"; sprintf "%s.dll" fsproj.Name |]
+        let ancestorProjects = ancestors fsproj
         eprintfn "Project %s" fsproj.FullName
         eprintfn "  References:"
         printList c.references "references"
         eprintfn "  Projects:"
-        printList c.projectReferences "projects"
+        printList ancestorProjects "projects"
         eprintfn "  Sources:"
         printList c.sources "sources"
         {
@@ -168,12 +181,12 @@ module ProjectManagerUtils =
             OriginalLoadReferences = []
             OtherOptions = [| yield "--noframework" 
                               // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-                              for f in c.projectReferences do
+                              for f in ancestorProjects do
                                   yield sprintf "-r:%O" (projectDll f)
                               for f in c.references do 
                                   yield sprintf "-r:%O" f |]
             ProjectFileName = fsproj.FullName 
-            ReferencedProjects = c.projectReferences |> List.map (fun f -> (projectDll f, parseProjectOptions f)) |> List.toArray
+            ReferencedProjects = ancestorProjects |> List.map (fun f -> (projectDll f, parseProjectOptions f)) |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
             Stamp = None 
             UnresolvedReferences = None 

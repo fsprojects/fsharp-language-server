@@ -11,6 +11,7 @@
     <Compile Include="Target.fs" />
     <Compile Include="Reference.fs" />
     <Compile Include="ReferenceDependsOn.fs" />
+    <Compile Include="ReferenceIndirectDep.fs" />
   </ItemGroup>
 
   <ItemGroup>
