@@ -110,6 +110,12 @@ let ``test exit message terminates stream`` (t: TestContext) =
     let messages = LanguageServer.readMessages stdin
     let found = Seq.toList messages
     if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
+    
+let ``test end of bytes terminates stream`` (t: TestContext) = 
+    let stdin = messageStream [initializeMessage]
+    let messages = LanguageServer.readMessages stdin
+    let found = Seq.toList messages
+    if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
 
 let mock (server: ILanguageServer) (messages: list<string>): string = 
     let stdout = new MemoryStream()
