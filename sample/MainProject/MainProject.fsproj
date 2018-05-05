@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="WrongType.fs" />
+    <Compile Include="CreateTypeError.fs" />
+    <Compile Include="Target.fs" />
+    <Compile Include="Reference.fs" />
+    <Compile Include="ReferenceDependsOn.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DependsOn\DependsOn.fsproj" />
+  </ItemGroup>
+</Project>

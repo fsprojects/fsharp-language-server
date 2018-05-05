@@ -6,9 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="WrongType.fs" />
-    <Compile Include="CreateTypeError.fs" />
-    <Compile Include="Target.fs" />
-    <Compile Include="Reference.fs" />
+    <Compile Include="MyLibrary.fs" />
   </ItemGroup>
 </Project>

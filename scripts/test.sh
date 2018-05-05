@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-dotnet build sample/Sample.fsproj
+dotnet build sample/MainProject/MainProject.fsproj
 dotnet run -p tests/LSP.Tests
 dotnet run -p tests/Main.Tests
 
