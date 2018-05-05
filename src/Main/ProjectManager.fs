@@ -141,15 +141,17 @@ module ProjectManagerUtils =
         }
     let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
+        let options = 
+            [|  yield "--noframework" 
+                for r in c.references do 
+                    yield sprintf "-r:%O" r |]
+        eprintfn "fsc %s" (String.concat " " options)
         {
             ExtraProjectInfo = None 
             IsIncompleteTypeCheckEnvironment = false 
             LoadTime = DateTime.Now
             OriginalLoadReferences = []
-            OtherOptions = 
-                [|  yield "--noframework" 
-                    for r in c.references do 
-                        yield sprintf "-r:%O" r |]
+            OtherOptions = options
             ProjectFileName = fsproj.FullName 
             ReferencedProjects = c.projectReferences |> List.map (fun f -> (f.FullName, parseProjectOptions f)) |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
