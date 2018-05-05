@@ -34,8 +34,11 @@ let createServer (): MockClient * ILanguageServer =
     let server = Server(client) :> ILanguageServer
     (client, server)
 
+let absPath (file: string): string = 
+    Path.Combine [|projectRoot.FullName; "sample"; file|]
+
 let readFile (name: string): string * string = 
-    let file = Path.Combine [|projectRoot.FullName; "sample"; name|]
+    let file = absPath name
     let fileText = File.ReadAllText(file)
     (file, fileText)
 
@@ -49,5 +52,45 @@ let createServerAndReadFile (name: string): MockClient * ILanguageServer =
 let ``test report a type error when a file is opened`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "WrongType.fs"
     if client.Diagnostics.Count = 0 then Fail("No diagnostics")
+    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
+
+let mutable versionCounter = 1
+
+let nextVersion () = 
+    versionCounter <- versionCounter + 1 
+    versionCounter
+
+let edit (file: string) (line: int) (character: int) (existingText: string) (replacementText: string): DidChangeTextDocumentParams = 
+    {
+        textDocument = 
+            {
+                uri = Uri(absPath file)
+                version = nextVersion()
+            }
+        contentChanges = 
+            [
+                {
+                    range = Some
+                        {
+                            start = { line=line-1; character=character-1 }
+                            _end = { line=line-1; character=character-1+existingText.Length }
+                        }
+                    rangeLength = None
+                    text = replacementText
+                }
+            ]
+    }
+let save (file: string): DidSaveTextDocumentParams = 
+    {
+        textDocument = { uri=Uri(absPath file) }
+        text = None
+    }
+
+let ``test report a type error when a file is saved`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "CreateTypeError.fs"
+    client.Diagnostics.Clear()
+    server.DidChangeTextDocument(edit "CreateTypeError.fs" 4 18 "1" "\"1\"")
+    server.DidSaveTextDocument(save "CreateTypeError.fs")
     let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)

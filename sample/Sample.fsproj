@@ -7,5 +7,6 @@
 
   <ItemGroup>
     <Compile Include="WrongType.fs" />
+    <Compile Include="CreateTypeError.fs" />
   </ItemGroup>
 </Project>
