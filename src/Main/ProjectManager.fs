@@ -163,11 +163,6 @@ module ProjectManagerUtils =
 open ProjectManagerUtils
 
 type ProjectManager() = 
-    let cache = new Dictionary<DirectoryInfo, FSharpProjectOptions>()
-    let addToCache (projectFile: FileInfo): FSharpProjectOptions = 
-        let parsed = parseProjectOptions projectFile
-        cache.[projectFile.Directory] <- parsed
-        parsed
     // Scan the parent directories looking for a file *.fsproj
     let findProjectFileInParents (sourceFile: FileInfo): option<FileInfo> = 
         seq {
@@ -177,19 +172,31 @@ type ProjectManager() =
                     yield proj
                 dir <- dir.Parent
         } |> Seq.tryHead
-    let tryFindAndCache (sourceFile: FileInfo): option<FSharpProjectOptions> = 
-        match findProjectFileInParents sourceFile with 
-        | None -> 
-            eprintfn "No project file for %s" sourceFile.Name
-            None
-        | Some projectFile -> 
-            eprintfn "Found project file %s for %s" projectFile.FullName sourceFile.Name
-            Some (addToCache projectFile)
+    let parseCache = new Dictionary<FileInfo, FSharpProjectOptions>()
+    let projectFileCache = new Dictionary<DirectoryInfo, FileInfo>()
+    let cachedParse (projectFile: FileInfo): FSharpProjectOptions = 
+        if not (parseCache.ContainsKey projectFile) then 
+            parseCache.[projectFile] <- parseProjectOptions projectFile
+        parseCache.[projectFile]
+    let cachedProjectFile (sourceFile: FileInfo): option<FileInfo> = 
+        let sourceDir = sourceFile.Directory 
+        if projectFileCache.ContainsKey(sourceDir) then 
+            Some (projectFileCache.[sourceDir])
+        else 
+            match findProjectFileInParents sourceFile with 
+            | None -> 
+                eprintfn "No project file for %s" sourceFile.Name
+                None
+            | Some projectFile -> 
+                eprintfn "Found project file %s for %s" projectFile.FullName sourceFile.Name
+                projectFileCache.[sourceDir] <- projectFile 
+                Some projectFile 
     member this.UpdateProjectFile(project: Uri): unit = 
         let file = FileInfo(project.AbsolutePath)
-        addToCache file |> ignore
+        // TODO make this more selective
+        parseCache.Clear() 
+        projectFileCache.Clear()
     member this.FindProjectOptions(sourceFile: Uri): option<FSharpProjectOptions> = 
         let file = FileInfo(sourceFile.AbsolutePath)
-        match tryFindAndCache file  with 
-        | Some cachedProject -> Some cachedProject
-        | None -> tryFindAndCache file
+        let project = cachedProjectFile file
+        Option.map cachedParse project
