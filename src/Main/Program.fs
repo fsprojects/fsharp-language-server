@@ -1,4 +1,4 @@
-﻿module Main.Program
+module Main.Program
 
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
