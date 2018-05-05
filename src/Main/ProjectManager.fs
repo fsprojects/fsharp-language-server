@@ -19,7 +19,7 @@ type CompilerOptions = {
 
 module ProjectManagerUtils = 
     type Dependency = {
-        _type: string 
+        ``type``: string 
         compile: list<string>
     }
 
@@ -43,7 +43,7 @@ module ProjectManagerUtils =
     let private parseDependency (info: JsonValue): Dependency = 
         let compile = info.TryGetProperty("compile") |> Option.map keys
         {
-            _type = info?``type``.AsString()
+            ``type`` = info?``type``.AsString()
             compile = defaultArg compile []
         }
     let private parseDependencies (dependencies: JsonValue): Map<string, Dependency> = 
@@ -91,7 +91,7 @@ module ProjectManagerUtils =
         List.ofSeq(seq {
             for target in assets.targets do 
                 for dependency in target.Value do 
-                    if dependency.Value._type = "package" && Map.containsKey dependency.Key assets.libraries then 
+                    if dependency.Value.``type`` = "package" && Map.containsKey dependency.Key assets.libraries then 
                         for dll in dependency.Value.compile do 
                             let resolved = resolveInLibrary dependency.Key dll
                             if resolved.IsSome then 

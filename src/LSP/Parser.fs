@@ -49,7 +49,7 @@ let parsePosition (json: JsonValue): Position =
 let parseRange (json: JsonValue): Range = 
     {
         start = json?start |> parsePosition 
-        _end = json?``end`` |> parsePosition
+        ``end`` = json?``end`` |> parsePosition
     }
 
 let parseVersionedTextDocumentIdentifier (json: JsonValue): VersionedTextDocumentIdentifier = 
@@ -110,7 +110,7 @@ let parseFileChangeType (i: int): FileChangeType =
 let parseFileEvent (json: JsonValue): FileEvent = 
     {
         uri = json?uri.AsString() |> Uri 
-        _type = json?``type``.AsInteger() |> parseFileChangeType
+        ``type`` = json?``type``.AsInteger() |> parseFileChangeType
     }
 
 let parseDidChangeWatchedFilesParams (json: JsonValue): DidChangeWatchedFilesParams = 

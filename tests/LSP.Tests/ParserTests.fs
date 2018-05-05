@@ -144,7 +144,7 @@ let ``test parse a DidChangeTextDocument notification with range`` (t: TestConte
             [{
                 range = Some {
                     start = {line = 0; character = 0}
-                    _end = {line = 0; character = 3}
+                    ``end`` = {line = 0; character = 3}
                 }
                 rangeLength = Some 3
                 text = "let x = 1"
@@ -231,7 +231,7 @@ let ``test parse a DidChangeWatchedFiles notification`` (t: TestContext) =
             changes = 
                 [{
                     uri = Uri("file://workspace/Main.fs")
-                    _type = FileChangeType.Changed
+                    ``type`` = FileChangeType.Changed
                 }]
         })
     if found <> expected then Fail(found)
@@ -373,7 +373,7 @@ let ``test parse maximal ResolveCompletionItem request`` (t: TestContext) =
                 range = 
                     {
                         start = {line = 0; character = 0}
-                        _end = {line = 0; character = 2}
+                        ``end`` = {line = 0; character = 2}
                     }
                 newText = "foo()"
             } 
@@ -382,7 +382,7 @@ let ``test parse maximal ResolveCompletionItem request`` (t: TestContext) =
                     range = 
                         {
                             start = {line = 1; character = 0}
-                            _end = {line = 1; character = 0}
+                            ``end`` = {line = 1; character = 0}
                         }
                     newText = "foo()"
                 }]
@@ -523,7 +523,7 @@ let ``test parse minimal CodeActions request`` (t: TestContext) =
             range = 
                 {
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
+                    ``end`` = {line = 1; character = 0}
                 }
             context = 
                 {
@@ -532,7 +532,7 @@ let ``test parse minimal CodeActions request`` (t: TestContext) =
                             range = 
                                 {
                                     start = {line = 1; character = 0}
-                                    _end = {line = 1; character = 0}
+                                    ``end`` = {line = 1; character = 0}
                                 }
                             severity = None
                             code = None
@@ -571,7 +571,7 @@ let ``test parse maximal CodeActions request`` (t: TestContext) =
             range = 
                 { 
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0} 
+                    ``end`` = {line = 1; character = 0} 
                 }
             context = 
                 {
@@ -580,7 +580,7 @@ let ``test parse maximal CodeActions request`` (t: TestContext) =
                             range = 
                                 { 
                                     start = {line = 1; character = 0}
-                                    _end = {line = 1; character = 0} 
+                                    ``end`` = {line = 1; character = 0} 
                                 }
                             severity = Some DiagnosticSeverity.Error
                             code = Some "SomeError"
@@ -617,7 +617,7 @@ let ``test parse CodeActions request with an integer code`` (t: TestContext) =
             range = 
                 {
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
+                    ``end`` = {line = 1; character = 0}
                 }
             context = 
                 {
@@ -626,7 +626,7 @@ let ``test parse CodeActions request with an integer code`` (t: TestContext) =
                             range = 
                                 {
                                     start = {line = 1; character = 0}
-                                    _end = {line = 1; character = 0}
+                                    ``end`` = {line = 1; character = 0}
                                 }
                             severity = None
                             code = Some "1"
@@ -661,7 +661,7 @@ let ``test parse minimal ResolveCodeLens request`` (t: TestContext) =
             range = 
                 {
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
+                    ``end`` = {line = 1; character = 0}
                 }
             command = None 
             data = JsonValue.Null
@@ -686,7 +686,7 @@ let ``test parse maximal ResolveCodeLens request`` (t: TestContext) =
             range = 
                 {
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
+                    ``end`` = {line = 1; character = 0}
                 }
             command = Some {
                 title = "save"
@@ -721,7 +721,7 @@ let ``test parse ResolveDocumentLink request`` (t: TestContext) =
             range = 
                 {
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
+                    ``end`` = {line = 1; character = 0}
                 }
             target = None
         })
@@ -795,7 +795,7 @@ let ``test parse DocumentRangeFormatting request`` (t: TestContext) =
             range = 
                 {
                     start = {line = 1; character = 0}
-                    _end = {line = 1; character = 0}
+                    ``end`` = {line = 1; character = 0}
                 }
         })
     if found <> expected then Fail(found)

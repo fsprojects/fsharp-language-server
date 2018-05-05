@@ -12,7 +12,7 @@ let private asRange (err: FSharpErrorInfo): Range =
     {
         // Got error "The field, constructor or member 'StartLine' is not defined"
         start = {line=err.StartLineAlternate-1; character=err.StartColumn}
-        _end = {line=err.EndLineAlternate-1; character=err.EndColumn}
+        ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
     }
 
 let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
@@ -83,7 +83,7 @@ type Server(client: ILanguageClient) =
             docs.Close p
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
-                eprintfn "Watched file %s %s" (change.uri.ToString()) (change._type.ToString())
+                eprintfn "Watched file %s %s" (change.uri.ToString()) (change.``type``.ToString())
                 if change.uri.AbsolutePath.EndsWith ".fsproj" then
                     projects.UpdateProjectFile change.uri 
         member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()

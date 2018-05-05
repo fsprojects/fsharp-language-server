@@ -20,7 +20,7 @@ module DocumentStoreUtils =
         for offset = 0 to text.Length do 
             if line = range.start.line && char = range.start.character then 
                 startOffset <- offset 
-            if line = range._end.line && char = range._end.character then 
+            if line = range.``end``.line && char = range.``end``.character then 
                 endOffset <- offset 
             if offset < text.Length then 
                 let c = text.[offset]

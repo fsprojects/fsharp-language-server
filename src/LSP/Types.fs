@@ -30,7 +30,7 @@ type Position = {
 
 type Range = {
     start: Position
-    _end: Position
+    ``end``: Position
 }
 
 type TextDocumentContentChangeEvent = {
@@ -88,7 +88,7 @@ let writeFileChangeType i =
 
 type FileEvent = {
     uri: Uri 
-    _type: FileChangeType
+    ``type``: FileChangeType
 }
 
 type DidChangeWatchedFilesParams = {

@@ -74,7 +74,7 @@ let edit (file: string) (line: int) (character: int) (existingText: string) (rep
                     range = Some
                         {
                             start = { line=line-1; character=character-1 }
-                            _end = { line=line-1; character=character-1+existingText.Length }
+                            ``end`` = { line=line-1; character=character-1+existingText.Length }
                         }
                     rangeLength = None
                     text = replacementText
