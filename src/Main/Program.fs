@@ -8,6 +8,7 @@ open LSP.Types
 
 let private TODO() = raise (Exception "TODO")
 
+// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private asRange (err: FSharpErrorInfo): Range = 
     {
         // Got error "The field, constructor or member 'StartLine' is not defined"
@@ -15,17 +16,13 @@ let private asRange (err: FSharpErrorInfo): Range =
         ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
     }
 
-let private hasNoLocation (err: FSharpErrorInfo): bool = 
-    err.StartLineAlternate-1 = 0 && 
-    err.StartColumn = 0 &&
-    err.EndLineAlternate-1 = 0 &&
-    err.EndColumn = 0
-
+// Convert an F# Compiler Services 'FSharpErrorSeverity' to an LSP 'DiagnosticSeverity'
 let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
     match s with 
     | FSharpErrorSeverity.Warning -> DiagnosticSeverity.Warning 
     | FSharpErrorSeverity.Error -> DiagnosticSeverity.Error 
 
+// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Diagnostic'
 let private asDiagnostic (err: FSharpErrorInfo): Diagnostic = 
     {
         range = asRange(err)
@@ -34,11 +31,22 @@ let private asDiagnostic (err: FSharpErrorInfo): Diagnostic =
         source = None
         message = err.Message
     }
+    
+// Some compiler errors have no location in the file and should be logged separately
+let private hasNoLocation (err: FSharpErrorInfo): bool = 
+    err.StartLineAlternate-1 = 0 && 
+    err.StartColumn = 0 &&
+    err.EndLineAlternate-1 = 0 &&
+    err.EndColumn = 0
+    
+// Log no-location messages once and then silence them
 let private alreadyLogged = System.Collections.Generic.HashSet<string>()
 let logOnce (message: string): unit = 
     if not (alreadyLogged.Contains message) then 
         eprintfn "%s" message 
         alreadyLogged.Add(message) |> ignore
+
+// Convert a list of F# Compiler Services 'FSharpErrorInfo' to and LSP 'PublishDiagnosticsParams'
 let convertDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]): PublishDiagnosticsParams =
     {
         uri = uri 
@@ -51,6 +59,9 @@ let convertDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]): PublishDiagnostic
                         yield asDiagnostic(err) 
             ]
     }
+
+// A special error message for when an .fs file is not listed in the parent .fsproj file,
+// or there is no .fsproj file
 let private notInProjectFile (uri: Uri) (projectFile: FileInfo option): PublishDiagnosticsParams =
     {
         uri = uri 
@@ -64,16 +75,20 @@ let private notInProjectFile (uri: Uri) (projectFile: FileInfo option): PublishD
             }]
     }
 
+// If LSP specifies a file that does not exist, throw an exception
+let notFound (uri: Uri) (): 'Any = 
+    raise (Exception (sprintf "%s does not exist" (uri.ToString())))
+
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
     let emptyProjectOptions = checker.GetProjectOptionsFromCommandLineArgs("NotFound.fsproj", [||])
-    let notFound (uri: Uri) (): 'Any = 
-        raise (Exception (sprintf "%s does not exist" (uri.ToString())))
+    // Send F# compiler diagnostics to the client
     let publishDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]) = 
         let lspErrors = convertDiagnostics uri errors
         client.PublishDiagnostics lspErrors
+    // Lint a file
     let lint (uri: Uri): unit = 
         async {
             eprintfn "Lint %O" uri

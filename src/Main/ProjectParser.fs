@@ -10,13 +10,12 @@ open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
-type CompilerOptions = {
-    sources: list<FileInfo>
-    projectReferences: list<FileInfo>
-    references: list<FileInfo>
-}
-
 module ProjectParser = 
+    type ParsedFsProj = {
+        sources: list<FileInfo>
+        projectReferences: list<FileInfo>
+        references: list<FileInfo>
+    }
     type Dependency = {
         ``type``: string 
         compile: list<string>
@@ -145,7 +144,7 @@ module ProjectParser =
         doc.LoadXml text 
         doc.DocumentElement
     // Parse fsproj and fsproj/../obj/project.assets.json
-    let parseBoth (path: FileInfo): CompilerOptions = 
+    let private parseBoth (path: FileInfo): ParsedFsProj = 
         let project = parseFsProj path
         // Find all <Compile Include=?> elements in fsproj
         let sources (fsproj: XmlNode): list<FileInfo> = 
@@ -213,6 +212,7 @@ module ProjectParser =
         for r in head.projectReferences do 
             traverse r
         List.ofSeq all
+    // Parse an .fsproj, looking at project.assets.json to find referenced .dlls
     let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
         let ancestorProjects = ancestors fsproj

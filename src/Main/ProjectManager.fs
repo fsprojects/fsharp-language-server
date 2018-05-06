@@ -10,6 +10,7 @@ open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
+// Maintains caches of parsed versions of .fsproj files
 type ProjectManager() = 
     // Scan the parent directories looking for a file *.fsproj
     let findProjectFileInParents (sourceFile: FileInfo): option<FileInfo> = 

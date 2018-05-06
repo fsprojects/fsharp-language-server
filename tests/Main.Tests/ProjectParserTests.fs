@@ -51,8 +51,9 @@ let ``test parsing a JSON project file`` (t: TestContext) =
 
 let ``test parsing a project file`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
-    let parsed = ProjectParser.parseBoth file
-    let hasName (name: string) (f: FileInfo) = name = f.Name
-    if not (Seq.exists (hasName "ProjectManager.fs") parsed.sources) then Fail("Failed")
-    if not (Seq.exists (hasName "LSP.fsproj") parsed.projectReferences) then Fail("Failed")
-    if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references) then Fail("Failed")
+    let parsed = ProjectParser.parseProjectOptions file
+    let referencedProjects = Array.map (fun (f, _) -> f) parsed.ReferencedProjects
+    let hasName (name: string) (f: string) = f.EndsWith(name)
+    if not (Seq.exists (hasName "ProjectManager.fs") parsed.SourceFiles) then Fail("Failed")
+    if not (Seq.exists (hasName "LSP.dll") referencedProjects) then Fail(sprintf "No LSP.dll in %A" referencedProjects)
+    if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.OtherOptions) then Fail(sprintf "No FSharp.Compiler.Service.dll in %A" parsed.OtherOptions)
