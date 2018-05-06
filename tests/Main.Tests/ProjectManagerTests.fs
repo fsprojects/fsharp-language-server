@@ -23,7 +23,7 @@ let ``test parse a project file recursively`` (t: TestContext) =
     let parsed = ProjectParser.parseProjectOptions file
     if not (Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles) then Fail("Failed")
     if not (Seq.exists (projectHasName "LSP.dll") parsed.ReferencedProjects) then Fail(parsed.ReferencedProjects)
-    // if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
+    if not (Seq.exists (fileHasName "FSharp.Compiler.Service.dll") parsed.OtherOptions) then Fail(parsed.OtherOptions)
 
 let ``test find an fsproj in a parent dir`` (t: TestContext) = 
     let projects = ProjectManager()
@@ -32,4 +32,4 @@ let ``test find an fsproj in a parent dir`` (t: TestContext) =
     let parsed = Option.map projects.FindProjectOptions projectFile |> Option.get
     if not (Seq.exists (fileHasName "ProjectManager.fs") parsed.SourceFiles) then Fail("Failed")
     if not (Seq.exists (projectHasName "LSP.dll") parsed.ReferencedProjects) then Fail(parsed.ReferencedProjects)
-    // if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.references)
+    if not (Seq.exists (fileHasName "FSharp.Compiler.Service.dll") parsed.OtherOptions) then Fail(parsed.OtherOptions)
