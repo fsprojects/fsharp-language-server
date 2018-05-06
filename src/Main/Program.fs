@@ -101,6 +101,14 @@ let findMethodCallBeforeCursor (lineContent: string) (character: int): int optio
     }
     Seq.tryHead find
 
+// Figure out the active parameter by counting ',' characters
+let countCommas (lineContent: string) (endOfMethodName: int) (cursor: int): int = 
+    let mutable count = 0
+    for i in endOfMethodName .. cursor-1 do 
+        if lineContent.[i] = ',' then 
+            count <- count + 1
+    count
+
 // Convert an F# `FSharpToolTipElement` to an LSP `Hover`
 let private asHover (FSharpToolTipText tips): Hover = 
     let convert = 
@@ -156,13 +164,6 @@ let private convertSignature (label: string) (s: FSharpMethodGroupItem): Signatu
         label = label 
         documentation = doc 
         parameters = List.map convertParameter (List.ofArray s.Parameters)
-    }
-
-let private convertSignatures (sigs: FSharpMethodGroup): SignatureHelp = 
-    {
-        signatures = List.map (convertSignature sigs.MethodName) (List.ofArray sigs.Methods)
-        activeSignature = None 
-        activeParameter = None // TODO
     }
 
 type private FindFile = 
@@ -291,8 +292,13 @@ type Server(client: ILanguageClient) =
                     let names = findNamesUnderCursor line endOfMethodName
                     eprintfn "Looking for overloads of %s" (String.concat "." names)
                     let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName+1, line, Some names) |> Async.RunSynchronously
+                    let sigs = Array.map (convertSignature overloads.MethodName) overloads.Methods |> List.ofArray
+                    let activeParameter = countCommas line endOfMethodName p.position.character
+                    // TODO actually look at types
+                    let isCompatible (overload: FSharpMethodGroupItem) = activeParameter = 0 || overload.Parameters.Length > activeParameter
+                    let activeDeclaration = Array.findIndex isCompatible overloads.Methods
                     eprintfn "Found %d overloads" overloads.Methods.Length
-                    Some(convertSignatures overloads)
+                    Some({signatures=sigs; activeSignature=Some activeDeclaration; activeParameter=Some activeParameter})
         member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = TODO()
         member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()

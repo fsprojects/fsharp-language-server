@@ -156,3 +156,11 @@ let ``test complete List members`` (t: TestContext) =
         let labels = List.map (fun (i:CompletionItem) -> i.label) completions.items 
         if not (List.contains "map" labels) then Fail(sprintf "List.map is not in %A" labels)
 
+let ``test signature help`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "SignatureHelp.fs"
+    match server.SignatureHelp(position "SignatureHelp.fs" 3 47) with 
+    | None -> Fail("No signature help")
+    | Some help -> 
+        if List.isEmpty help.signatures then Fail("Signature list is empty")
+        if List.length help.signatures <> 2 then Fail(sprintf "Expected 2 overloads of Substring but found %A" help)
+

@@ -14,6 +14,7 @@
     <Compile Include="ReferenceIndirectDep.fs" />
     <Compile Include="Hover.fs" />
     <Compile Include="Completions.fs" />
+    <Compile Include="SignatureHelp.fs" />
   </ItemGroup>
 
   <ItemGroup>
