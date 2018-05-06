@@ -60,7 +60,7 @@ let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (req
     | WillSaveWaitUntilTextDocument p -> 
         server.WillSaveWaitUntilTextDocument p |> serializeTextEditList |> respond send id
     | Completion p -> 
-        server.Completion p |> serializeCompletionList |> respond send id
+        server.Completion p |> Option.map serializeCompletionList |> Option.defaultValue "null" |> respond send id
     | Hover p -> 
         server.Hover p |> Option.map serializeHover |> Option.defaultValue "null" |> respond send id
     | ResolveCompletionItem p -> 

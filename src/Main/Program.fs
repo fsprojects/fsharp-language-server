@@ -1,5 +1,6 @@
 module Main.Program
 
+open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
 open System.IO
@@ -106,6 +107,44 @@ let private asHover (FSharpToolTipText tips): Hover =
                 eprintfn "Tooltip error %s" err]
     {contents=convert; range=None}
 
+let private asDocumentation (FSharpToolTipText tips): string option = 
+    let convert = 
+        [ for t in tips do 
+            match t with 
+            | FSharpToolTipElement.None -> () 
+            | FSharpToolTipElement.Group elements -> 
+                for e in elements do 
+                    yield e.MainDescription
+            | FSharpToolTipElement.CompositionError err -> 
+                eprintfn "Tooltip error %s" err]
+    match convert with 
+    | [] -> None 
+    | single::[] -> Some single 
+    | head::tail -> 
+        eprintfn "Found multiple docstrings, ignoring %A" tail 
+        Some head
+
+let private convertCompletionItemKind (k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
+    match k with 
+    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Field -> Some CompletionItemKind.Field
+    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Property -> Some CompletionItemKind.Property
+    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Method isExtension -> Some CompletionItemKind.Method
+    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Event -> None
+    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Argument -> Some CompletionItemKind.Variable
+    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Other -> None
+
+let private convertDeclaration (i: FSharpDeclarationListItem): CompletionItem = 
+    { defaultCompletionItem with 
+        label = i.Name 
+        kind = convertCompletionItemKind i.Kind
+        detail = Some i.FullName
+        documentation = asDocumentation i.DescriptionText
+    }
+
+let private convertDeclarations (ds: FSharpDeclarationListInfo): CompletionList = 
+    let items = List.map convertDeclaration (List.ofArray ds.Items)
+    {isIncomplete=false; items=items}
+
 type private FindFile = 
     | NoSourceFile of sourcePath: string
     | NoProjectFile of sourcePath: string
@@ -166,6 +205,7 @@ type Server(client: ILanguageClient) =
             { capabilities = 
                 { defaultServerCapabilities with 
                     hoverProvider = true
+                    completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -193,7 +233,16 @@ type Server(client: ILanguageClient) =
                 eprintfn "Watched file %s %s" (change.uri.ToString()) (change.``type``.ToString())
                 if change.uri.AbsolutePath.EndsWith ".fsproj" then
                     projects.UpdateProjectFile change.uri 
-        member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()
+        member this.Completion(p: TextDocumentPositionParams): CompletionList option =
+            match check (p.textDocument.uri) with 
+            | Errors errors -> 
+                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                None
+            | Ok(parseResult, checkResult, _) -> 
+                let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character)
+                let declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName) |> Async.RunSynchronously
+                Some (convertDeclarations declarations)
         member this.Hover(p: TextDocumentPositionParams): option<Hover> = 
             match check (p.textDocument.uri) with 
             | Errors errors -> 

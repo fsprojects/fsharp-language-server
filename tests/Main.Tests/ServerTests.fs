@@ -147,3 +147,9 @@ let ``test hover over qualified name`` (t: TestContext) =
     | None -> Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Fail("Hover list is empty")
 
+let ``test complete List members`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "Completions.fs"
+    match server.Completion(position "Completions.fs" 2 10) with 
+    | None -> Fail("No completions")
+    | Some completions -> if List.isEmpty completions.items then Fail("Completion list is empty")
+

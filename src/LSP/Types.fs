@@ -264,6 +264,22 @@ type CompletionItem = {
     data: JsonValue
 }
 
+let defaultCompletionItem: CompletionItem = {
+    label = ""
+    kind = None 
+    detail = None 
+    documentation = None 
+    sortText = None 
+    filterText = None
+    insertText = None
+    insertTextFormat = None
+    textEdit = None
+    additionalTextEdits = []
+    commitCharacters = []
+    command = None
+    data = JsonValue.Null
+}
+
 type ReferenceContext = {
     includeDeclaration: bool
 }
@@ -609,8 +625,8 @@ type ILanguageServer =
     abstract member DidSaveTextDocument: DidSaveTextDocumentParams -> unit
     abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> unit
     abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> unit
-    abstract member Completion: TextDocumentPositionParams -> CompletionList
-    abstract member Hover: TextDocumentPositionParams -> option<Hover>
+    abstract member Completion: TextDocumentPositionParams -> CompletionList option
+    abstract member Hover: TextDocumentPositionParams -> Hover option
     abstract member ResolveCompletionItem: CompletionItem -> CompletionItem
     abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp
     abstract member GotoDefinition: TextDocumentPositionParams -> list<Location>
