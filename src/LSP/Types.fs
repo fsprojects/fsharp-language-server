@@ -628,7 +628,7 @@ type ILanguageServer =
     abstract member Completion: TextDocumentPositionParams -> CompletionList option
     abstract member Hover: TextDocumentPositionParams -> Hover option
     abstract member ResolveCompletionItem: CompletionItem -> CompletionItem
-    abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp
+    abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp option
     abstract member GotoDefinition: TextDocumentPositionParams -> list<Location>
     abstract member FindReferences: ReferenceParams -> list<Location>
     abstract member DocumentHighlight: TextDocumentPositionParams -> list<DocumentHighlight>

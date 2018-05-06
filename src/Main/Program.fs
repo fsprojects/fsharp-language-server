@@ -93,9 +93,16 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
         eprintfn "Line %s offset %d matched multiple groups %A" lineContent character multiple 
         []
 
+// Look for a method call like foo.MyMethod() before the cursor
+let findMethodCallBeforeCursor (lineContent: string) (character: int): int option = 
+    let find = seq {
+        for i in character .. -1 .. 0 do 
+            if lineContent.[i] = '(' then yield i-1
+    }
+    Seq.tryHead find
+
 // Convert an F# `FSharpToolTipElement` to an LSP `Hover`
 let private asHover (FSharpToolTipText tips): Hover = 
-    eprintfn "Rendering tooltip for %A" tips 
     let convert = 
         [ for t in tips do
             match t with 
@@ -132,6 +139,31 @@ let private convertDeclaration (i: FSharpDeclarationListItem): CompletionItem =
 let private convertDeclarations (ds: FSharpDeclarationListInfo): CompletionList = 
     let items = List.map convertDeclaration (List.ofArray ds.Items)
     {isIncomplete=false; items=items}
+
+let private convertParameter (p: FSharpMethodGroupItemParameter): ParameterInformation = 
+    {
+        label = p.ParameterName
+        documentation = Some p.Display
+    }
+
+let private convertSignature (label: string) (s: FSharpMethodGroupItem): SignatureInformation = 
+    let doc = match s.Description with 
+                | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription 
+                | _ -> 
+                    eprintfn "Can't render documentation %A" s.Description 
+                    None 
+    {
+        label = label 
+        documentation = doc 
+        parameters = List.map convertParameter (List.ofArray s.Parameters)
+    }
+
+let private convertSignatures (sigs: FSharpMethodGroup): SignatureHelp = 
+    {
+        signatures = List.map (convertSignature sigs.MethodName) (List.ofArray sigs.Methods)
+        activeSignature = None 
+        activeParameter = None // TODO
+    }
 
 type private FindFile = 
     | NoSourceFile of sourcePath: string
@@ -194,6 +226,7 @@ type Server(client: ILanguageClient) =
                 { defaultServerCapabilities with 
                     hoverProvider = true
                     completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
+                    signatureHelpProvider = Some({triggerCharacters=['('; ',']})
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -243,7 +276,23 @@ type Server(client: ILanguageClient) =
                 let tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier) |> Async.RunSynchronously
                 Some(asHover tips)
         member this.ResolveCompletionItem(p: CompletionItem): CompletionItem = TODO()
-        member this.SignatureHelp(p: TextDocumentPositionParams): SignatureHelp = TODO()
+        member this.SignatureHelp(p: TextDocumentPositionParams): SignatureHelp option = 
+            match check (p.textDocument.uri) with 
+            | Errors errors -> 
+                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                None
+            | Ok(parseResult, checkResult, _) -> 
+                let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                match findMethodCallBeforeCursor line p.position.character with 
+                | None -> 
+                    eprintfn "No method call in line %s" line 
+                    None
+                | Some endOfMethodName -> 
+                    let names = findNamesUnderCursor line endOfMethodName
+                    eprintfn "Looking for overloads of %s" (String.concat "." names)
+                    let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName+1, line, Some names) |> Async.RunSynchronously
+                    eprintfn "Found %d overloads" overloads.Methods.Length
+                    Some(convertSignatures overloads)
         member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = TODO()
         member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()

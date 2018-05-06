@@ -66,7 +66,7 @@ let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (req
     | ResolveCompletionItem p -> 
         server.ResolveCompletionItem p |> serializeCompletionItem |> respond send id 
     | SignatureHelp p -> 
-        server.SignatureHelp p |> serializeSignatureHelp |> respond send id
+        server.SignatureHelp p |> Option.map serializeSignatureHelp |> Option.defaultValue "null" |> respond send id
     | GotoDefinition p -> 
         server.GotoDefinition p |> serializeLocationList |> respond send id
     | FindReferences p -> 
