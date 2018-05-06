@@ -151,5 +151,8 @@ let ``test complete List members`` (t: TestContext) =
     let (client, server) = createServerAndReadFile "Completions.fs"
     match server.Completion(position "Completions.fs" 2 10) with 
     | None -> Fail("No completions")
-    | Some completions -> if List.isEmpty completions.items then Fail("Completion list is empty")
+    | Some completions -> 
+        if List.isEmpty completions.items then Fail("Completion list is empty")
+        let labels = List.map (fun (i:CompletionItem) -> i.label) completions.items 
+        if not (List.contains "map" labels) then Fail(sprintf "List.map is not in %A" labels)
 

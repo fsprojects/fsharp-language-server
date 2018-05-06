@@ -108,21 +108,9 @@ let private asHover (FSharpToolTipText tips): Hover =
     {contents=convert; range=None}
 
 let private asDocumentation (FSharpToolTipText tips): string option = 
-    let convert = 
-        [ for t in tips do 
-            match t with 
-            | FSharpToolTipElement.None -> () 
-            | FSharpToolTipElement.Group elements -> 
-                for e in elements do 
-                    yield e.MainDescription
-            | FSharpToolTipElement.CompositionError err -> 
-                eprintfn "Tooltip error %s" err]
-    match convert with 
-    | [] -> None 
-    | single::[] -> Some single 
-    | head::tail -> 
-        eprintfn "Found multiple docstrings, ignoring %A" tail 
-        Some head
+    match tips with 
+    | [FSharpToolTipElement.Group [e]] -> Some e.MainDescription
+    | _ -> None // When there are zero or multiple overloads, don't display docs
 
 let private convertCompletionItemKind (k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
     match k with 
@@ -240,7 +228,8 @@ type Server(client: ILanguageClient) =
                 None
             | Ok(parseResult, checkResult, _) -> 
                 let line = docs.LineContent(p.textDocument.uri, p.position.line)
-                let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character)
+                let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
+                eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
                 let declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName) |> Async.RunSynchronously
                 Some (convertDeclarations declarations)
         member this.Hover(p: TextDocumentPositionParams): option<Hover> = 
