@@ -190,6 +190,8 @@ module ProjectParser =
     let private projectDll (fsproj: FileInfo): string = 
         let bin = DirectoryInfo(Path.Combine(fsproj.Directory.FullName, "bin"))
         let name = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
+        // TODO this is pretty hacky
+        // Does it actually matter if I find a real .dll? Can I just use bin/Debug/placeholder/___.dll?
         let list = [ for target in bin.GetDirectories() do 
                         for platform in target.GetDirectories() do 
                             let file = Path.Combine(platform.FullName, name)

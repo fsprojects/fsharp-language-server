@@ -2,8 +2,8 @@
     "files.exclude": {
         ".git/**": true,
         ".idea/": true,
-        // "src/**/bin/": true,
-        // "src/**/obj/": true,
+        "src/**/bin/": true,
+        "src/**/obj/": true,
         "tests/**/bin/": true,
         "tests/**/obj/": true
     }
