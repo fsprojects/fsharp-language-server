@@ -126,27 +126,18 @@ module ProjectManagerUtils =
             let libraryPath = assets.libraries.[library].path
             let dependencyPath = Path.Combine(libraryPath, dll) |> fixPath 
             resolveInPackageFolders dependencyPath
-        // Find all .dll files used by a dependency, for example "FSharp.Compiler.Service"
-        let resolveDep (findDep: string): seq<FileInfo> = 
-            seq {
-                for target in assets.targets do 
-                    for dependency in target.Value do 
-                        if dependency.Value.``type`` = "package" && dependency.Key.StartsWith(findDep + "/") then 
-                            for dll in dependency.Value.compile do 
-                                let resolved = resolveInLibrary dependency.Key dll
-                                if resolved.IsSome then 
-                                    yield resolved.Value 
-                                else 
-                                    let packageFolders = String.concat ", " assets.packageFolders
-                                    eprintfn "Couldn't find %s in %s" dll packageFolders
-            }
-        let resolveAllDeps (): seq<FileInfo> =
-            seq {
-                for framework in assets.project.frameworks do 
-                    for dependency in framework.Value.dependencies do 
-                        yield! resolveDep dependency.Key
-            }
-        List.ofSeq(resolveAllDeps())
+        List.ofSeq(seq {
+            for target in assets.targets do 
+                for dependency in target.Value do 
+                    if dependency.Value.``type`` = "package" && Map.containsKey dependency.Key assets.libraries then 
+                        for dll in dependency.Value.compile do 
+                            let resolved = resolveInLibrary dependency.Key dll
+                            if resolved.IsSome then 
+                                yield resolved.Value 
+                            else 
+                                let packageFolders = String.concat ", " assets.packageFolders
+                                eprintfn "Couldn't find %s in %s" dll packageFolders
+        })
     // Parse fsproj
     let private parseFsProj (fsproj: FileInfo): XmlElement = 
         let text = File.ReadAllText fsproj.FullName
