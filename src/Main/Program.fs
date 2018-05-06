@@ -34,44 +34,63 @@ let private asDiagnostic (err: FSharpErrorInfo): Diagnostic =
         source = None
         message = err.Message
     }
-
 let private alreadyLogged = System.Collections.Generic.HashSet<string>()
 let logOnce (message: string): unit = 
     if not (alreadyLogged.Contains message) then 
         eprintfn "%s" message 
         alreadyLogged.Add(message) |> ignore
+let convertDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]): PublishDiagnosticsParams =
+    {
+        uri = uri 
+        diagnostics = 
+            [ 
+                for err in errors do 
+                    if hasNoLocation err then 
+                        logOnce(sprintf "NOPOS %s %d %s '%s'" err.FileName err.ErrorNumber err.Subcategory err.Message)
+                    else
+                        yield asDiagnostic(err) 
+            ]
+    }
+let private notInProjectFile (uri: Uri) (projectFile: FileInfo option): PublishDiagnosticsParams =
+    {
+        uri = uri 
+        diagnostics =
+            [{
+                range = { start = {line=0; character=0}; ``end`` = {line=0; character=1} }
+                severity = Some DiagnosticSeverity.Error 
+                code = None
+                source = None 
+                message = sprintf "Not in project %A" projectFile
+            }]
+    }
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
     let emptyProjectOptions = checker.GetProjectOptionsFromCommandLineArgs("NotFound.fsproj", [||])
-    let notFound (doc: Uri) (): 'Any = 
-        raise (Exception (sprintf "%s does not exist" (doc.ToString())))
-    let publishDiagnostics (doc: Uri) (errors: FSharpErrorInfo[]) =
-        let diags = {
-            uri = doc 
-            diagnostics = 
-                [ for err in errors do 
-                    if hasNoLocation err then 
-                        logOnce(sprintf "NOPOS %s %d %s '%s'" err.FileName err.ErrorNumber err.Subcategory err.Message)
-                    else
-                        yield asDiagnostic(err) ]
-        }
-        client.PublishDiagnostics(diags)
-    let lint (doc: Uri): unit = 
+    let notFound (uri: Uri) (): 'Any = 
+        raise (Exception (sprintf "%s does not exist" (uri.ToString())))
+    let publishDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]) = 
+        let lspErrors = convertDiagnostics uri errors
+        client.PublishDiagnostics lspErrors
+    let lint (uri: Uri): unit = 
         async {
-            eprintfn "Lint %O" doc
-            let name = doc.AbsolutePath.ToString()
-            let version = docs.GetVersion doc |> Option.defaultWith (notFound doc)
-            let source = docs.GetText doc |> Option.defaultWith (notFound doc)
-            let projectOptions = projects.FindProjectOptions doc |> Option.defaultValue emptyProjectOptions
-            let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(name, version, source, projectOptions)
-            publishDiagnostics doc parseResults.Errors
-            match checkAnswer with 
-            | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" name 
-            | FSharpCheckFileAnswer.Succeeded checkResults -> 
-                publishDiagnostics doc checkResults.Errors
+            eprintfn "Lint %O" uri
+            let sourceFile = uri.AbsolutePath.ToString()
+            let version = docs.GetVersion uri |> Option.defaultWith (notFound uri)
+            let source = docs.GetText uri |> Option.defaultWith (notFound uri)
+            let projectFile = projects.FindProjectFile uri
+            let projectOptions = Option.map projects.FindProjectOptions projectFile |> Option.defaultValue emptyProjectOptions
+            if Array.contains sourceFile projectOptions.SourceFiles then 
+                let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(sourceFile, version, source, projectOptions)
+                publishDiagnostics uri parseResults.Errors
+                match checkAnswer with 
+                | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" sourceFile 
+                | FSharpCheckFileAnswer.Succeeded checkResults -> 
+                        publishDiagnostics uri checkResults.Errors
+            else 
+                client.PublishDiagnostics(notInProjectFile uri projectFile)
         } |> Async.RunSynchronously
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 

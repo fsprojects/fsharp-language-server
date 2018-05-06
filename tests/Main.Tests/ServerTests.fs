@@ -109,3 +109,8 @@ let ``test reference indirect dependency`` (t: TestContext) =
     let (client, server) = createServerAndReadFile "ReferenceIndirectDep.fs"
     let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
+
+let ``test skip file not in project file`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "NotInFsproj.fs"
+    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    if not (List.exists (fun (m:string) -> m.Contains("Not in project")) messages) then Fail(sprintf "No 'Not in project' error in %A" messages)

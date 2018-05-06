@@ -46,7 +46,8 @@ type ProjectManager() =
         // TODO make this more selective
         parseCache.Clear() 
         projectFileCache.Clear()
-    member this.FindProjectOptions(sourceFile: Uri): option<FSharpProjectOptions> = 
+    member this.FindProjectFile(sourceFile: Uri): option<FileInfo> = 
         let file = FileInfo(sourceFile.AbsolutePath)
-        let project = cachedProjectFile file
-        Option.map cachedParse project
+        cachedProjectFile file
+    member this.FindProjectOptions(fsproj: FileInfo): FSharpProjectOptions = 
+        cachedParse fsproj
