@@ -193,10 +193,11 @@ module ProjectManagerUtils =
         else 
             for f in files do 
                 eprintfn "    %s" f.FullName
-    // Generate fake .dll for each project
+    // Reference .dll for each project
     // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
     let private projectDll (fsproj: FileInfo) = 
-        Path.Combine [| fsproj.Directory.FullName; "bin"; "fake"; sprintf "%s.dll" fsproj.Name |]
+        // TODO get this from the other .fsproj file, or something...
+        Path.Combine [| fsproj.Directory.FullName; "bin"; "Debug"; "netcoreapp2.0"; fsproj.Name + ".dll" |]
     // Traverse the tree of project references
     let private ancestors (fsproj: FileInfo): list<FileInfo> = 
         let all = List<FileInfo>()
@@ -228,12 +229,12 @@ module ProjectManagerUtils =
             IsIncompleteTypeCheckEnvironment = false 
             LoadTime = DateTime.Now
             OriginalLoadReferences = []
-            OtherOptions = [| yield "--noframework" 
-                              // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-                              for f in ancestorProjects do
-                                  yield sprintf "-r:%O" (projectDll f)
-                              for f in c.references do 
-                                  yield sprintf "-r:%O" f |]
+            OtherOptions = [|   yield "--noframework" 
+                                // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
+                                for f in ancestorProjects do
+                                    yield sprintf "-r:%O" (projectDll f)
+                                for f in c.references do 
+                                    yield sprintf "-r:%O" f |]
             ProjectFileName = fsproj.FullName 
             ReferencedProjects = ancestorProjects |> List.map (fun f -> (projectDll f, parseProjectOptions f)) |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray

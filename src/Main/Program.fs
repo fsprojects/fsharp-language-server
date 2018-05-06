@@ -31,7 +31,7 @@ let private asDiagnostic (err: FSharpErrorInfo): Diagnostic =
         range = asRange(err)
         severity = Some (asDiagnosticSeverity err.Severity)
         code = Some (sprintf "%d: %s" err.ErrorNumber err.Subcategory)
-        source = Some "F#"
+        source = None
         message = err.Message
     }
 
