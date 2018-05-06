@@ -24,7 +24,7 @@ type ProjectManager() =
     let projectFileCache = new Dictionary<String, FileInfo>()
     let cachedParse (projectFile: FileInfo): FSharpProjectOptions = 
         if not (parseCache.ContainsKey projectFile.FullName) then 
-            eprintfn "Project file %O has not been parsed" projectFile 
+            eprintfn "Project %O has not been parsed" projectFile
             parseCache.[projectFile.FullName] <- ProjectParser.parseProjectOptions projectFile
         parseCache.[projectFile.FullName]
     let cachedProjectFile (sourceFile: FileInfo): option<FileInfo> = 
