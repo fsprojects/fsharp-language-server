@@ -60,7 +60,7 @@ let private notInProjectFile (uri: Uri) (projectFile: FileInfo option): PublishD
                 severity = Some DiagnosticSeverity.Error 
                 code = None
                 source = None 
-                message = sprintf "Not in project %A" projectFile
+                message = projectFile |> Option.map (fun f -> sprintf "Not in project %s" f.Name) |> Option.defaultValue "No .fsproj file"
             }]
     }
 
