@@ -41,13 +41,13 @@ let private hasNoLocation (err: FSharpErrorInfo): bool =
     
 // Log no-location messages once and then silence them
 let private alreadyLogged = System.Collections.Generic.HashSet<string>()
-let logOnce (message: string): unit = 
+let private logOnce (message: string): unit = 
     if not (alreadyLogged.Contains message) then 
         eprintfn "%s" message 
         alreadyLogged.Add(message) |> ignore
 
 // Convert a list of F# Compiler Services 'FSharpErrorInfo' to and LSP 'PublishDiagnosticsParams'
-let convertDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]): PublishDiagnosticsParams =
+let private convertDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]): PublishDiagnosticsParams =
     {
         uri = uri 
         diagnostics = 
@@ -60,9 +60,8 @@ let convertDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]): PublishDiagnostic
             ]
     }
 
-// A special error message for when an .fs file is not listed in the parent .fsproj file,
-// or there is no .fsproj file
-let private notInProjectFile (uri: Uri) (projectFile: FileInfo option): PublishDiagnosticsParams =
+// A special error message that shows at the top of the file
+let private errorAtTop (uri: Uri) (message: string): PublishDiagnosticsParams =
     {
         uri = uri 
         diagnostics =
@@ -71,19 +70,33 @@ let private notInProjectFile (uri: Uri) (projectFile: FileInfo option): PublishD
                 severity = Some DiagnosticSeverity.Error 
                 code = None
                 source = None 
-                message = projectFile |> Option.map (fun f -> sprintf "Not in project %s" f.Name) |> Option.defaultValue "No .fsproj file"
+                message = message
             }]
     }
 
-// If LSP specifies a file that does not exist, throw an exception
-let notFound (uri: Uri) (): 'Any = 
-    raise (Exception (sprintf "%s does not exist" (uri.ToString())))
+type private FindFile = 
+    | NoSourceFile of sourcePath: string
+    | NoProjectFile of sourcePath: string
+    | NotInProjectOptions of sourcePath: string * projectOptions: FSharpProjectOptions 
+    | Ok of sourcePath: string * sourceVersion: int * sourceText: string * projectOptions: FSharpProjectOptions 
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
-    let emptyProjectOptions = checker.GetProjectOptionsFromCommandLineArgs("NotFound.fsproj", [||])
+    // Find a file and its .fsproj context
+    let find (uri: Uri): FindFile = 
+        let sourcePath = uri.AbsolutePath.ToString()
+        let source = docs.Get uri
+        let projectOptions = projects.FindProjectFile uri |> Option.map projects.FindProjectOptions
+        match source, projectOptions with 
+        | None, _ -> NoSourceFile sourcePath
+        | _, None -> NoProjectFile sourcePath
+        | Some(sourceText, sourceVersion), Some projectOptions -> 
+            if Array.contains sourcePath projectOptions.SourceFiles then 
+                Ok(sourcePath, sourceVersion, sourceText, projectOptions) 
+            else 
+                NotInProjectOptions(sourcePath, projectOptions)
     // Send F# compiler diagnostics to the client
     let publishDiagnostics (uri: Uri) (errors: FSharpErrorInfo[]) = 
         let lspErrors = convertDiagnostics uri errors
@@ -92,20 +105,22 @@ type Server(client: ILanguageClient) =
     let lint (uri: Uri): unit = 
         async {
             eprintfn "Lint %O" uri
-            let sourceFile = uri.AbsolutePath.ToString()
-            let version = docs.GetVersion uri |> Option.defaultWith (notFound uri)
-            let source = docs.GetText uri |> Option.defaultWith (notFound uri)
-            let projectFile = projects.FindProjectFile uri
-            let projectOptions = Option.map projects.FindProjectOptions projectFile |> Option.defaultValue emptyProjectOptions
-            if Array.contains sourceFile projectOptions.SourceFiles then 
-                let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(sourceFile, version, source, projectOptions)
+            match find uri with 
+            | NoSourceFile sourcePath -> 
+                eprintfn "No source file %s" sourcePath 
+            | NoProjectFile sourcePath -> 
+                let message = sprintf "No project file for source %s" sourcePath 
+                client.PublishDiagnostics (errorAtTop uri message)
+            | NotInProjectOptions(sourcePath, projectOptions) -> 
+                let message = sprintf "Not in project %s" projectOptions.ProjectFileName
+                client.PublishDiagnostics (errorAtTop uri message)
+            | Ok(sourcePath, sourceVersion, sourceText, projectOptions) -> 
+                let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(sourcePath, sourceVersion, sourceText, projectOptions)
                 publishDiagnostics uri parseResults.Errors
                 match checkAnswer with 
-                | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" sourceFile 
+                | FSharpCheckFileAnswer.Aborted -> eprintfn "Aborted checking %s" sourcePath 
                 | FSharpCheckFileAnswer.Succeeded checkResults -> 
                         publishDiagnostics uri checkResults.Errors
-            else 
-                client.PublishDiagnostics(notInProjectFile uri projectFile)
         } |> Async.RunSynchronously
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 

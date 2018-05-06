@@ -81,5 +81,9 @@ type DocumentStore() =
         let found, value = activeDocuments.TryGetValue(uri)
         if found then Some value.version else None 
 
+    member this.Get(uri: Uri): option<string * int> = 
+        let found, value = activeDocuments.TryGetValue(uri)
+        if found then Some (value.text.ToString(), value.version) else None 
+
     member this.Close(doc: DidCloseTextDocumentParams): unit = 
         activeDocuments.Remove doc.textDocument.uri |> ignore
