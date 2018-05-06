@@ -29,6 +29,19 @@ let ``test parsing a JSON project file`` (t: TestContext) =
       "packageFolders": {
         "/Users/george/.nuget/packages/": {},
         "/usr/local/share/dotnet/sdk/NuGetFallbackFolder": {}
+      },
+      "project": {
+        "version": "1.0.0",
+        "frameworks": {
+          "netcoreapp2.0": {
+            "dependencies": {
+              "FSharp.Compiler.Service": {
+                "target": "Package",
+                "version": "[16.0.2, )"
+              }
+            }
+          }
+        }
       }
     }"""
     let parsed = ProjectManagerUtils.parseAssetsJson json
