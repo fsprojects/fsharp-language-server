@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ProjectParser.fs" />
     <Compile Include="ProjectManager.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

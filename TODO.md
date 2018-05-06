@@ -10,3 +10,6 @@
   - type
   - not
   - done
+
+# Bugs
+- If project is not in .fsproj, crashes server
