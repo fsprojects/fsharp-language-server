@@ -12,6 +12,7 @@
     <Compile Include="Reference.fs" />
     <Compile Include="ReferenceDependsOn.fs" />
     <Compile Include="ReferenceIndirectDep.fs" />
+    <Compile Include="Hover.fs" />
   </ItemGroup>
 
   <ItemGroup>

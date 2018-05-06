@@ -62,7 +62,7 @@ let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (req
     | Completion p -> 
         server.Completion p |> serializeCompletionList |> respond send id
     | Hover p -> 
-        server.Hover p |> serializeHover |> respond send id
+        server.Hover p |> Option.map serializeHover |> Option.defaultValue "null" |> respond send id
     | ResolveCompletionItem p -> 
         server.ResolveCompletionItem p |> serializeCompletionItem |> respond send id 
     | SignatureHelp p -> 

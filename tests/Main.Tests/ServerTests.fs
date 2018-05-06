@@ -10,7 +10,6 @@ open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System.Reflection
 open System.Diagnostics
-open System.Collections.Generic
 
 let ``test check errors in some text`` (t: TestContext) = 
     let file = "MyScript.fsx"
@@ -24,10 +23,13 @@ let ``test check errors in some text`` (t: TestContext) =
     ()
 
 type MockClient() = 
-    member val Diagnostics = List<PublishDiagnosticsParams>()
+    member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
             this.Diagnostics.Add(p)
+
+let private diagnosticMessages (client: MockClient): list<string> = 
+    List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
 
 let createServer (): MockClient * ILanguageServer = 
     let client = MockClient()
@@ -52,7 +54,7 @@ let createServerAndReadFile (name: string): MockClient * ILanguageServer =
 let ``test report a type error when a file is opened`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "WrongType.fs"
     if client.Diagnostics.Count = 0 then Fail("No diagnostics")
-    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
 
 let mutable versionCounter = 1
@@ -87,30 +89,61 @@ let save (file: string): DidSaveTextDocumentParams =
         text = None
     }
 
+let position (file: string) (line: int) (character: int): TextDocumentPositionParams = 
+    {
+        textDocument = { uri=Uri(absPath file) }
+        position = { line=line-1; character=character-1 }
+    }
+
 let ``test report a type error when a file is saved`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "CreateTypeError.fs"
     client.Diagnostics.Clear()
     server.DidChangeTextDocument(edit "CreateTypeError.fs" 4 18 "1" "\"1\"")
     server.DidSaveTextDocument(save "CreateTypeError.fs")
-    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
 
 let ``test reference other file in same project`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Reference.fs"
-    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
 
 let ``test reference another project`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "ReferenceDependsOn.fs"
-    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
 
 let ``test reference indirect dependency`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "ReferenceIndirectDep.fs"
-    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
 
 let ``test skip file not in project file`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "NotInFsproj.fs"
-    let messages = List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("Not in project")) messages) then Fail(sprintf "No 'Not in project' error in %A" messages)
+
+let ``test findNamesUnderCursor`` (t: TestContext) = 
+    let names = findNamesUnderCursor "foo" 2
+    if names <> ["foo"] then Fail(names)
+    let names = findNamesUnderCursor "foo.bar" 6
+    if names <> ["foo"; "bar"] then Fail(names)
+    let names = findNamesUnderCursor "let x = foo.bar" 14
+    if names <> ["foo"; "bar"] then Fail(names)
+    let names = findNamesUnderCursor "let x = foo.bar" 10
+    if names <> ["foo"] then Fail(names)
+    let names = findNamesUnderCursor "let x = ``foo bar``.bar" 22
+    if names <> ["foo bar"; "bar"] then Fail(names)
+
+let ``test hover over function`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "Hover.fs"
+    match server.Hover(position "Hover.fs" 6 23) with 
+    | None -> Fail("No hover")
+    | Some hover -> if List.isEmpty hover.contents then Fail("Hover list is empty")
+
+let ``test hover over qualified name`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "Hover.fs"
+    match server.Hover(position "Hover.fs" 12 38) with 
+    | None -> Fail("No hover")
+    | Some hover -> if List.isEmpty hover.contents then Fail("Hover list is empty")
+

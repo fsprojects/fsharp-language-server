@@ -610,7 +610,7 @@ type ILanguageServer =
     abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> unit
     abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> unit
     abstract member Completion: TextDocumentPositionParams -> CompletionList
-    abstract member Hover: TextDocumentPositionParams -> Hover
+    abstract member Hover: TextDocumentPositionParams -> option<Hover>
     abstract member ResolveCompletionItem: CompletionItem -> CompletionItem
     abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp
     abstract member GotoDefinition: TextDocumentPositionParams -> list<Location>
@@ -619,7 +619,7 @@ type ILanguageServer =
     abstract member DocumentSymbols: DocumentSymbolParams -> list<SymbolInformation>
     abstract member WorkspaceSymbols: WorkspaceSymbolParams -> list<SymbolInformation>
     abstract member CodeActions: CodeActionParams -> list<Command>
-    abstract member CodeLens: CodeLensParams -> List<CodeLens>
+    abstract member CodeLens: CodeLensParams -> list<CodeLens>
     abstract member ResolveCodeLens: CodeLens -> CodeLens
     abstract member DocumentLink: DocumentLinkParams -> list<DocumentLink>
     abstract member ResolveDocumentLink: DocumentLink -> DocumentLink

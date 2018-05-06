@@ -53,6 +53,9 @@ type DocumentStore() =
         existing.text.Clear() |> ignore
         existing.text.Append(text) |> ignore
         existing.version <- doc.version
+    let notFound (uri: Uri) (): string = 
+        eprintfn "No such file %O" uri 
+        ""
 
     member this.Open(doc: DidOpenTextDocumentParams): unit = 
         let text = StringBuilder(doc.textDocument.text)
@@ -87,3 +90,16 @@ type DocumentStore() =
 
     member this.Close(doc: DidCloseTextDocumentParams): unit = 
         activeDocuments.Remove doc.textDocument.uri |> ignore
+
+    member this.LineContent(uri: Uri, targetLine: int): string = 
+        let text = this.GetText uri |> Option.defaultWith (notFound uri)
+        let reader = new StringReader(text)
+        let mutable line = 0
+        while line < targetLine && reader.Peek() <> -1 do 
+            reader.ReadLine() |> ignore
+            line <- line + 1
+        if reader.Peek() = -1 then 
+            eprintfn "Reached EOF before line %d in file %O" targetLine uri
+            "" 
+        else 
+            reader.ReadLine()

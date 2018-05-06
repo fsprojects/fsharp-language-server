@@ -5,6 +5,7 @@ open System
 open System.IO
 open LSP
 open LSP.Types
+open System.Text.RegularExpressions
 
 let private TODO() = raise (Exception "TODO")
 
@@ -66,6 +67,45 @@ let private errorAtTop (message: string): Diagnostic =
         message = message
     }
 
+// Look for a fully qualified name leading up to the cursor
+let findNamesUnderCursor (lineContent: string) (character: int): string list = 
+    let r = Regex(@"(\w+|``[^`]+``)([\.?](\w+|``[^`]+``))*")
+    let ms = r.Matches(lineContent)
+    let overlaps (m: Match) = m.Index <= character && character <= m.Index + m.Length 
+    let found: Match list = [ for m in ms do if overlaps m then yield m ]
+    match found with 
+    | [] -> 
+        eprintfn "No identifiers at %d in line %s" character lineContent
+        [] 
+    | single::[] -> 
+        let r = Regex(@"(\w+|``[^`]+``)")
+        let ms = r.Matches(single.Value)
+        let result = [ for m in ms do 
+                            if single.Index + m.Index < character then 
+                                if m.Value.StartsWith("``") then
+                                    yield m.Value.Substring(2, m.Value.Length - 4)
+                                else
+                                    yield m.Value ]
+        eprintfn "Found identifier under cursor %A" result
+        result
+    | multiple -> 
+        eprintfn "Line %s offset %d matched multiple groups %A" lineContent character multiple 
+        []
+
+// Convert an F# `FSharpToolTipElement` to an LSP `Hover`
+let private asHover (FSharpToolTipText tips): Hover = 
+    eprintfn "Rendering tooltip for %A" tips 
+    let convert = 
+        [ for t in tips do
+            match t with 
+            | FSharpToolTipElement.None -> () 
+            | FSharpToolTipElement.Group elements -> 
+                for e in elements do 
+                    yield HighlightedString(e.MainDescription, "fsharp")
+            | FSharpToolTipElement.CompositionError err -> 
+                eprintfn "Tooltip error %s" err]
+    {contents=convert; range=None}
+
 type private FindFile = 
     | NoSourceFile of sourcePath: string
     | NoProjectFile of sourcePath: string
@@ -74,7 +114,7 @@ type private FindFile =
 
 type private CheckFile = 
     | Errors of Diagnostic list
-    | Ok of parseResults: FSharpParseFileResults * checkResults: FSharpCheckFileResults * errors: Diagnostic list
+    | Ok of parseResult: FSharpParseFileResults * checkResult: FSharpCheckFileResults * errors: Diagnostic list
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
@@ -105,26 +145,27 @@ type Server(client: ILanguageClient) =
             | NotInProjectOptions(sourcePath, projectOptions) -> 
                 return Errors [errorAtTop (sprintf "Not in project %s" projectOptions.ProjectFileName)]
             | Found(sourcePath, sourceVersion, sourceText, projectOptions) -> 
-                let! parseResults, checkAnswer = checker.ParseAndCheckFileInProject(sourcePath, sourceVersion, sourceText, projectOptions)
-                let parseErrors = convertDiagnostics parseResults.Errors
+                let! parseResult, checkAnswer = checker.ParseAndCheckFileInProject(sourcePath, sourceVersion, sourceText, projectOptions)
+                let parseErrors = convertDiagnostics parseResult.Errors
                 match checkAnswer with 
                 | FSharpCheckFileAnswer.Aborted -> 
                     eprintfn "Aborted checking %s" sourcePath 
                     return Errors parseErrors
-                | FSharpCheckFileAnswer.Succeeded checkResults -> 
-                    let checkErrors = convertDiagnostics checkResults.Errors 
+                | FSharpCheckFileAnswer.Succeeded checkResult -> 
+                    let checkErrors = convertDiagnostics checkResult.Errors 
                     let allErrors = parseErrors@checkErrors 
-                    return Ok(parseResults, checkResults, allErrors)
+                    return Ok(parseResult, checkResult, allErrors)
         } |> Async.RunSynchronously
     // Check a file and send all errors to the client
     let lint (uri: Uri): unit = 
         match check uri with 
         | Errors errors -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
-        | Ok(parseResults, checkResults, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+        | Ok(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
             { capabilities = 
                 { defaultServerCapabilities with 
+                    hoverProvider = true
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -153,7 +194,16 @@ type Server(client: ILanguageClient) =
                 if change.uri.AbsolutePath.EndsWith ".fsproj" then
                     projects.UpdateProjectFile change.uri 
         member this.Completion(p: TextDocumentPositionParams): CompletionList = TODO()
-        member this.Hover(p: TextDocumentPositionParams): Hover = TODO()
+        member this.Hover(p: TextDocumentPositionParams): option<Hover> = 
+            match check (p.textDocument.uri) with 
+            | Errors errors -> 
+                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                None
+            | Ok(parseResult, checkResult, _) -> 
+                let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                let names = findNamesUnderCursor line p.position.character
+                let tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier) |> Async.RunSynchronously
+                Some(asHover tips)
         member this.ResolveCompletionItem(p: CompletionItem): CompletionItem = TODO()
         member this.SignatureHelp(p: TextDocumentPositionParams): SignatureHelp = TODO()
         member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = TODO()
