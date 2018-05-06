@@ -184,11 +184,21 @@ module ProjectParser =
         else 
             for f in files do 
                 eprintfn "    %s" f.FullName
-    // Reference .dll for each project
+    // Find .dll corresponding to an .fsproj file 
+    // For example, sample/IndirectDep/IndirectDep.fsproj corresponds to sample/IndirectDep/bin/Debug/netcoreapp2.0/IndirectDep.dll
     // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-    let private projectDll (fsproj: FileInfo) = 
-        // TODO get this from the other .fsproj file, or something...
-        Path.Combine [| fsproj.Directory.FullName; "bin"; "Debug"; "netcoreapp2.0"; fsproj.Name + ".dll" |]
+    let private projectDll (fsproj: FileInfo): string = 
+        let bin = DirectoryInfo(Path.Combine(fsproj.Directory.FullName, "bin"))
+        let name = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
+        let list = [ for target in bin.GetDirectories() do 
+                        for platform in target.GetDirectories() do 
+                            let file = Path.Combine(platform.FullName, name)
+                            if File.Exists file then 
+                                yield file ]
+        if list.Length > 0 then 
+            list.[0] 
+        else
+            Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; name|]
     // Traverse the tree of project references
     let private ancestors (fsproj: FileInfo): list<FileInfo> = 
         let all = List<FileInfo>()
