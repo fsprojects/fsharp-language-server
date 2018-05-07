@@ -21,13 +21,7 @@ type ProjectManager() =
                     yield proj
                 dir <- dir.Parent
         } |> Seq.tryHead
-    let parseCache = new Dictionary<String, FSharpProjectOptions>()
     let projectFileCache = new Dictionary<String, FileInfo>()
-    let cachedParse (projectFile: FileInfo): FSharpProjectOptions = 
-        if not (parseCache.ContainsKey projectFile.FullName) then 
-            eprintfn "Project %O has not been parsed" projectFile
-            parseCache.[projectFile.FullName] <- ProjectParser.parseProjectOptions projectFile
-        parseCache.[projectFile.FullName]
     let cachedProjectFile (sourceFile: FileInfo): option<FileInfo> = 
         let sourceDir = sourceFile.Directory 
         if projectFileCache.ContainsKey(sourceDir.FullName) then 
@@ -41,16 +35,10 @@ type ProjectManager() =
                 eprintfn "Found project file %s for %s" projectFile.FullName sourceFile.Name
                 projectFileCache.[sourceDir.FullName] <- projectFile 
                 Some projectFile 
-    member this.UpdateProjectFile(project: Uri): unit = 
-        let file = FileInfo(project.AbsolutePath)
-        eprintfn "Clear project files caches for %O" project
-        // TODO make this more selective
-        parseCache.Clear() 
-        projectFileCache.Clear()
     member this.FindProjectFile(sourceFile: Uri): option<FileInfo> = 
         let file = FileInfo(sourceFile.AbsolutePath)
         cachedProjectFile file
     member this.FindProjectOptions(fsproj: FileInfo): FSharpProjectOptions = 
-        cachedParse fsproj
-    member this.AllProjectFiles: FileInfo list = 
-        List.ofSeq projectFileCache.Values
+        ProjectParser.parseProjectOptions fsproj
+    member this.OpenProjects: FSharpProjectOptions list = 
+        ProjectParser.openProjects()

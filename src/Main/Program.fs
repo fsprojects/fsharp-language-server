@@ -345,8 +345,6 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
                 eprintfn "Watched file %s %s" (change.uri.ToString()) (change.``type``.ToString())
-                if change.uri.AbsolutePath.EndsWith ".fsproj" then
-                    projects.UpdateProjectFile change.uri 
         member this.Completion(p: TextDocumentPositionParams): CompletionList option =
             match check (p.textDocument.uri) with 
             | Errors errors -> 
@@ -394,10 +392,11 @@ type Server(client: ILanguageClient) =
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> = TODO()
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): list<SymbolInformation> = 
-            eprintfn "Looking for symbols matching %s" p.query
+            let openProjects = projects.OpenProjects
+            let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
+            eprintfn "Looking for symbols matching %s in %s" p.query names
             let all = seq {
-                for projectFile in projects.AllProjectFiles do 
-                    let options = projects.FindProjectOptions projectFile 
+                for options in openProjects do 
                     let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
                     for e in check.AssemblySignature.Entities do 
                         yield e :> FSharpSymbol

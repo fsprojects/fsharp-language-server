@@ -198,3 +198,5 @@ let ``test find project symbols`` (t: TestContext) =
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
     let found = server.WorkspaceSymbols({query = "signatureHelp"})
     if List.isEmpty found then Fail("Should have found signatureHelp")
+    let found = server.WorkspaceSymbols({query = "IndirectLibrary"})
+    if List.isEmpty found then Fail("Should have found IndirectLibrary")

@@ -212,8 +212,9 @@ module ProjectParser =
         for r in head.projectReferences do 
             traverse r
         List.ofSeq all
+    let private projectOptionsCache = Dictionary<string, FSharpProjectOptions>()
     // Parse an .fsproj, looking at project.assets.json to find referenced .dlls
-    let rec parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
+    let rec private doParseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
         let c = parseBoth(fsproj)
         let ancestorProjects = ancestors fsproj
         eprintfn "Project %s" fsproj.FullName
@@ -230,7 +231,7 @@ module ProjectParser =
         {
             ExtraProjectInfo = None 
             IsIncompleteTypeCheckEnvironment = false 
-            LoadTime = DateTime.Now
+            LoadTime = fsproj.LastWriteTime
             OriginalLoadReferences = []
             OtherOptions = [|   yield "--noframework" 
                                 // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
@@ -245,3 +246,13 @@ module ProjectParser =
             UnresolvedReferences = None 
             UseScriptResolutionRules = false
         }
+    and parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
+        let modified = fsproj.LastWriteTime
+        if not (projectOptionsCache.ContainsKey fsproj.FullName) then 
+            eprintfn "%s is not in the cache" fsproj.Name
+            projectOptionsCache.[fsproj.FullName] <- doParseProjectOptions fsproj
+        if projectOptionsCache.[fsproj.FullName].LoadTime.CompareTo(modified) < 0 then 
+            eprintfn "%s has been modified" fsproj.Name
+            projectOptionsCache.[fsproj.FullName] <- doParseProjectOptions fsproj
+        projectOptionsCache.[fsproj.FullName]
+    let openProjects () = projectOptionsCache.Values |> List.ofSeq
