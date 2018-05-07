@@ -207,3 +207,10 @@ let ``test find project symbols`` (t: TestContext) =
     if List.isEmpty found then Fail("Should have found signatureHelp")
     let found = server.WorkspaceSymbols({query = "IndirectLibrary"})
     if List.isEmpty found then Fail("Should have found IndirectLibrary")
+
+let ``test go to definition`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "Reference.fs"
+    match server.GotoDefinition(position "Reference.fs" 3 31) with 
+    | [] -> Fail("No symbol definition")
+    | [single] -> ()
+    | many -> Fail(sprintf "Multiple definitions found %A" many)

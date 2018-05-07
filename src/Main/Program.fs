@@ -11,7 +11,7 @@ open System.Text.RegularExpressions
 let private TODO() = raise (Exception "TODO")
 
 // Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
-let private asRange (err: FSharpErrorInfo): Range = 
+let private errorAsRange (err: FSharpErrorInfo): Range = 
     {
         // Got error "The field, constructor or member 'StartLine' is not defined"
         start = {line=err.StartLineAlternate-1; character=err.StartColumn}
@@ -27,7 +27,7 @@ let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
 // Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Diagnostic'
 let private asDiagnostic (err: FSharpErrorInfo): Diagnostic = 
     {
-        range = asRange(err)
+        range = errorAsRange(err)
         severity = Some (asDiagnosticSeverity err.Severity)
         code = Some (sprintf "%d: %s" err.ErrorNumber err.Subcategory)
         source = None
@@ -113,6 +113,19 @@ let findMethodCallBeforeCursor (lineContent: string) (cursor: int): int option =
             eprintfn "No signature help in member expression %s" lineContent 
             None 
         else Some prefix.Length
+
+let findEndOfIdentifierUnderCursor (lineContent: string) (cursor: int): int option = 
+    let r = Regex(@"\w+|``[^`]+``")
+    let ms = r.Matches(lineContent)
+    let overlaps (m: Match) = m.Index <= cursor && cursor <= m.Index + m.Length 
+    let found: Match list = [ for m in ms do if overlaps m then yield m ]
+    match found with 
+    | [] -> 
+        eprintfn "No identifier at %d in line %s" cursor lineContent
+        None
+    | m::_ -> 
+        Some(m.Index + m.Length)
+
 
 // Figure out the active parameter by counting ',' characters
 let countCommas (lineContent: string) (endOfMethodName: int) (cursor: int): int = 
@@ -238,19 +251,26 @@ let private containerName (s: FSharpSymbol): string option =
         Some s.FullName
 
 let private asPosition (p: Range.pos): Position = 
-    {line=p.Line-1; character = p.Column}
+    {line=p.Line-1; character=p.Column}
 
-let private asLocation (s: FSharpSymbol): Location = 
-    let l = s.DeclarationLocation.Value
-    let uri = Uri("file://" + l.FileName)
+let private asRange (r: Range.range): Range = 
     {
-        uri=uri
-        range = 
-        {
-            start=asPosition l.Start
-            ``end``=asPosition l.End
-        }
+        start=asPosition r.Start
+        ``end``=asPosition r.End
     }
+
+let private asLocation (s: FSharpSymbol): Location option = 
+    match s.DeclarationLocation with 
+    | None -> 
+        eprintfn "Symbol %s has no declaration" s.FullName 
+        None 
+    | Some l ->
+        let l = s.DeclarationLocation.Value
+        let uri = Uri("file://" + l.FileName)
+        {
+            uri=uri
+            range = asRange l
+        } |> Some
 
 let private symbolHasLocation (s: FSharpSymbol): bool = 
     s.DeclarationLocation.IsSome
@@ -260,7 +280,7 @@ let private symbolInformation (s: FSharpSymbol): SymbolInformation =
         name = s.DisplayName
         containerName = containerName s
         kind = symbolKind(s)
-        location = asLocation(s)
+        location = asLocation(s).Value
     }
 
 let private symbolIsInFile (file: string) (s: FSharpSymbol): bool = 
@@ -340,6 +360,7 @@ type Server(client: ILanguageClient) =
                     signatureHelpProvider = Some({triggerCharacters=['('; ',']})
                     documentSymbolProvider = true
                     workspaceSymbolProvider = true
+                    definitionProvider = true
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -407,7 +428,27 @@ type Server(client: ILanguageClient) =
                     let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
                     eprintfn "Found %d overloads" overloads.Methods.Length
                     Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
-        member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = TODO()
+        member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = 
+            match check (p.textDocument.uri) with 
+            | Errors errors -> 
+                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                []
+            | Ok(parseResult, checkResult, _) -> 
+                let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                match findEndOfIdentifierUnderCursor line p.position.character with 
+                | None -> 
+                    eprintfn "No identifier at %d in line '%s'" p.position.character line 
+                    []
+                | Some endOfIdentifier -> 
+                    let names = findNamesUnderCursor line (endOfIdentifier - 1)
+                    let dotName = String.concat "." names
+                    eprintfn "Go to defintion of %s" dotName
+                    match checkResult.GetSymbolUseAtLocation(p.position.line+1, endOfIdentifier, line, names) |> Async.RunSynchronously with 
+                    | None -> 
+                        eprintfn "%s in line '%s' is not a symbol use" dotName line
+                        []
+                    | Some s -> 
+                        asLocation s.Symbol |> Option.toList
         member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> =
