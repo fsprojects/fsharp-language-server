@@ -190,7 +190,7 @@ let private containsChars (find: string) (candidate: string): bool =
     iFind = find.Length
 
 let private matchesQuery (query: string) (candidate: FSharpSymbol): bool = 
-    containsChars (query.ToLower()) (candidate.FullName.ToLower())
+    containsChars (query.ToLower()) (candidate.DisplayName.ToLower())
 
 // FSharpEntity, FSharpUnionCase
 /// FSharpField, FSharpGenericParameter, FSharpStaticParameter, FSharpMemberOrFunctionOrValue, FSharpParameter,
