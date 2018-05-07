@@ -181,6 +181,17 @@ let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): Si
         parameters = Array.map convertParameter s.Parameters |> List.ofArray
     }
 
+// Lazily all symbols in a file or project
+let private allSymbols (es: FSharpEntity seq) = 
+    seq {
+        for e in es do 
+            yield e :> FSharpSymbol
+            for x in e.MembersFunctionsAndValues do
+                yield x :> FSharpSymbol
+            for x in e.UnionCases do
+                yield x :> FSharpSymbol
+    }
+
 // Check if candidate contains all the characters of find, in-order, case-insensitive
 // candidate is allowed to have other characters in between, as long as it contains all of find in-order
 let private containsChars (find: string) (candidate: string): bool = 
@@ -319,6 +330,7 @@ type Server(client: ILanguageClient) =
                     hoverProvider = true
                     completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
                     signatureHelpProvider = Some({triggerCharacters=['('; ',']})
+                    documentSymbolProvider = true
                     workspaceSymbolProvider = true
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
@@ -390,20 +402,24 @@ type Server(client: ILanguageClient) =
         member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = TODO()
         member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
-        member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> = TODO()
+        member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> =
+            match check (p.textDocument.uri) with 
+            | Errors errors -> 
+                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                []
+            | Ok(parseResult, checkResult, _) -> 
+                eprintfn "Looking for symbols in %s" parseResult.FileName
+                let all = allSymbols checkResult.PartialAssemblySignature.Entities
+                all |> Seq.map symbolInformation |> List.ofSeq
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): list<SymbolInformation> = 
+            // TODO consider just parsing all files and using GetNavigationItems
             let openProjects = projects.OpenProjects
             let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
             eprintfn "Looking for symbols matching %s in %s" p.query names
             let all = seq {
                 for options in openProjects do 
                     let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
-                    for e in check.AssemblySignature.Entities do 
-                        yield e :> FSharpSymbol
-                        for x in e.MembersFunctionsAndValues do
-                            yield x :> FSharpSymbol
-                        for x in e.UnionCases do
-                            yield x :> FSharpSymbol
+                    yield! allSymbols check.AssemblySignature.Entities 
             }
             all |> Seq.filter (matchesQuery p.query) 
                 |> Seq.filter (fun s -> s.DeclarationLocation.IsSome)

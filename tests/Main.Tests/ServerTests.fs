@@ -194,6 +194,12 @@ let ``test findMethodCallBeforeCursor`` (t: TestContext) =
     | Some 16 -> ()
     | Some i -> Fail(sprintf "End of bar is at 17 but found %d" i)
 
+let ``test find document symbols`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "SignatureHelp.fs"
+    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "SignatureHelp.fs")}})
+    let names = found |> List.map (fun f -> f.name)
+    if not (List.contains "signatureHelp" names) then Fail(sprintf "signatureHelp is not in %A" names)
+
 let ``test find project symbols`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
     let found = server.WorkspaceSymbols({query = "signatureHelp"})
