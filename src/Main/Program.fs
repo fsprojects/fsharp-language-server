@@ -252,6 +252,9 @@ let private asLocation (s: FSharpSymbol): Location =
         }
     }
 
+let private symbolHasLocation (s: FSharpSymbol): bool = 
+    s.DeclarationLocation.IsSome
+
 let private symbolInformation (s: FSharpSymbol): SymbolInformation = 
     {
         name = s.DisplayName
@@ -259,6 +262,11 @@ let private symbolInformation (s: FSharpSymbol): SymbolInformation =
         kind = symbolKind(s)
         location = asLocation(s)
     }
+
+let private symbolIsInFile (file: string) (s: FSharpSymbol): bool = 
+    match s.DeclarationLocation with 
+    | Some l -> l.FileName = file 
+    | None -> false
 
 // TODO actually consider types
 let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethodGroupItem[]): int option = 
@@ -410,7 +418,9 @@ type Server(client: ILanguageClient) =
             | Ok(parseResult, checkResult, _) -> 
                 eprintfn "Looking for symbols in %s" parseResult.FileName
                 let all = allSymbols checkResult.PartialAssemblySignature.Entities
-                all |> Seq.map symbolInformation |> List.ofSeq
+                all |> Seq.filter (symbolIsInFile parseResult.FileName)
+                    |> Seq.map symbolInformation 
+                    |> List.ofSeq
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): list<SymbolInformation> = 
             // TODO consider just parsing all files and using GetNavigationItems
             let openProjects = projects.OpenProjects
@@ -422,7 +432,7 @@ type Server(client: ILanguageClient) =
                     yield! allSymbols check.AssemblySignature.Entities 
             }
             all |> Seq.filter (matchesQuery p.query) 
-                |> Seq.filter (fun s -> s.DeclarationLocation.IsSome)
+                |> Seq.filter symbolHasLocation
                 |> Seq.truncate 50 
                 |> Seq.map symbolInformation 
                 |> List.ofSeq

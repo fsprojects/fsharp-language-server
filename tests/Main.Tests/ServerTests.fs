@@ -195,10 +195,11 @@ let ``test findMethodCallBeforeCursor`` (t: TestContext) =
     | Some i -> Fail(sprintf "End of bar is at 17 but found %d" i)
 
 let ``test find document symbols`` (t: TestContext) = 
-    let (client, server) = createServerAndReadFile "SignatureHelp.fs"
-    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "SignatureHelp.fs")}})
+    let (client, server) = createServerAndReadFile "Reference.fs"
+    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "Reference.fs")}})
     let names = found |> List.map (fun f -> f.name)
-    if not (List.contains "signatureHelp" names) then Fail(sprintf "signatureHelp is not in %A" names)
+    if not (List.contains "Reference" names) then Fail(sprintf "Reference is not in %A" names)
+    if List.contains "ReferenceDependsOn" names then Fail("Document symbols includes dependency")
 
 let ``test find project symbols`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
