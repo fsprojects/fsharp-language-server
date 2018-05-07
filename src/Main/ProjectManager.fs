@@ -13,7 +13,7 @@ open Microsoft.FSharp.Compiler.SourceCodeServices
 // Maintains caches of parsed versions of .fsproj files
 type ProjectManager() = 
     // Scan the parent directories looking for a file *.fsproj
-    let findProjectFileInParents (sourceFile: FileInfo): option<FileInfo> = 
+    let findProjectFileInParents (sourceFile: FileInfo): FileInfo option = 
         seq {
             let mutable dir = sourceFile.Directory
             while dir <> dir.Root do 
@@ -22,7 +22,7 @@ type ProjectManager() =
                 dir <- dir.Parent
         } |> Seq.tryHead
     let projectFileCache = new Dictionary<String, FileInfo>()
-    let cachedProjectFile (sourceFile: FileInfo): option<FileInfo> = 
+    let cachedProjectFile (sourceFile: FileInfo): FileInfo option = 
         let sourceDir = sourceFile.Directory 
         if projectFileCache.ContainsKey(sourceDir.FullName) then 
             Some (projectFileCache.[sourceDir.FullName])
@@ -35,7 +35,7 @@ type ProjectManager() =
                 eprintfn "Found project file %s for %s" projectFile.FullName sourceFile.Name
                 projectFileCache.[sourceDir.FullName] <- projectFile 
                 Some projectFile 
-    member this.FindProjectFile(sourceFile: Uri): option<FileInfo> = 
+    member this.FindProjectFile(sourceFile: Uri): FileInfo option = 
         let file = FileInfo(sourceFile.AbsolutePath)
         cachedProjectFile file
     member this.FindProjectOptions(fsproj: FileInfo): FSharpProjectOptions = 

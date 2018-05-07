@@ -404,7 +404,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
             docs.Change p
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
-        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): list<TextEdit> = TODO()
+        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): TextEdit list = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
             lint p.textDocument.uri
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
@@ -425,7 +425,7 @@ type Server(client: ILanguageClient) =
                 eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
                 let declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName) |> Async.RunSynchronously
                 Some (convertDeclarations declarations)
-        member this.Hover(p: TextDocumentPositionParams): option<Hover> = 
+        member this.Hover(p: TextDocumentPositionParams): Hover option = 
             match check (p.textDocument.uri) with 
             | Errors errors -> 
                 eprintfn "Check failed, ignored %d errors" (List.length errors)
@@ -456,11 +456,11 @@ type Server(client: ILanguageClient) =
                     let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
                     eprintfn "Found %d overloads" overloads.Methods.Length
                     Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
-        member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = 
+        member this.GotoDefinition(p: TextDocumentPositionParams): Location list = 
             match symbolAt p.textDocument p.position with 
             | None -> []
             | Some s -> declarationLocation s.Symbol |> Option.toList
-        member this.FindReferences(p: ReferenceParams): list<Location> = 
+        member this.FindReferences(p: ReferenceParams): Location list = 
             match symbolAt p.textDocument p.position with 
             | None -> [] 
             | Some s -> 
@@ -473,8 +473,8 @@ type Server(client: ILanguageClient) =
                         yield! check.GetUsesOfSymbol(s.Symbol) |> Async.RunSynchronously
                 }
                 all |> Seq.map useLocation |> List.ofSeq
-        member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
-        member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> =
+        member this.DocumentHighlight(p: TextDocumentPositionParams): DocumentHighlight list = TODO()
+        member this.DocumentSymbols(p: DocumentSymbolParams): SymbolInformation list =
             match check (p.textDocument.uri) with 
             | Errors errors -> 
                 eprintfn "Check failed, ignored %d errors" (List.length errors)
@@ -485,7 +485,7 @@ type Server(client: ILanguageClient) =
                 all |> Seq.filter (symbolIsInFile parseResult.FileName)
                     |> Seq.map symbolInformation 
                     |> List.ofSeq
-        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): list<SymbolInformation> = 
+        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): SymbolInformation list = 
             // TODO consider just parsing all files and using GetNavigationItems
             let openProjects = projects.OpenProjects
             let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
@@ -500,14 +500,14 @@ type Server(client: ILanguageClient) =
                 |> Seq.truncate 50 
                 |> Seq.map symbolInformation 
                 |> List.ofSeq
-        member this.CodeActions(p: CodeActionParams): list<Command> = TODO()
+        member this.CodeActions(p: CodeActionParams): Command list = TODO()
         member this.CodeLens(p: CodeLensParams): List<CodeLens> = TODO()
         member this.ResolveCodeLens(p: CodeLens): CodeLens = TODO()
-        member this.DocumentLink(p: DocumentLinkParams): list<DocumentLink> = TODO()
+        member this.DocumentLink(p: DocumentLinkParams): DocumentLink list = TODO()
         member this.ResolveDocumentLink(p: DocumentLink): DocumentLink = TODO()
-        member this.DocumentFormatting(p: DocumentFormattingParams): list<TextEdit> = TODO()
-        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): list<TextEdit> = TODO()
-        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): list<TextEdit> = TODO()
+        member this.DocumentFormatting(p: DocumentFormattingParams): TextEdit list = TODO()
+        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): TextEdit list = TODO()
+        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): TextEdit list = TODO()
         member this.Rename(p: RenameParams): WorkspaceEdit = TODO()
         member this.ExecuteCommand(p: ExecuteCommandParams): unit = TODO()
 

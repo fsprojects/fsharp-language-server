@@ -34,14 +34,14 @@ type Range = {
 }
 
 type TextDocumentContentChangeEvent = {
-    range: option<Range>
-    rangeLength: option<int>
+    range: Range option
+    rangeLength: int option
     text: string
 }
 
 type DidChangeTextDocumentParams = {
     textDocument: VersionedTextDocumentIdentifier
-    contentChanges: list<TextDocumentContentChangeEvent>
+    contentChanges: TextDocumentContentChangeEvent list
 }
 
 type TextDocumentIdentifier = {
@@ -67,7 +67,7 @@ type WillSaveTextDocumentParams = {
 
 type DidSaveTextDocumentParams = {
     textDocument: TextDocumentIdentifier
-    text: option<string>
+    text: string option
 }
 
 type DidCloseTextDocumentParams = {
@@ -92,7 +92,7 @@ type FileEvent = {
 }
 
 type DidChangeWatchedFilesParams = {
-    changes: list<FileEvent>
+    changes: FileEvent list
 }
     
 type Notification = 
@@ -129,16 +129,16 @@ let writeDiagnosticSeverity i =
 
 type Diagnostic = {
     range: Range
-    severity: option<DiagnosticSeverity>
-    code: option<string>
-    source: option<string>
+    severity: DiagnosticSeverity option
+    code: string option
+    source: string option
     message: string;
 }
 
 type Command = {
     title: string
     command: string 
-    arguments: list<JsonValue>
+    arguments: JsonValue list
 }
 
 type TextEdit = {
@@ -148,11 +148,11 @@ type TextEdit = {
 
 type TextDocumentEdit = {
     textDocument: VersionedTextDocumentIdentifier
-    edits: list<TextEdit>
+    edits: TextEdit list
 }
 
 type WorkspaceEdit = {
-    documentChanges: list<TextDocumentEdit>
+    documentChanges: TextDocumentEdit list
 }
 
 type TextDocumentPositionParams = {
@@ -166,7 +166,7 @@ type DocumentFilter = {
     pattern: string
 }
 
-type DocumentSelector = list<DocumentFilter>
+type DocumentSelector = DocumentFilter list
 
 [<RequireQualifiedAccess>]
 type Trace = 
@@ -181,11 +181,11 @@ let writeTrace i =
     | Trace.Verbose -> "verbose"
 
 type InitializeParams = {
-    processId: option<int>
-    rootUri: option<Uri>
-    initializationOptions: option<JsonValue>
+    processId: int option
+    rootUri: Uri option
+    initializationOptions: JsonValue option
     capabilitiesMap: Map<string, bool>
-    trace: option<Trace>
+    trace: Trace option
 }
 
 let defaultInitializeParams: InitializeParams = {
@@ -250,17 +250,17 @@ let writeCompletionItemKind (i: CompletionItemKind) =
 
 type CompletionItem = {
     label: string 
-    kind: option<CompletionItemKind>
-    detail: option<string>
-    documentation: option<string>
-    sortText: option<string>
-    filterText: option<string>
-    insertText: option<string>
-    insertTextFormat: option<InsertTextFormat>
-    textEdit: option<TextEdit>
-    additionalTextEdits: list<TextEdit>
-    commitCharacters: list<char>
-    command: option<Command>
+    kind: CompletionItemKind option
+    detail: string option
+    documentation: string option
+    sortText: string option
+    filterText: string option
+    insertText: string option
+    insertTextFormat: InsertTextFormat option
+    textEdit: TextEdit option
+    additionalTextEdits: TextEdit list
+    commitCharacters: char list
+    command: Command option
     data: JsonValue
 }
 
@@ -299,7 +299,7 @@ type WorkspaceSymbolParams = {
 }
 
 type CodeActionContext = {
-    diagnostics: list<Diagnostic>
+    diagnostics: Diagnostic list
 }
 
 type CodeActionParams = {
@@ -314,7 +314,7 @@ type CodeLensParams = {
 
 type CodeLens = {
     range: Range 
-    command: option<Command>
+    command: Command option
     data: JsonValue
 }
 
@@ -324,7 +324,7 @@ type DocumentLinkParams = {
 
 type DocumentLink = {
     range: Range 
-    target: option<Uri>
+    target: Uri option
 }
 
 type DocumentFormattingOptions = {
@@ -361,7 +361,7 @@ type RenameParams = {
 
 type ExecuteCommandParams = {
     command: string 
-    arguments: list<JsonValue>
+    arguments: JsonValue list
 }
 
 type Request = 
@@ -401,7 +401,7 @@ let writeTextDocumentSyncKind (i: TextDocumentSyncKind) =
 
 type CompletionOptions = {
     resolveProvider: bool 
-    triggerCharacters: list<char>
+    triggerCharacters: char list
 }
 
 let defaultCompletionOptions = {
@@ -410,7 +410,7 @@ let defaultCompletionOptions = {
 }
 
 type SignatureHelpOptions = {
-    triggerCharacters: list<char>
+    triggerCharacters: char list
 }
 
 let defaultSignatureHelpOptions = {
@@ -427,7 +427,7 @@ let defaultCodeLensOptions = {
 
 type DocumentOnTypeFormattingOptions = {
     firstTriggerCharacter: char
-    moreTriggerCharacter: list<char>
+    moreTriggerCharacter: char list
 }
 
 type DocumentLinkOptions = {
@@ -439,7 +439,7 @@ let defaultDocumentLinkOptions = {
 }
 
 type ExecuteCommandOptions = {
-    commands: list<string>
+    commands: string list
 }
 
 type SaveOptions = {
@@ -451,7 +451,7 @@ type TextDocumentSyncOptions = {
     change: TextDocumentSyncKind
     willSave: bool
     willSaveWaitUntil: bool
-    save: option<SaveOptions>
+    save: SaveOptions option
 }
 
 let defaultTextDocumentSyncOptions = {
@@ -465,21 +465,21 @@ let defaultTextDocumentSyncOptions = {
 type ServerCapabilities = {
     textDocumentSync: TextDocumentSyncOptions
     hoverProvider: bool
-    completionProvider: option<CompletionOptions>
-    signatureHelpProvider: option<SignatureHelpOptions>
+    completionProvider: CompletionOptions option
+    signatureHelpProvider: SignatureHelpOptions option
     definitionProvider: bool
     referencesProvider: bool
     documentHighlightProvider: bool
     documentSymbolProvider: bool
     workspaceSymbolProvider: bool
     codeActionProvider: bool
-    codeLensProvider: option<CodeLensOptions>
+    codeLensProvider: CodeLensOptions option
     documentFormattingProvider: bool
     documentRangeFormattingProvider: bool
-    documentOnTypeFormattingProvider: option<DocumentOnTypeFormattingOptions>
+    documentOnTypeFormattingProvider: DocumentOnTypeFormattingOptions option
     renameProvider: bool
-    documentLinkProvider: option<DocumentLinkOptions>
-    executeCommandProvider: option<ExecuteCommandOptions>
+    documentLinkProvider: DocumentLinkOptions option
+    executeCommandProvider: ExecuteCommandOptions option
 }
 
 let defaultServerCapabilities: ServerCapabilities = {
@@ -508,7 +508,7 @@ type InitializeResult = {
 
 type CompletionList = {
     isIncomplete: bool 
-    items: list<CompletionItem>
+    items: CompletionItem list
 }
 
 type MarkedString = 
@@ -525,25 +525,25 @@ let writeMarkedString (s: MarkedString): JsonValue =
         JsonValue.String value
 
 type Hover = {
-    contents: list<MarkedString>
-    range: option<Range>
+    contents: MarkedString list
+    range: Range option
 }
 
 type ParameterInformation = {
     label: string 
-    documentation: option<string>
+    documentation: string option
 }
 
 type SignatureInformation = {
     label: string 
-    documentation: option<string>
-    parameters: list<ParameterInformation>
+    documentation: string option
+    parameters: ParameterInformation list
 }
 
 type SignatureHelp = {
-    signatures: list<SignatureInformation>
-    activeSignature: option<int>
-    activeParameter: option<int>
+    signatures: SignatureInformation list
+    activeSignature: int option
+    activeParameter: int option
 }
 
 [<RequireQualifiedAccess>]
@@ -610,7 +610,7 @@ type SymbolInformation = {
     name: string 
     kind: SymbolKind 
     location: Location
-    containerName: option<string>
+    containerName: string option
 }
 
 type ILanguageServer = 
@@ -621,7 +621,7 @@ type ILanguageServer =
     abstract member DidOpenTextDocument: DidOpenTextDocumentParams -> unit 
     abstract member DidChangeTextDocument: DidChangeTextDocumentParams -> unit 
     abstract member WillSaveTextDocument: WillSaveTextDocumentParams -> unit
-    abstract member WillSaveWaitUntilTextDocument: WillSaveTextDocumentParams -> list<TextEdit>
+    abstract member WillSaveWaitUntilTextDocument: WillSaveTextDocumentParams -> TextEdit list
     abstract member DidSaveTextDocument: DidSaveTextDocumentParams -> unit
     abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> unit
     abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> unit
@@ -629,19 +629,19 @@ type ILanguageServer =
     abstract member Hover: TextDocumentPositionParams -> Hover option
     abstract member ResolveCompletionItem: CompletionItem -> CompletionItem
     abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp option
-    abstract member GotoDefinition: TextDocumentPositionParams -> list<Location>
-    abstract member FindReferences: ReferenceParams -> list<Location>
-    abstract member DocumentHighlight: TextDocumentPositionParams -> list<DocumentHighlight>
-    abstract member DocumentSymbols: DocumentSymbolParams -> list<SymbolInformation>
-    abstract member WorkspaceSymbols: WorkspaceSymbolParams -> list<SymbolInformation>
-    abstract member CodeActions: CodeActionParams -> list<Command>
-    abstract member CodeLens: CodeLensParams -> list<CodeLens>
+    abstract member GotoDefinition: TextDocumentPositionParams -> Location list
+    abstract member FindReferences: ReferenceParams -> Location list
+    abstract member DocumentHighlight: TextDocumentPositionParams -> DocumentHighlight list
+    abstract member DocumentSymbols: DocumentSymbolParams -> SymbolInformation list
+    abstract member WorkspaceSymbols: WorkspaceSymbolParams -> SymbolInformation list
+    abstract member CodeActions: CodeActionParams -> Command list
+    abstract member CodeLens: CodeLensParams -> CodeLens list
     abstract member ResolveCodeLens: CodeLens -> CodeLens
-    abstract member DocumentLink: DocumentLinkParams -> list<DocumentLink>
+    abstract member DocumentLink: DocumentLinkParams -> DocumentLink list
     abstract member ResolveDocumentLink: DocumentLink -> DocumentLink
-    abstract member DocumentFormatting: DocumentFormattingParams -> list<TextEdit>
-    abstract member DocumentRangeFormatting: DocumentRangeFormattingParams -> list<TextEdit>
-    abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> list<TextEdit>
+    abstract member DocumentFormatting: DocumentFormattingParams -> TextEdit list
+    abstract member DocumentRangeFormatting: DocumentRangeFormattingParams -> TextEdit list
+    abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> TextEdit list
     abstract member Rename: RenameParams -> WorkspaceEdit
     abstract member ExecuteCommand: ExecuteCommandParams -> unit
 
@@ -649,7 +649,7 @@ type ILanguageServer =
 
 type PublishDiagnosticsParams = {
     uri: Uri 
-    diagnostics: list<Diagnostic>
+    diagnostics: Diagnostic list
 }
 
 type ILanguageClient =

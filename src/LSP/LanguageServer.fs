@@ -22,18 +22,18 @@ let jsonWriteOptions =
               writeSymbolKind ] }
 
 let private serializeInitializeResult = serializerFactory<InitializeResult> jsonWriteOptions
-let private serializeTextEditList = serializerFactory<list<TextEdit>> jsonWriteOptions
+let private serializeTextEditList = serializerFactory<TextEdit list> jsonWriteOptions
 let private serializeCompletionList = serializerFactory<CompletionList> jsonWriteOptions
 let private serializeHover = serializerFactory<Hover> jsonWriteOptions
 let private serializeCompletionItem = serializerFactory<CompletionItem> jsonWriteOptions
 let private serializeSignatureHelp = serializerFactory<SignatureHelp> jsonWriteOptions
-let private serializeLocationList = serializerFactory<list<Location>> jsonWriteOptions
-let private serializeDocumentHighlightList = serializerFactory<list<DocumentHighlight>> jsonWriteOptions
-let private serializeSymbolInformationList = serializerFactory<list<SymbolInformation>> jsonWriteOptions
-let private serializeCommandList = serializerFactory<list<Command>> jsonWriteOptions
-let private serializeCodeLensList = serializerFactory<list<CodeLens>> jsonWriteOptions
+let private serializeLocationList = serializerFactory<Location list> jsonWriteOptions
+let private serializeDocumentHighlightList = serializerFactory<DocumentHighlight list> jsonWriteOptions
+let private serializeSymbolInformationList = serializerFactory<SymbolInformation list> jsonWriteOptions
+let private serializeCommandList = serializerFactory<Command list> jsonWriteOptions
+let private serializeCodeLensList = serializerFactory<CodeLens list> jsonWriteOptions
 let private serializeCodeLens = serializerFactory<CodeLens> jsonWriteOptions
-let private serializeDocumentLinkList = serializerFactory<list<DocumentLink>> jsonWriteOptions
+let private serializeDocumentLinkList = serializerFactory<DocumentLink list> jsonWriteOptions
 let private serializeDocumentLink = serializerFactory<DocumentLink> jsonWriteOptions
 let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteOptions
 let private serializePublishDiagnostics = serializerFactory<PublishDiagnosticsParams> jsonWriteOptions

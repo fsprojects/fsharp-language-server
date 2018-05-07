@@ -19,7 +19,7 @@ let readLength (byteLength: int) (client: BinaryReader): string =
     let bytes = client.ReadBytes(byteLength)
     Encoding.UTF8.GetString bytes
     
-let readLine (client: BinaryReader): option<string> = 
+let readLine (client: BinaryReader): string option = 
     let buffer = StringBuilder()
     try
         let mutable endOfLine = false

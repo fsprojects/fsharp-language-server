@@ -76,11 +76,11 @@ type DocumentStore() =
                 | Some range -> patch doc.textDocument range change.text 
                 | None -> replace doc.textDocument change.text 
 
-    member this.GetText(uri: Uri): option<string> = 
+    member this.GetText(uri: Uri): string option = 
         let found, value = activeDocuments.TryGetValue(uri)
         if found then Some (value.text.ToString()) else None 
 
-    member this.GetVersion(uri: Uri): option<int> = 
+    member this.GetVersion(uri: Uri): int option = 
         let found, value = activeDocuments.TryGetValue(uri)
         if found then Some value.version else None 
 

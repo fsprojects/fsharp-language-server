@@ -12,13 +12,13 @@ open Microsoft.FSharp.Compiler.SourceCodeServices
 
 module ProjectParser = 
     type ParsedFsProj = {
-        sources: list<FileInfo>
-        projectReferences: list<FileInfo>
-        references: list<FileInfo>
+        sources: FileInfo list
+        projectReferences: FileInfo list
+        references: FileInfo list
     }
     type Dependency = {
         ``type``: string 
-        compile: list<string>
+        compile: string list
     }
 
     type Library = {
@@ -42,13 +42,13 @@ module ProjectParser =
     type ProjectAssets = {
         targets: Map<string, Map<string, Dependency>>
         libraries: Map<string, Library>
-        packageFolders: list<string>
+        packageFolders: string list
         project: Project
     }
 
     let private fixPath (path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
-    let keys (record: JsonValue): list<string> = 
+    let keys (record: JsonValue): string list = 
         List.ofSeq(seq {
             for key, _ in record.Properties do 
                 yield key 
@@ -111,8 +111,8 @@ module ProjectParser =
         let text = File.ReadAllText path.FullName
         parseAssetsJson text
     // Find all dlls in project.assets.json
-    let private references (assets: ProjectAssets): list<FileInfo> = 
-        let resolveInPackageFolders (dependencyPath: string): option<FileInfo> = 
+    let private references (assets: ProjectAssets): FileInfo list = 
+        let resolveInPackageFolders (dependencyPath: string): FileInfo option = 
             seq {
                 for packageFolder in assets.packageFolders do 
                     let absolutePath = Path.Combine(packageFolder, dependencyPath)
@@ -121,7 +121,7 @@ module ProjectParser =
                         yield FileInfo(normalizePath)
             } |> Seq.tryHead
         // Find a specific .dll file for a library with a version, for example "FSharp.Compiler.Service/22.0.3"
-        let resolveInLibrary (library: string) (dll: string): option<FileInfo> = 
+        let resolveInLibrary (library: string) (dll: string): FileInfo option = 
             let libraryPath = assets.libraries.[library].path
             let dependencyPath = Path.Combine(libraryPath, dll) |> fixPath 
             resolveInPackageFolders dependencyPath
@@ -147,7 +147,7 @@ module ProjectParser =
     let private parseBoth (path: FileInfo): ParsedFsProj = 
         let project = parseFsProj path
         // Find all <Compile Include=?> elements in fsproj
-        let sources (fsproj: XmlNode): list<FileInfo> = 
+        let sources (fsproj: XmlNode): FileInfo list = 
             List.ofSeq(seq {
                 for n in fsproj.SelectNodes "//Compile[@Include]" do 
                     let relativePath = n.Attributes.["Include"].Value |> fixPath
@@ -156,7 +156,7 @@ module ProjectParser =
                     yield FileInfo(normalizePath)
             })
         // Find all <ProjectReference Include=?> elements in fsproj
-        let projectReferences (fsproj: XmlNode): list<FileInfo> = 
+        let projectReferences (fsproj: XmlNode): FileInfo list = 
             List.ofSeq(seq {
                 for n in fsproj.SelectNodes "//ProjectReference[@Include]" do 
                     let relativePath = n.Attributes.["Include"].Value |> fixPath
@@ -201,7 +201,7 @@ module ProjectParser =
         else
             Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; name|]
     // Traverse the tree of project references
-    let private ancestors (fsproj: FileInfo): list<FileInfo> = 
+    let private ancestors (fsproj: FileInfo): FileInfo list = 
         let all = List<FileInfo>()
         let rec traverse (fsproj: FileInfo) = 
             let head = parseBoth fsproj

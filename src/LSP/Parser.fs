@@ -7,7 +7,7 @@ open Types
 
 type Message = 
 | RequestMessage of id: int * method: string * json: JsonValue
-| NotificationMessage of method: string * json: option<JsonValue>
+| NotificationMessage of method: string * json: JsonValue option
 
 let parseMessage (jsonText: string): Message = 
     let json = JsonValue.Parse jsonText
@@ -118,7 +118,7 @@ let parseDidChangeWatchedFilesParams (json: JsonValue): DidChangeWatchedFilesPar
         changes = json?changes.AsArray() |> List.ofArray |> List.map parseFileEvent
     }
 
-let parseNotification (method: string) (maybeBody: option<JsonValue>): Notification = 
+let parseNotification (method: string) (maybeBody: JsonValue option): Notification = 
     match method, maybeBody with 
     | "cancel", Some json -> Cancel (json?id.AsInteger())
     | "initialized", _ -> Initialized
@@ -143,7 +143,7 @@ let noneAs<'T> (orDefault: 'T) (maybe: option<'T>): 'T =
     | Some value -> value 
     | None -> orDefault
 
-let checkNull (json: JsonValue): option<JsonValue> = 
+let checkNull (json: JsonValue): JsonValue option = 
     match json with 
     | JsonValue.Null -> None 
     | _ -> Some json 
@@ -155,7 +155,7 @@ let parseTrace (text: string): Trace =
     | "verbose" -> Trace.Verbose
     | _ -> raise (Exception (sprintf "Unexpected trace %s" text))
 
-let pathString (pathReversed: list<string>): string = 
+let pathString (pathReversed: string list): string = 
     String.concat "." (List.rev pathReversed)
 
 let parseCapabilities (nested: JsonValue): Map<string, bool> =

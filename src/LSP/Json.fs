@@ -20,7 +20,7 @@ let private escapeStr (text:string) =
     sprintf "\"%s\"" escaped
 
 let private isOption (t: Type) = 
-    t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<option<_>>
+    t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<_ option>
 
 let private isEnum (t: Type) = 
     t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<seq<_>>
@@ -29,7 +29,7 @@ let private implementsEnum (t: Type) =
     Seq.exists isEnum is
 
 type JsonWriteOptions = {
-    customWriters: list<obj>
+    customWriters: obj list
 }
 
 let defaultJsonWriteOptions: JsonWriteOptions = {
@@ -40,7 +40,7 @@ let private matchWriter (t: Type) (w: obj): bool =
     let domain, _ = w.GetType() |> FSharpType.GetFunctionElements 
     domain.IsAssignableFrom(t)
 
-let private findWriter (t: Type) (customWriters: list<obj>): option<obj> = 
+let private findWriter (t: Type) (customWriters: obj list): obj option = 
     Seq.tryFind (matchWriter t) customWriters 
 
 let asFun (w: obj): obj -> obj = 

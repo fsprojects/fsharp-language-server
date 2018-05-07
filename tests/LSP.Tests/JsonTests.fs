@@ -40,9 +40,9 @@ let ``test serialize JsonValue to JSON`` (t: TestContext) =
     if found <> "{}" then Fail(found)
 
 let ``test serialize option to JSON`` (t: TestContext) = 
-    let found = serializerFactory<option<int>> defaultJsonWriteOptions (Some 1)
+    let found = serializerFactory<int option> defaultJsonWriteOptions (Some 1)
     if found <> "1" then Fail(found)
-    let found = serializerFactory<option<int>> defaultJsonWriteOptions (None)
+    let found = serializerFactory<int option> defaultJsonWriteOptions (None)
     if found <> "null" then Fail(found)
 
 type SimpleRecord = {simpleMember: int}
@@ -54,12 +54,12 @@ let ``test serialize record to JSON`` (t: TestContext) =
 
 let ``test serialize list of ints to JSON`` (t: TestContext) = 
     let example = [1; 2]
-    let found = serializerFactory<list<int>> defaultJsonWriteOptions example
+    let found = serializerFactory<int list> defaultJsonWriteOptions example
     if found <> """[1,2]""" then Fail(found)
 
 let ``test serialize list of strings to JSON`` (t: TestContext) = 
     let example = ["foo"; "bar"]
-    let found = serializerFactory<list<string>> defaultJsonWriteOptions example
+    let found = serializerFactory<string list> defaultJsonWriteOptions example
     if found <> """["foo","bar"]""" then Fail(found)
 
 let ``test serialize a record with a custom writer`` (t: TestContext) = 
