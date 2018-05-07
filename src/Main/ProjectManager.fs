@@ -10,17 +10,21 @@ open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
-// Maintains caches of parsed versions of .fsproj files
-type ProjectManager() = 
+module ProjectManagerUtils = 
     // Scan the parent directories looking for a file *.fsproj
     let findProjectFileInParents (sourceFile: FileInfo): FileInfo option = 
-        seq {
-            let mutable dir = sourceFile.Directory
-            while dir <> dir.Root do 
-                for proj in dir.GetFiles("*.fsproj") do 
-                    yield proj
-                dir <- dir.Parent
-        } |> Seq.tryHead
+        let mutable result: FileInfo option = None 
+        let mutable dir = sourceFile.Directory
+        while dir <> null && result.IsNone do 
+            for proj in dir.GetFiles("*.fsproj") do 
+                result <- Some proj
+            dir <- dir.Parent
+        result
+
+open ProjectManagerUtils
+
+// Maintains caches of parsed versions of .fsproj files
+type ProjectManager() = 
     let projectFileCache = new Dictionary<String, FileInfo>()
     let cachedProjectFile (sourceFile: FileInfo): FileInfo option = 
         let sourceDir = sourceFile.Directory 

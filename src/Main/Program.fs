@@ -354,6 +354,7 @@ type Server(client: ILanguageClient) =
         match check uri with 
         | Errors errors -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
         | Ok(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+    // Find the symbol at a position
     let symbolAt (textDocument: TextDocumentIdentifier) (position: Position): FSharpSymbolUse option = 
         match check (textDocument.uri) with 
         | Errors errors -> 
@@ -375,6 +376,16 @@ type Server(client: ILanguageClient) =
                     eprintfn "%s in line '%s' is not a symbol use" dotName line
                     None
                 | s -> s
+    // Rename one usage of a symbol
+    let renameTo (newName: string) (file: string, usages: FSharpSymbolUse seq): TextDocumentEdit = 
+        let uri = Uri("file://" + file)
+        let version = docs.GetVersion(uri) |> Option.defaultValue 0
+        let edits = seq {
+            for u in usages do 
+                let range = asRange u.RangeAlternate 
+                yield {range=range; newText=newName}
+        } 
+        {textDocument={uri=uri; version=version}; edits=List.ofSeq edits}
 
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
@@ -387,6 +398,7 @@ type Server(client: ILanguageClient) =
                     workspaceSymbolProvider = true
                     definitionProvider = true
                     referencesProvider = true
+                    renameProvider = true
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -508,7 +520,22 @@ type Server(client: ILanguageClient) =
         member this.DocumentFormatting(p: DocumentFormattingParams): TextEdit list = TODO()
         member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): TextEdit list = TODO()
         member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): TextEdit list = TODO()
-        member this.Rename(p: RenameParams): WorkspaceEdit = TODO()
+        member this.Rename(p: RenameParams): WorkspaceEdit =
+            match symbolAt p.textDocument p.position with 
+            | None -> {documentChanges=[]}
+            | Some s -> 
+                let openProjects = projects.OpenProjects
+                let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
+                eprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName names
+                let all = seq {
+                    for options in openProjects do 
+                        let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
+                        yield! check.GetUsesOfSymbol(s.Symbol) |> Async.RunSynchronously
+                }
+                let edits = all |> Seq.groupBy (fun usage -> usage.FileName)
+                                |> Seq.map (renameTo p.newName)
+                                |> List.ofSeq
+                {documentChanges=edits}
         member this.ExecuteCommand(p: ExecuteCommandParams): unit = TODO()
 
 [<EntryPoint>]

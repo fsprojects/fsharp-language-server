@@ -18,6 +18,13 @@ let private projectHasName (name: string) (project: string * FSharpProjectOption
   let fName = parts.[parts.Length - 1]
   name = fName
 
+let ``test find project file`` (t: TestContext) = 
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+    let project = ProjectManagerUtils.findProjectFileInParents file 
+    match project with 
+    | None -> Fail("Didn't find project file")
+    | Some f -> if not (f.Name = "MainProject.fsproj") then Fail(f)
+
 let ``test parse a project file recursively`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectParser.parseProjectOptions file
