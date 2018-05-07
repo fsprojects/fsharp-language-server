@@ -52,3 +52,5 @@ type ProjectManager() =
         cachedProjectFile file
     member this.FindProjectOptions(fsproj: FileInfo): FSharpProjectOptions = 
         cachedParse fsproj
+    member this.AllProjectFiles: FileInfo list = 
+        List.ofSeq projectFileCache.Values

@@ -194,3 +194,7 @@ let ``test findMethodCallBeforeCursor`` (t: TestContext) =
     | Some 16 -> ()
     | Some i -> Fail(sprintf "End of bar is at 17 but found %d" i)
 
+let ``test find project symbols`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "SignatureHelp.fs"
+    let found = server.WorkspaceSymbols({query = "signatureHelp"})
+    if List.isEmpty found then Fail("Should have found signatureHelp")

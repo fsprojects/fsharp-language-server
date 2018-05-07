@@ -181,6 +181,74 @@ let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): Si
         parameters = Array.map convertParameter s.Parameters |> List.ofArray
     }
 
+// Check if candidate contains all the characters of find, in-order, case-insensitive
+// candidate is allowed to have other characters in between, as long as it contains all of find in-order
+let private containsChars (find: string) (candidate: string): bool = 
+    let mutable iFind = 0
+    for c in candidate do 
+        if iFind < find.Length && c = find.[iFind] then iFind <- iFind + 1
+    iFind = find.Length
+
+let private matchesQuery (query: string) (candidate: FSharpSymbol): bool = 
+    containsChars (query.ToLower()) (candidate.FullName.ToLower())
+
+// FSharpEntity, FSharpUnionCase
+/// FSharpField, FSharpGenericParameter, FSharpStaticParameter, FSharpMemberOrFunctionOrValue, FSharpParameter,
+/// or FSharpActivePatternCase.
+let private symbolKind (s: FSharpSymbol): SymbolKind = 
+    match s with 
+    | :? FSharpEntity as x -> 
+        if x.IsFSharpModule then SymbolKind.Module 
+        else if x.IsNamespace then SymbolKind.Namespace 
+        else if x.IsClass then SymbolKind.Class
+        else if x.IsEnum then SymbolKind.Enum 
+        else if x.IsInterface then SymbolKind.Interface 
+        else SymbolKind.Variable 
+    | :? FSharpUnionCase as x -> SymbolKind.Constant
+    | :? FSharpField as x -> SymbolKind.Field
+    | :? FSharpGenericParameter as x -> SymbolKind.Interface
+    | :? FSharpStaticParameter as x -> SymbolKind.Variable 
+    | :? FSharpMemberOrFunctionOrValue as x -> 
+        if x.IsConstructor then SymbolKind.Constructor 
+        else if x.IsTypeFunction then SymbolKind.Function
+        else if x.IsValue then SymbolKind.Property 
+        else if x.IsProperty then SymbolKind.Property 
+        else if x.IsMember then SymbolKind.Method 
+        else SymbolKind.Function
+    | :? FSharpParameter as x -> SymbolKind.Variable
+    | :? FSharpActivePatternCase as x -> SymbolKind.Constant
+
+let private containerName (s: FSharpSymbol): string option = 
+    if s.FullName = s.DisplayName then 
+        None
+    else if s.FullName.EndsWith("." + s.DisplayName) then 
+        Some(s.FullName.Substring(0, s.FullName.Length - s.DisplayName.Length - 1))
+    else 
+        Some s.FullName
+
+let private asPosition (p: Range.pos): Position = 
+    {line=p.Line-1; character = p.Column}
+
+let private asLocation (s: FSharpSymbol): Location = 
+    let l = s.DeclarationLocation.Value
+    let uri = Uri("file://" + l.FileName)
+    {
+        uri=uri
+        range = 
+        {
+            start=asPosition l.Start
+            ``end``=asPosition l.End
+        }
+    }
+
+let private symbolInformation (s: FSharpSymbol): SymbolInformation = 
+    {
+        name = s.DisplayName
+        containerName = containerName s
+        kind = symbolKind(s)
+        location = asLocation(s)
+    }
+
 // TODO actually consider types
 let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethodGroupItem[]): int option = 
     let mutable result = -1 
@@ -251,6 +319,7 @@ type Server(client: ILanguageClient) =
                     hoverProvider = true
                     completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
                     signatureHelpProvider = Some({triggerCharacters=['('; ',']})
+                    workspaceSymbolProvider = true
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -324,7 +393,25 @@ type Server(client: ILanguageClient) =
         member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> = TODO()
-        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): list<SymbolInformation> = TODO()
+        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): list<SymbolInformation> = 
+            eprintfn "Looking for symbols matching %s" p.query
+            let all = seq {
+                for projectFile in projects.AllProjectFiles do 
+                    let options = projects.FindProjectOptions projectFile 
+                    let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
+                    for e in check.AssemblySignature.Entities do 
+                        yield e :> FSharpSymbol
+                        for x in e.MembersFunctionsAndValues do
+                            yield x :> FSharpSymbol
+                        for x in e.UnionCases do
+                            yield x :> FSharpSymbol
+            }
+            all |> Seq.filter (matchesQuery p.query) 
+                |> Seq.filter (fun s -> s.DeclarationLocation.IsSome)
+                |> Seq.truncate 50 
+                |> Seq.map symbolInformation 
+                |> List.ofSeq
+
         member this.CodeActions(p: CodeActionParams): list<Command> = TODO()
         member this.CodeLens(p: CodeLensParams): List<CodeLens> = TODO()
         member this.ResolveCodeLens(p: CodeLens): CodeLens = TODO()
