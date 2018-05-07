@@ -164,3 +164,33 @@ let ``test signature help`` (t: TestContext) =
         if List.isEmpty help.signatures then Fail("Signature list is empty")
         if List.length help.signatures <> 2 then Fail(sprintf "Expected 2 overloads of Substring but found %A" help)
 
+let ``test findMethodCallBeforeCursor`` (t: TestContext) = 
+    match findMethodCallBeforeCursor "foo()" 4 with 
+    | None -> Fail("Should have found foo")
+    | Some 3 -> ()
+    | Some i -> Fail(sprintf "End of foo is at 3 but found %d" i)
+    match findMethodCallBeforeCursor "foo ()" 5 with 
+    | None -> Fail("Should have found foo")
+    | Some 3 -> ()
+    | Some i -> Fail(sprintf "End of foo is at 3 but found %d" i)
+    match findMethodCallBeforeCursor "foo(bar(), )" 11 with 
+    | None -> Fail("Should have found foo")
+    | Some 3 -> ()
+    | Some i -> Fail(sprintf "End of foo is at 3 but found %d" i)
+    match findMethodCallBeforeCursor "let foo ()" 9 with 
+    | None -> ()
+    | Some i -> Fail(sprintf "Shouldn't find method %d in let expression" i)
+    match findMethodCallBeforeCursor "let private foo ()" 17 with 
+    | None -> ()
+    | Some i -> Fail(sprintf "Shouldn't find method %d in let expression" i)
+    match findMethodCallBeforeCursor "member foo ()" 12 with 
+    | None -> ()
+    | Some i -> Fail(sprintf "Shouldn't find method %d in member expression" i)
+    match findMethodCallBeforeCursor "member this.foo ()" 17 with 
+    | None -> ()
+    | Some i -> Fail(sprintf "Shouldn't find method %d in member expression" i)
+    match findMethodCallBeforeCursor "let foo () = bar()" 17 with 
+    | None -> Fail("Should have found bar")
+    | Some 16 -> ()
+    | Some i -> Fail(sprintf "End of bar is at 17 but found %d" i)
+

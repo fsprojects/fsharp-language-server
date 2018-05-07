@@ -47,4 +47,6 @@ let runAllTests(assembly: Assembly, argv: array<string>): unit =
                         eprintfn "  %s" message
                         countFailed <- countFailed + 1
                     | _ -> reraise()
-    eprintfn "\u001b[33mRan: %d  \u001b[32mSucceeded: %d  \u001b[31mFailed: %d\u001b[0m" (countSucceeded + countFailed) countSucceeded countFailed
+    eprintf "\u001b[33mRan: %d  \u001b[32mSucceeded: %d " (countSucceeded + countFailed) countSucceeded
+    if countFailed > 0 then eprintf "  \u001b[31mFailed: %d" countFailed 
+    eprintfn "\u001b[0m"

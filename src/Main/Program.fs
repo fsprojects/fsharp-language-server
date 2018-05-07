@@ -94,17 +94,30 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
         []
 
 // Look for a method call like foo.MyMethod() before the cursor
-let findMethodCallBeforeCursor (lineContent: string) (character: int): int option = 
-    let find = seq {
-        for i in character .. -1 .. 0 do 
-            if lineContent.[i] = '(' then yield i-1
-    }
-    Seq.tryHead find
+let findMethodCallBeforeCursor (lineContent: string) (cursor: int): int option = 
+    let mutable found = -1
+    let mutable parenDepth = 0
+    for i in (min (cursor-1) lineContent.Length) .. -1 .. 0 do 
+        match lineContent.[i] with 
+        | ')' -> parenDepth <- parenDepth + 1
+        | '(' when parenDepth > 0 -> parenDepth <- parenDepth - 1
+        | '(' when found = -1 -> found <- i
+        | _ -> ()
+    if found = -1 then None 
+    else 
+        let prefix = lineContent.Substring(0, found).TrimEnd()
+        if Regex(@"let[ \w]+$").IsMatch(prefix) then 
+            eprintfn "No signature help in let expression %s" lineContent 
+            None 
+        else if Regex(@"member[ \w\.]+$").IsMatch(prefix) then 
+            eprintfn "No signature help in member expression %s" lineContent 
+            None 
+        else Some prefix.Length
 
 // Figure out the active parameter by counting ',' characters
 let countCommas (lineContent: string) (endOfMethodName: int) (cursor: int): int = 
     let mutable count = 0
-    for i in endOfMethodName .. cursor-1 do 
+    for i in endOfMethodName .. (min (cursor-1) lineContent.Length) do 
         if lineContent.[i] = ',' then 
             count <- count + 1
     count
@@ -154,17 +167,27 @@ let private convertParameter (p: FSharpMethodGroupItemParameter): ParameterInfor
         documentation = Some p.Display
     }
 
-let private convertSignature (label: string) (s: FSharpMethodGroupItem): SignatureInformation = 
+let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): SignatureInformation = 
     let doc = match s.Description with 
                 | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription 
                 | _ -> 
                     eprintfn "Can't render documentation %A" s.Description 
                     None 
+    let parameterName (p: FSharpMethodGroupItemParameter) = p.ParameterName
+    let parameterNames = Array.map parameterName s.Parameters
     {
-        label = label 
+        label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames) 
         documentation = doc 
-        parameters = List.map convertParameter (List.ofArray s.Parameters)
+        parameters = Array.map convertParameter s.Parameters |> List.ofArray
     }
+
+// TODO actually consider types
+let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethodGroupItem[]): int option = 
+    let mutable result = -1 
+    for i in 0 .. methods.Length - 1 do 
+        if result = -1 && (activeParameter = 0 || activeParameter < methods.[i].Parameters.Length) then 
+            result <- i 
+    if result = -1 then None else Some result
 
 type private FindFile = 
     | NoSourceFile of sourcePath: string
@@ -289,16 +312,14 @@ type Server(client: ILanguageClient) =
                     eprintfn "No method call in line %s" line 
                     None
                 | Some endOfMethodName -> 
-                    let names = findNamesUnderCursor line endOfMethodName
+                    let names = findNamesUnderCursor line (endOfMethodName - 1)
                     eprintfn "Looking for overloads of %s" (String.concat "." names)
-                    let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName+1, line, Some names) |> Async.RunSynchronously
+                    let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names) |> Async.RunSynchronously
                     let sigs = Array.map (convertSignature overloads.MethodName) overloads.Methods |> List.ofArray
                     let activeParameter = countCommas line endOfMethodName p.position.character
-                    // TODO actually look at types
-                    let isCompatible (overload: FSharpMethodGroupItem) = activeParameter = 0 || overload.Parameters.Length > activeParameter
-                    let activeDeclaration = Array.findIndex isCompatible overloads.Methods
+                    let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
                     eprintfn "Found %d overloads" overloads.Methods.Length
-                    Some({signatures=sigs; activeSignature=Some activeDeclaration; activeParameter=Some activeParameter})
+                    Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
         member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = TODO()
         member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
