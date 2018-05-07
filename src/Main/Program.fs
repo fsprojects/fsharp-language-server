@@ -194,7 +194,7 @@ let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): Si
     }
 
 // Lazily all symbols in a file or project
-let private allSymbols (es: FSharpEntity seq) = 
+let rec private allSymbols (es: FSharpEntity seq) = 
     seq {
         for e in es do 
             yield e :> FSharpSymbol
@@ -202,6 +202,9 @@ let private allSymbols (es: FSharpEntity seq) =
                 yield x :> FSharpSymbol
             for x in e.UnionCases do
                 yield x :> FSharpSymbol
+            for x in e.FSharpFields do
+                yield x :> FSharpSymbol
+            yield! allSymbols e.NestedEntities
     }
 
 // Check if candidate contains all the characters of find, in-order, case-insensitive

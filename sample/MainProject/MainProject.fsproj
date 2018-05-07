@@ -17,6 +17,7 @@
     <Compile Include="SignatureHelp.fs" />
     <Compile Include="DeclareSymbol.fs" />
     <Compile Include="UseSymbol.fs" />
+    <Compile Include="InterfaceInModule.fs" />
   </ItemGroup>
 
   <ItemGroup>

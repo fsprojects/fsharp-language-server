@@ -201,12 +201,20 @@ let ``test find document symbols`` (t: TestContext) =
     if not (List.contains "Reference" names) then Fail(sprintf "Reference is not in %A" names)
     if List.contains "ReferenceDependsOn" names then Fail("Document symbols includes dependency")
 
+let ``test find interface inside module`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "InterfaceInModule.fs"
+    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "InterfaceInModule.fs")}})
+    let names = found |> List.map (fun f -> f.name)
+    if not (List.contains "IMyInterface" names) then Fail(sprintf "IMyInterface is not in %A" names)
+
 let ``test find project symbols`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
     let found = server.WorkspaceSymbols({query = "signatureHelp"})
     if List.isEmpty found then Fail("Should have found signatureHelp")
     let found = server.WorkspaceSymbols({query = "IndirectLibrary"})
     if List.isEmpty found then Fail("Should have found IndirectLibrary")
+    let found = server.WorkspaceSymbols({query = "IMyInterface"})
+    if List.isEmpty found then Fail("Should have found IMyInterface")
 
 let ``test go to definition`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Reference.fs"
