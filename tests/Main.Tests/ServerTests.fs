@@ -214,3 +214,16 @@ let ``test go to definition`` (t: TestContext) =
     | [] -> Fail("No symbol definition")
     | [single] -> ()
     | many -> Fail(sprintf "Multiple definitions found %A" many)
+
+let ``test find references`` (t: TestContext) = 
+    let (client, server) = createServerAndReadFile "DeclareSymbol.fs"
+    let p = 
+        {
+            textDocument = { uri=Uri(absPath "DeclareSymbol.fs") }
+            position = { line=3-1; character=6-1 }
+            context = { includeDeclaration=true }
+        }
+    let list = server.FindReferences(p)
+    let isReferenceFs (r: Location) = r.uri.AbsolutePath.EndsWith("UseSymbol.fs")
+    let found = List.exists isReferenceFs list
+    if not found then Fail(sprintf "Didn't find reference from UseSymbol.fs in %A" list)

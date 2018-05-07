@@ -15,6 +15,8 @@
     <Compile Include="Hover.fs" />
     <Compile Include="Completions.fs" />
     <Compile Include="SignatureHelp.fs" />
+    <Compile Include="DeclareSymbol.fs" />
+    <Compile Include="UseSymbol.fs" />
   </ItemGroup>
 
   <ItemGroup>

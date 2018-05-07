@@ -255,4 +255,7 @@ module ProjectParser =
             eprintfn "%s has been modified" fsproj.Name
             projectOptionsCache.[fsproj.FullName] <- doParseProjectOptions fsproj
         projectOptionsCache.[fsproj.FullName]
-    let openProjects () = projectOptionsCache.Values |> List.ofSeq
+    let openProjects () = 
+        projectOptionsCache.Values |> List.ofSeq
+    let invalidateProjectFile (uri: Uri) = 
+        projectOptionsCache.Clear() // TODO make more selective

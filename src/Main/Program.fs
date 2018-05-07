@@ -82,12 +82,11 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
         let r = Regex(@"(\w+|``[^`]+``)")
         let ms = r.Matches(single.Value)
         let result = [ for m in ms do 
-                            if single.Index + m.Index < character then 
+                            if single.Index + m.Index <= character then 
                                 if m.Value.StartsWith("``") then
                                     yield m.Value.Substring(2, m.Value.Length - 4)
                                 else
                                     yield m.Value ]
-        eprintfn "Found identifier under cursor %A" result
         result
     | multiple -> 
         eprintfn "Line %s offset %d matched multiple groups %A" lineContent character multiple 
@@ -259,7 +258,7 @@ let private asRange (r: Range.range): Range =
         ``end``=asPosition r.End
     }
 
-let private asLocation (s: FSharpSymbol): Location option = 
+let private declarationLocation (s: FSharpSymbol): Location option = 
     match s.DeclarationLocation with 
     | None -> 
         eprintfn "Symbol %s has no declaration" s.FullName 
@@ -267,10 +266,11 @@ let private asLocation (s: FSharpSymbol): Location option =
     | Some l ->
         let l = s.DeclarationLocation.Value
         let uri = Uri("file://" + l.FileName)
-        {
-            uri=uri
-            range = asRange l
-        } |> Some
+        Some({ uri=uri; range = asRange l })
+
+let private useLocation (s: FSharpSymbolUse): Location = 
+    let uri = Uri("file://" + s.FileName)
+    { uri=uri; range = asRange s.RangeAlternate }
 
 let private symbolHasLocation (s: FSharpSymbol): bool = 
     s.DeclarationLocation.IsSome
@@ -280,7 +280,7 @@ let private symbolInformation (s: FSharpSymbol): SymbolInformation =
         name = s.DisplayName
         containerName = containerName s
         kind = symbolKind(s)
-        location = asLocation(s).Value
+        location = declarationLocation(s).Value
     }
 
 let private symbolIsInFile (file: string) (s: FSharpSymbol): bool = 
@@ -351,6 +351,28 @@ type Server(client: ILanguageClient) =
         match check uri with 
         | Errors errors -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
         | Ok(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+    let symbolAt (textDocument: TextDocumentIdentifier) (position: Position): FSharpSymbolUse option = 
+        match check (textDocument.uri) with 
+        | Errors errors -> 
+            eprintfn "Check failed, ignored %d errors" (List.length errors)
+            None
+        | Ok(parseResult, checkResult, _) -> 
+            let line = docs.LineContent(textDocument.uri, position.line)
+            match findEndOfIdentifierUnderCursor line position.character with 
+            | None -> 
+                eprintfn "No identifier at %d in line '%s'" position.character line 
+                None
+            | Some endOfIdentifier -> 
+                eprintfn "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
+                let names = findNamesUnderCursor line (endOfIdentifier - 1)
+                let dotName = String.concat "." names
+                eprintfn "Looking at symbol %s" dotName
+                match checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names) |> Async.RunSynchronously with 
+                | None -> 
+                    eprintfn "%s in line '%s' is not a symbol use" dotName line
+                    None
+                | s -> s
+
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
             { capabilities = 
@@ -361,6 +383,7 @@ type Server(client: ILanguageClient) =
                     documentSymbolProvider = true
                     workspaceSymbolProvider = true
                     definitionProvider = true
+                    referencesProvider = true
                     textDocumentSync = 
                         { defaultTextDocumentSyncOptions with 
                             openClose = true 
@@ -386,6 +409,8 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
                 eprintfn "Watched file %s %s" (change.uri.ToString()) (change.``type``.ToString())
+                if change.uri.AbsolutePath.EndsWith(".fsproj") then 
+                    ProjectParser.invalidateProjectFile change.uri
         member this.Completion(p: TextDocumentPositionParams): CompletionList option =
             match check (p.textDocument.uri) with 
             | Errors errors -> 
@@ -429,27 +454,22 @@ type Server(client: ILanguageClient) =
                     eprintfn "Found %d overloads" overloads.Methods.Length
                     Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
         member this.GotoDefinition(p: TextDocumentPositionParams): list<Location> = 
-            match check (p.textDocument.uri) with 
-            | Errors errors -> 
-                eprintfn "Check failed, ignored %d errors" (List.length errors)
-                []
-            | Ok(parseResult, checkResult, _) -> 
-                let line = docs.LineContent(p.textDocument.uri, p.position.line)
-                match findEndOfIdentifierUnderCursor line p.position.character with 
-                | None -> 
-                    eprintfn "No identifier at %d in line '%s'" p.position.character line 
-                    []
-                | Some endOfIdentifier -> 
-                    let names = findNamesUnderCursor line (endOfIdentifier - 1)
-                    let dotName = String.concat "." names
-                    eprintfn "Go to defintion of %s" dotName
-                    match checkResult.GetSymbolUseAtLocation(p.position.line+1, endOfIdentifier, line, names) |> Async.RunSynchronously with 
-                    | None -> 
-                        eprintfn "%s in line '%s' is not a symbol use" dotName line
-                        []
-                    | Some s -> 
-                        asLocation s.Symbol |> Option.toList
-        member this.FindReferences(p: ReferenceParams): list<Location> = TODO()
+            match symbolAt p.textDocument p.position with 
+            | None -> []
+            | Some s -> declarationLocation s.Symbol |> Option.toList
+        member this.FindReferences(p: ReferenceParams): list<Location> = 
+            match symbolAt p.textDocument p.position with 
+            | None -> [] 
+            | Some s -> 
+                let openProjects = projects.OpenProjects
+                let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
+                eprintfn "Looking for references to %s in %s" s.Symbol.FullName names
+                let all = seq {
+                    for options in openProjects do 
+                        let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
+                        yield! check.GetUsesOfSymbol(s.Symbol) |> Async.RunSynchronously
+                }
+                all |> Seq.map useLocation |> List.ofSeq
         member this.DocumentHighlight(p: TextDocumentPositionParams): list<DocumentHighlight> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): list<SymbolInformation> =
             match check (p.textDocument.uri) with 
@@ -477,7 +497,6 @@ type Server(client: ILanguageClient) =
                 |> Seq.truncate 50 
                 |> Seq.map symbolInformation 
                 |> List.ofSeq
-
         member this.CodeActions(p: CodeActionParams): list<Command> = TODO()
         member this.CodeLens(p: CodeLensParams): List<CodeLens> = TODO()
         member this.ResolveCodeLens(p: CodeLens): CodeLens = TODO()
