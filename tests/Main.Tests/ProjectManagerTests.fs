@@ -25,6 +25,13 @@ let ``test find project file`` (t: TestContext) =
     | None -> Fail("Didn't find project file")
     | Some f -> if not (f.Name = "MainProject.fsproj") then Fail(f)
 
+let ``test project-file-not-found`` (t: TestContext) = 
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "README.md"|])
+    let project = ProjectManagerUtils.findProjectFileInParents file
+    match project with 
+    | Some f -> Fail(eprintfn "Shouldn't have found project file %s" f.FullName)
+    | None -> ()
+
 let ``test parse a project file recursively`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectParser.parseProjectOptions file
