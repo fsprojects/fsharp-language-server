@@ -22,7 +22,12 @@ module ProjectParser =
     }
 
     type Library = {
-        path: string
+        // Type of dependency. 'package' is the one we want
+        ``type``: string 
+        // Additional component of path to .dll, relative to packageFolders[?]
+        path: string option
+        // List of dlls, relative to packageFolders[?]/path
+        files: string list
     }
 
     type ProjectFrameworkDependency = {
@@ -46,6 +51,10 @@ module ProjectParser =
         project: Project
     }
 
+    let private asString (json: JsonValue) = 
+        json.AsString()
+    let private asStringList (array: JsonValue): string list = 
+        array.AsArray() |> Array.map asString |> List.ofArray
     let private fixPath (path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
     let keys (record: JsonValue): string list = 
@@ -54,10 +63,9 @@ module ProjectParser =
                 yield key 
         })
     let private parseDependency (info: JsonValue): Dependency = 
-        let compile = info.TryGetProperty("compile") |> Option.map keys
         {
             ``type`` = info?``type``.AsString()
-            compile = defaultArg compile []
+            compile = info.TryGetProperty("compile") |> Option.map keys |> Option.defaultValue []
         }
     let private parseDependencies (dependencies: JsonValue): Map<string, Dependency> = 
         Map.ofSeq(seq {
@@ -71,7 +79,9 @@ module ProjectParser =
         })
     let private parseLibrary (library: JsonValue): Library = 
         {
-            path = library?path.AsString()
+            ``type`` = library?``type``.AsString()
+            path = library.TryGetProperty("path") |> Option.map asString
+            files = library.TryGetProperty("files") |> Option.map asStringList |> Option.defaultValue []
         }
     let private parseLibraries (libraries: JsonValue): Map<string, Library> = 
         Map.ofSeq(seq {
@@ -122,7 +132,11 @@ module ProjectParser =
             } |> Seq.tryHead
         // Find a specific .dll file for a library with a version, for example "FSharp.Compiler.Service/22.0.3"
         let resolveInLibrary (library: string) (dll: string): FileInfo option = 
-            let libraryPath = assets.libraries.[library].path
+            let library = assets.libraries.[library]
+            let noPath () = 
+                eprintfn "No path in %A" library
+                ""
+            let libraryPath = library.path |> Option.defaultWith noPath
             let dependencyPath = Path.Combine(libraryPath, dll) |> fixPath 
             resolveInPackageFolders dependencyPath
         List.ofSeq(seq {
@@ -191,11 +205,12 @@ module ProjectParser =
         let name = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
         // TODO this is pretty hacky
         // Does it actually matter if I find a real .dll? Can I just use bin/Debug/placeholder/___.dll?
-        let list = [ for target in bin.GetDirectories() do 
-                        for platform in target.GetDirectories() do 
-                            let file = Path.Combine(platform.FullName, name)
-                            if File.Exists file then 
-                                yield file ]
+        let list = [ if bin.Exists then
+                        for target in bin.GetDirectories() do 
+                            for platform in target.GetDirectories() do 
+                                let file = Path.Combine(platform.FullName, name)
+                                if File.Exists file then 
+                                    yield file ]
         if list.Length > 0 then 
             list.[0] 
         else
@@ -224,21 +239,17 @@ module ProjectParser =
         printList ancestorProjects "projects"
         eprintfn "  Sources:"
         printList c.sources "sources"
-        // for f in ancestorProjects do
-        //     eprintfn "-r:%O" (projectDll f)
-        // for f in c.references do 
-        //     eprintfn "-r:%O" f
         {
             ExtraProjectInfo = None 
             IsIncompleteTypeCheckEnvironment = false 
             LoadTime = fsproj.LastWriteTime
             OriginalLoadReferences = []
-            OtherOptions = [|   yield "--noframework" 
+            OtherOptions = [|   yield "--noframework"
                                 // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
                                 for f in ancestorProjects do
-                                    yield sprintf "-r:%O" (projectDll f)
+                                    yield "-r:" + (projectDll f)
                                 for f in c.references do 
-                                    yield sprintf "-r:%O" f |]
+                                    yield "-r:" + f.FullName |]
             ProjectFileName = fsproj.FullName 
             ReferencedProjects = ancestorProjects |> List.map (fun f -> (projectDll f, parseProjectOptions f)) |> List.toArray
             SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray

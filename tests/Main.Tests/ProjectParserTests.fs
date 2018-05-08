@@ -13,7 +13,7 @@ let ``test parsing a JSON project file`` (t: TestContext) =
       "version": 3,
       "targets": {
         ".NETCoreApp,Version=v2.0": {
-          "FSharp.Compiler.Service/16.0.2": {
+          "FSharp.Compiler.Service/22.0.3": {
             "type": "package",
             "compile": {
               "lib/netstandard1.6/FSharp.Compiler.Service.dll": {}
@@ -22,8 +22,17 @@ let ``test parsing a JSON project file`` (t: TestContext) =
         }
       },
       "libraries": {
-        "FSharp.Compiler.Service/16.0.2": {
-          "path": "fsharp.compiler.service/16.0.2"
+        "FSharp.Compiler.Service/22.0.3": {
+          "type": "package",
+          "path": "fsharp.compiler.service/22.0.3",
+          "files": [
+            "fsharp.compiler.service.22.0.3.nupkg.sha512",
+            "fsharp.compiler.service.nuspec",
+            "lib/net45/FSharp.Compiler.Service.dll",
+            "lib/net45/FSharp.Compiler.Service.xml",
+            "lib/netstandard2.0/FSharp.Compiler.Service.dll",
+            "lib/netstandard2.0/FSharp.Compiler.Service.xml"
+          ]
         }
       },
       "packageFolders": {
@@ -37,7 +46,7 @@ let ``test parsing a JSON project file`` (t: TestContext) =
             "dependencies": {
               "FSharp.Compiler.Service": {
                 "target": "Package",
-                "version": "[16.0.2, )"
+                "version": "[22.0.3, )"
               }
             }
           }
@@ -45,8 +54,7 @@ let ``test parsing a JSON project file`` (t: TestContext) =
       }
     }"""
     let parsed = ProjectParser.parseAssetsJson json
-    if not (Map.containsKey ".NETCoreApp,Version=v2.0" parsed.targets) then Fail("Failed")
-    if not (Map.containsKey "FSharp.Compiler.Service/16.0.2" parsed.libraries) then Fail("Failed")
+    if not (Map.containsKey "FSharp.Compiler.Service/22.0.3" parsed.libraries) then Fail("Failed")
     if not (Seq.exists ((=) "/Users/george/.nuget/packages/") parsed.packageFolders) then Fail("Failed")
 
 let ``test parsing a project file`` (t: TestContext) = 

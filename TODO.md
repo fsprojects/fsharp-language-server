@@ -13,3 +13,7 @@
 
 # Bugs
 - Re-lint when a parent file is edited
+- Autocompleting in strings
+
+# Features
+- Docstrings on autocomplete and hover
