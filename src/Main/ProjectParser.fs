@@ -135,6 +135,7 @@ module ProjectParser =
             alreadyLogged.Add(message) |> ignore
     // Find all dlls in project.assets.json
     let private references (assets: ProjectAssets): FileInfo list = 
+        // TODO rewrite all this parsing and traversing as a JSON-query, like jsonQuery(jsonValue, ["foo", "bar", ...])
         // Given a dependency name, for example FSharp.Core, lookup the version in $.libraries, for example FSharp.Core/4.3.4
         let lookupVersion (dependencyName: string) = 
             let mutable found: string option = None
@@ -169,6 +170,23 @@ module ProjectParser =
                     else logOnce(sprintf "Couldn't find %s in targets[%s]" dependency targetName)
 
         }
+        // We want to include all contents from dependencies with autoReferenced=true,
+        // no matter what we see in $.targets[*][dep/version].compile
+        let autoReferenced = seq {
+            for KeyValue(frameworkName, framework) in assets.project.frameworks do 
+                for KeyValue(dependencyName, dependency) in framework.dependencies do 
+                    if dependency.autoReferenced then 
+                        yield! lookupVersion dependencyName |> Option.toList
+        }
+        let autoReferencedFiles = seq {
+            for dependency in autoReferenced do 
+                if assets.libraries.ContainsKey(dependency) then 
+                    for dll in assets.libraries.[dependency].files do 
+                        if dll.EndsWith ".dll" then 
+                            yield (dependency, dll)
+                else logOnce(sprintf "Couldn't find auto-referenced dependency %s in libraries" dependency)
+        }
+        let allFiles = Seq.concat [ compileFiles; autoReferencedFiles ] |> Set.ofSeq
         // Look up each dependency in $.libraries[dep/version].files
         let libraryFile (dependency: string, dll: string) = seq {
             if assets.libraries.ContainsKey dependency then 
@@ -182,7 +200,7 @@ module ProjectParser =
                         logOnce(sprintf "DLL %s is not in libraries[%s].files" dll dependency)
             else logOnce(sprintf "Dependency %s not in libraries" dependency)
         }
-        let files = Seq.collect libraryFile compileFiles
+        let files = Seq.collect libraryFile allFiles
         // Find .dlls by checking each key of $.packageFolders
         let findAbsolutePath (relativePath: string): FileInfo option = 
             let mutable found: FileInfo option = None
