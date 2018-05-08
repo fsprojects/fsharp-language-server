@@ -19,6 +19,7 @@ module ProjectParser =
     type Dependency = {
         ``type``: string 
         compile: string list
+        dependencies: Map<string, string>
     }
 
     type Library = {
@@ -55,6 +56,11 @@ module ProjectParser =
         json.AsString()
     let private asStringList (array: JsonValue): string list = 
         array.AsArray() |> Array.map asString |> List.ofArray
+    let private asStringStringMap (json: JsonValue): Map<string, string> = 
+        Map.ofSeq(seq {
+            for k, v in json.Properties do
+                yield k, v.AsString()
+        })
     let private fixPath (path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
     let keys (record: JsonValue): string list = 
@@ -66,6 +72,7 @@ module ProjectParser =
         {
             ``type`` = info?``type``.AsString()
             compile = info.TryGetProperty("compile") |> Option.map keys |> Option.defaultValue []
+            dependencies = info.TryGetProperty("dependencies") |> Option.map asStringStringMap |> Option.defaultValue Map.empty
         }
     let private parseDependencies (dependencies: JsonValue): Map<string, Dependency> = 
         Map.ofSeq(seq {
@@ -120,37 +127,72 @@ module ProjectParser =
     let private parseAssets (path: FileInfo): ProjectAssets = 
         let text = File.ReadAllText path.FullName
         parseAssetsJson text
+    // Log no-location messages once and then silence them
+    let private alreadyLogged = System.Collections.Generic.HashSet<string>()
+    let private logOnce (message: string): unit = 
+        if not (alreadyLogged.Contains message) then 
+            eprintfn "%s" message 
+            alreadyLogged.Add(message) |> ignore
     // Find all dlls in project.assets.json
     let private references (assets: ProjectAssets): FileInfo list = 
-        let resolveInPackageFolders (dependencyPath: string): FileInfo option = 
-            seq {
-                for packageFolder in assets.packageFolders do 
-                    let absolutePath = Path.Combine(packageFolder, dependencyPath)
-                    let normalizePath = Path.GetFullPath(absolutePath)
-                    if File.Exists normalizePath then
-                        yield FileInfo(normalizePath)
-            } |> Seq.tryHead
-        // Find a specific .dll file for a library with a version, for example "FSharp.Compiler.Service/22.0.3"
-        let resolveInLibrary (library: string) (dll: string): FileInfo option = 
-            let library = assets.libraries.[library]
-            let noPath () = 
-                eprintfn "No path in %A" library
-                ""
-            let libraryPath = library.path |> Option.defaultWith noPath
-            let dependencyPath = Path.Combine(libraryPath, dll) |> fixPath 
-            resolveInPackageFolders dependencyPath
-        List.ofSeq(seq {
-            for target in assets.targets do 
-                for dependency in target.Value do 
-                    if dependency.Value.``type`` = "package" && Map.containsKey dependency.Key assets.libraries then 
-                        for dll in dependency.Value.compile do 
-                            let resolved = resolveInLibrary dependency.Key dll
-                            if resolved.IsSome then 
-                                yield resolved.Value 
-                            else 
-                                let packageFolders = String.concat ", " assets.packageFolders
-                                eprintfn "Couldn't find %s in %s" dll packageFolders
-        })
+        // Given a dependency name, for example FSharp.Core, lookup the version in $.libraries, for example FSharp.Core/4.3.4
+        let lookupVersion (dependencyName: string) = 
+            let mutable found: string option = None
+            for KeyValue(dependencyVersion, library) in assets.libraries do 
+                if dependencyVersion.StartsWith(dependencyName + "/") && found = None then 
+                    found <- Some dependencyVersion
+            found
+        // Find the names of all dependencies in keys of $.project.frameworks[*].dependencies
+        let dependencies = seq {
+            for KeyValue(frameworkName, framework) in assets.project.frameworks do 
+                for KeyValue(dependencyName, dependency) in framework.dependencies do 
+                    yield! lookupVersion dependencyName |> Option.toList
+        }
+        // Find transitive dependencies in $.targets 
+        let rec transitiveDependencies (fromDependency: string) = seq {
+            yield fromDependency
+            for KeyValue(targetName, libraryMap) in assets.targets do 
+                if libraryMap.ContainsKey fromDependency then 
+                    for KeyValue(dependencyName, version) in libraryMap.[fromDependency].dependencies do 
+                        yield! transitiveDependencies (dependencyName + "/" + version)
+                else logOnce(sprintf "Couldn't find %s in targets[%s]" fromDependency targetName)
+        }
+        let transitive = Seq.collect transitiveDependencies dependencies |> Set.ofSeq
+        // Identify which files are needed in $.targets[*][dep/version].compile
+        let compileFiles = seq {
+            for dependency in transitive do 
+                for KeyValue(targetName, libraryMap) in assets.targets do 
+                    if libraryMap.ContainsKey(dependency) then 
+                        for dll in libraryMap.[dependency].compile do 
+                            if dll.EndsWith ".dll" then 
+                                yield (dependency, dll)
+                    else logOnce(sprintf "Couldn't find %s in targets[%s]" dependency targetName)
+
+        }
+        // Look up each dependency in $.libraries[dep/version].files
+        let libraryFile (dependency: string, dll: string) = seq {
+            if assets.libraries.ContainsKey dependency then 
+                let library = assets.libraries.[dependency]
+                match library.path with 
+                | None -> eprintfn "Skipping %s because no path in %A" dependency library
+                | Some parentPath -> 
+                    if List.contains dll library.files then 
+                        yield Path.Combine(parentPath, dll)
+                    else 
+                        logOnce(sprintf "DLL %s is not in libraries[%s].files" dll dependency)
+            else logOnce(sprintf "Dependency %s not in libraries" dependency)
+        }
+        let files = Seq.collect libraryFile compileFiles
+        // Find .dlls by checking each key of $.packageFolders
+        let findAbsolutePath (relativePath: string): FileInfo option = 
+            let mutable found: FileInfo option = None
+            for packageFolder in assets.packageFolders do 
+                let absolutePath = Path.Combine(packageFolder, relativePath)
+                let normalizePath = Path.GetFullPath(absolutePath)
+                if File.Exists normalizePath && found = None then
+                    found <- Some(FileInfo(normalizePath))
+            found
+        Seq.map findAbsolutePath files |> Seq.collect Option.toList |> List.ofSeq
     // Parse fsproj
     let private parseFsProj (fsproj: FileInfo): XmlElement = 
         let text = File.ReadAllText fsproj.FullName
@@ -239,6 +281,8 @@ module ProjectParser =
         printList ancestorProjects "projects"
         eprintfn "  Sources:"
         printList c.sources "sources"
+        for f in c.references do 
+            eprintfn "-r:%s" f.FullName
         {
             ExtraProjectInfo = None 
             IsIncompleteTypeCheckEnvironment = false 
