@@ -14,6 +14,7 @@
 # Bugs
 - Re-lint when a parent file is edited
 - Autocompleting in strings
+- Rename symbol renames whole Path.To.symbol
 
 # Features
 - Docstrings on autocomplete and hover

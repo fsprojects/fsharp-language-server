@@ -315,7 +315,7 @@ type private JsonParser(jsonText:string, cultureInfo, tolerateErrors) =
         JsonValue.Array(vals.ToArray())
 
     and parseLiteral(expected, r) =
-        ensure(i+expected.Length < s.Length)
+        ensure(i+expected.Length <= s.Length)
         for j in 0 .. expected.Length - 1 do
             ensure(s.[i+j] = expected.[j])
         i <- i + expected.Length
@@ -323,7 +323,7 @@ type private JsonParser(jsonText:string, cultureInfo, tolerateErrors) =
 
     // Start by parsing the top-level value
     member x.Parse() =
-        let value = parseRootValue()
+        let value = parseValue()
         skipWhitespace()
         if i <> s.Length then
             throw()

@@ -96,3 +96,48 @@ let ``test serialize an interface with a custom writer`` (t: TestContext) =
     if found <> "\"foo\"" then Fail(found)
     let found = serializerFactory<MyFoo> options example
     if found <> "\"foo\"" then Fail(found)
+
+let ``test deserialize simple types`` (t: TestContext) = 
+    let options = defaultJsonReadOptions
+    let found = deserializerFactory<bool> options "true" 
+    if found <> true then Fail(found)
+    let found = deserializerFactory<int> options "1" 
+    if found <> 1 then Fail(found)
+    let found = deserializerFactory<char> options "\"x\"" 
+    if found <> 'x' then Fail(found)
+    let found = deserializerFactory<string> options "\"foo\"" 
+    if found <> "foo" then Fail(found)
+    let found = deserializerFactory<Uri> options "\"https://github.com\"" 
+    if found <> Uri("https://github.com") then Fail(found)
+
+type TestSimpleRead = {
+    oneField: int
+}
+
+let ``test deserialize complex types`` (t: TestContext) = 
+    let options = defaultJsonReadOptions
+    let found = deserializerFactory<TestSimpleRead> options """{"oneField":1}"""
+    if found <> {oneField=1} then Fail(found)
+    let found = deserializerFactory<int list> options """[1]"""
+    if found <> [1] then Fail(found)
+    let found = deserializerFactory<int option> options """1"""
+    if found <> Some 1 then Fail(found)
+    let found = deserializerFactory<int option> options """null"""
+    if found <> None then Fail(found)
+
+type TestOptionalRead = {
+    optionField: int option
+}
+
+let ``test deserialize optional types`` (t: TestContext) = 
+    let options = defaultJsonReadOptions
+    let found = deserializerFactory<TestOptionalRead> options """{"optionField":1}"""
+    if found <> {optionField=Some 1} then Fail(found)
+    let found = deserializerFactory<TestOptionalRead> options """{"optionField":null}"""
+    if found <> {optionField=None} then Fail(found)
+    let found = deserializerFactory<TestOptionalRead> options """{}"""
+    if found <> {optionField=None} then Fail(found)
+    let found = deserializerFactory<int option list> options """[1]"""
+    if found <> [Some 1] then Fail(found)
+    let found = deserializerFactory<int option list> options """[null]"""
+    if found <> [None] then Fail(found)

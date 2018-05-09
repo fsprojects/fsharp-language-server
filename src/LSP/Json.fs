@@ -22,11 +22,14 @@ let private escapeStr (text:string) =
 let private isOption (t: Type) = 
     t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<_ option>
 
-let private isEnum (t: Type) = 
+let private isSeq (t: Type) = 
     t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<seq<_>>
-let private implementsEnum (t: Type) = 
+let private implementsSeq (t: Type) = 
     let is = t.GetInterfaces()
-    Seq.exists isEnum is
+    Seq.exists isSeq is
+
+let private isList (t: Type) = 
+    t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<list<_>>
 
 type JsonWriteOptions = {
     customWriters: obj list
@@ -47,6 +50,20 @@ let asFun (w: obj): obj -> obj =
     let invoke = w.GetType().GetMethod("Invoke")
     fun x -> invoke.Invoke(w, [|x|])
 
+type MakeHelpers = 
+    static member MakeList<'T> (items: obj seq): 'T list = 
+        [ for i in items do yield i :?> 'T ]
+    static member MakeOption<'T> (item: obj option): 'T option = 
+        match item with 
+        | None -> None 
+        | Some i -> Some (i :?> 'T)
+
+let private makeList (t: Type) (items: obj seq) = 
+    typeof<MakeHelpers>.GetMethod("MakeList").MakeGenericMethod([|t|]).Invoke(null, [|items|])
+
+let private makeOption (t: Type) (item: obj option) = 
+    typeof<MakeHelpers>.GetMethod("MakeOption").MakeGenericMethod([|t|]).Invoke(null, [|item|])
+
 let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string = 
     let custom = findWriter t options.customWriters 
     if custom.IsSome then 
@@ -55,7 +72,7 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
         let g = serializer options range
         let f = asFun fObj
         f >> g
-    else if t = typeof<bool> then 
+    elif t = typeof<bool> then 
         fun o -> sprintf "%b" (unbox<bool> o)
     elif t = typeof<int> then 
         fun o -> sprintf "%d" (unbox<int> o)
@@ -78,7 +95,7 @@ let rec private serializer (options: JsonWriteOptions) (t: Type): obj -> string 
             let fieldStrings = Array.map (fun f -> f outer) serializers
             let innerString = String.concat "," fieldStrings
             sprintf "{%s}" innerString
-    elif implementsEnum t then 
+    elif implementsSeq t then 
         let [|innerType|] = t.GetGenericArguments() 
         let serializeInner = serializer options innerType
         fun outer -> 
@@ -107,4 +124,68 @@ and fieldSerializer (options: JsonWriteOptions) (field: PropertyInfo): obj -> st
 
 let serializerFactory<'T> (options: JsonWriteOptions): 'T -> string = serializer options typeof<'T>
 
-// TODO deserializer that works the same way
+type JsonReadOptions = {
+    customReaders: obj list
+}
+
+let defaultJsonReadOptions: JsonReadOptions = {
+    customReaders = []
+}
+
+let private matchReader (t: Type) (w: obj): bool = 
+    let _, range = w.GetType() |> FSharpType.GetFunctionElements 
+    t.IsAssignableFrom(range)
+
+let private findReader (t: Type) (customReaders: obj list): obj option = 
+    Seq.tryFind (matchReader t) customReaders 
+
+let rec private deserializer<'T> (options: JsonReadOptions) (t: Type): JsonValue -> obj = 
+    let custom = findReader t options.customReaders 
+    if custom.IsSome then 
+        asFun custom.Value 
+    elif t = typeof<bool> then 
+        fun j -> j.AsBoolean() |> box
+    elif t = typeof<int> then 
+        fun j -> j.AsInteger() |> box
+    elif t = typeof<char> then 
+        fun j ->
+            let s = j.AsString()
+            if s.Length = 1 then s.[0] |> box
+            else raise(Exception(sprintf "Expected char but found '%s'" s))
+    elif t = typeof<string> then 
+        fun j -> j.AsString() |> box
+    elif t = typeof<Uri> then 
+        fun j -> Uri(j.AsString()) |> box
+    elif t = typeof<JsonValue> then 
+        fun j -> j |> box
+    elif FSharpType.IsRecord t then 
+        let fields = FSharpType.GetRecordFields t 
+        let readers = Array.map (fieldDeserializer options) fields 
+        fun j -> 
+            let array = [| for field, reader in readers do 
+                                yield reader j |]
+            FSharpValue.MakeRecord(t, array)
+    elif isList t then 
+        let [|innerType|] = t.GetGenericArguments() 
+        let deserializeInner = deserializer options innerType
+        fun j -> j.AsArray() |> Seq.map deserializeInner |> makeList innerType |> box
+    elif isOption t then 
+        let [|innerType|] = t.GetGenericArguments()
+        let deserializeInner = deserializer options innerType
+        fun j ->
+            if j = JsonValue.Null then 
+                None |> makeOption innerType |> box 
+            else 
+                deserializeInner j |> Some |> makeOption innerType |> box
+    else 
+        raise (Exception (sprintf "Don't know how to deserialize %s from JSON" (t.ToString())))
+and fieldDeserializer (options: JsonReadOptions) (field: PropertyInfo): string * (JsonValue -> obj) = 
+    let deserializeInner = deserializer options field.PropertyType
+    let deserializeField (j: JsonValue) = 
+        let value = j.TryGetProperty(field.Name) |> Option.defaultValue JsonValue.Null
+        deserializeInner value |> box
+    field.Name, deserializeField
+
+let deserializerFactory<'T> (options: JsonReadOptions): string -> 'T = 
+    let d = deserializer options typeof<'T>
+    fun s -> JsonValue.Parse s |> d :?> 'T
