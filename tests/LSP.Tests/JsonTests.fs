@@ -99,15 +99,15 @@ let ``test serialize an interface with a custom writer`` (t: TestContext) =
 
 let ``test deserialize simple types`` (t: TestContext) = 
     let options = defaultJsonReadOptions
-    let found = deserializerFactory<bool> options "true" 
+    let found = deserializerFactory<bool> options (JsonValue.Parse "true")
     if found <> true then Fail(found)
-    let found = deserializerFactory<int> options "1" 
+    let found = deserializerFactory<int> options (JsonValue.Parse "1")
     if found <> 1 then Fail(found)
-    let found = deserializerFactory<char> options "\"x\"" 
+    let found = deserializerFactory<char> options (JsonValue.Parse "\"x\"")
     if found <> 'x' then Fail(found)
-    let found = deserializerFactory<string> options "\"foo\"" 
+    let found = deserializerFactory<string> options (JsonValue.Parse "\"foo\"")
     if found <> "foo" then Fail(found)
-    let found = deserializerFactory<Uri> options "\"https://github.com\"" 
+    let found = deserializerFactory<Uri> options (JsonValue.Parse "\"https://github.com\"")
     if found <> Uri("https://github.com") then Fail(found)
 
 type TestSimpleRead = {
@@ -116,13 +116,13 @@ type TestSimpleRead = {
 
 let ``test deserialize complex types`` (t: TestContext) = 
     let options = defaultJsonReadOptions
-    let found = deserializerFactory<TestSimpleRead> options """{"oneField":1}"""
+    let found = deserializerFactory<TestSimpleRead> options (JsonValue.Parse """{"oneField":1}""")
     if found <> {oneField=1} then Fail(found)
-    let found = deserializerFactory<int list> options """[1]"""
+    let found = deserializerFactory<int list> options (JsonValue.Parse """[1]""")
     if found <> [1] then Fail(found)
-    let found = deserializerFactory<int option> options """1"""
+    let found = deserializerFactory<int option> options (JsonValue.Parse """1""")
     if found <> Some 1 then Fail(found)
-    let found = deserializerFactory<int option> options """null"""
+    let found = deserializerFactory<int option> options (JsonValue.Parse """null""")
     if found <> None then Fail(found)
 
 type TestOptionalRead = {
@@ -131,13 +131,25 @@ type TestOptionalRead = {
 
 let ``test deserialize optional types`` (t: TestContext) = 
     let options = defaultJsonReadOptions
-    let found = deserializerFactory<TestOptionalRead> options """{"optionField":1}"""
+    let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{"optionField":1}""")
     if found <> {optionField=Some 1} then Fail(found)
-    let found = deserializerFactory<TestOptionalRead> options """{"optionField":null}"""
+    let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{"optionField":null}""")
     if found <> {optionField=None} then Fail(found)
-    let found = deserializerFactory<TestOptionalRead> options """{}"""
+    let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{}""")
     if found <> {optionField=None} then Fail(found)
-    let found = deserializerFactory<int option list> options """[1]"""
+    let found = deserializerFactory<int option list> options (JsonValue.Parse """[1]""")
     if found <> [Some 1] then Fail(found)
-    let found = deserializerFactory<int option list> options """[null]"""
+    let found = deserializerFactory<int option list> options (JsonValue.Parse """[null]""")
     if found <> [None] then Fail(found)
+
+type TestEnum = One | Two
+
+let deserializeTestEnum (i: int) = 
+    match i with 
+    | 1 -> One  
+    | 2 -> Two
+
+let ``test deserialize enum`` (t: TestContext) = 
+    let options = { defaultJsonReadOptions with customReaders = [deserializeTestEnum]}
+    let found = deserializerFactory<TestEnum> options (JsonValue.Parse """1""")
+    if found <> One then Fail(found)

@@ -142,7 +142,10 @@ let private findReader (t: Type) (customReaders: obj list): obj option =
 let rec private deserializer<'T> (options: JsonReadOptions) (t: Type): JsonValue -> obj = 
     let custom = findReader t options.customReaders 
     if custom.IsSome then 
-        asFun custom.Value 
+        let domain, _ = custom.Value.GetType() |> FSharpType.GetFunctionElements 
+        let deserializeDomain = deserializer options domain
+        let deserializeInner = asFun custom.Value 
+        deserializeDomain >> deserializeInner
     elif t = typeof<bool> then 
         fun j -> j.AsBoolean() |> box
     elif t = typeof<int> then 
@@ -178,7 +181,7 @@ let rec private deserializer<'T> (options: JsonReadOptions) (t: Type): JsonValue
             else 
                 deserializeInner j |> Some |> makeOption innerType |> box
     else 
-        raise (Exception (sprintf "Don't know how to deserialize %s from JSON" (t.ToString())))
+        raise (Exception (sprintf "Don't know how to deserialize %A from JSON" t))
 and fieldDeserializer (options: JsonReadOptions) (field: PropertyInfo): string * (JsonValue -> obj) = 
     let deserializeInner = deserializer options field.PropertyType
     let deserializeField (j: JsonValue) = 
@@ -186,6 +189,6 @@ and fieldDeserializer (options: JsonReadOptions) (field: PropertyInfo): string *
         deserializeInner value |> box
     field.Name, deserializeField
 
-let deserializerFactory<'T> (options: JsonReadOptions): string -> 'T = 
+let deserializerFactory<'T> (options: JsonReadOptions): JsonValue -> 'T = 
     let d = deserializer options typeof<'T>
-    fun s -> JsonValue.Parse s |> d :?> 'T
+    fun s -> d s :?> 'T
