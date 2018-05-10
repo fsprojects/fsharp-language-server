@@ -252,11 +252,8 @@ module ProjectParser =
             references = rs
         }
     let private printList (files: FileInfo list) (describe: string) =
-        if List.length files > 10 then 
-            eprintfn "    (%d %s)" (List.length files) describe 
-        else 
-            for f in files do 
-                eprintfn "    %s" f.FullName
+        for f in files do 
+            eprintfn "    %s" f.FullName
     // Find .dll corresponding to an .fsproj file 
     // For example, sample/IndirectDep/IndirectDep.fsproj corresponds to sample/IndirectDep/bin/Debug/netcoreapp2.0/IndirectDep.dll
     // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
@@ -299,8 +296,6 @@ module ProjectParser =
         printList ancestorProjects "projects"
         eprintfn "  Sources:"
         printList c.sources "sources"
-        for f in c.references do 
-            eprintfn "-r:%s" f.FullName
         {
             ExtraProjectInfo = None 
             IsIncompleteTypeCheckEnvironment = false 
