@@ -35,8 +35,7 @@
 					".fs",
 					".fsi",
 					".fsx"
-				],
-				"configuration": "./syntaxes/kotlin.configuration.json"
+				]
 			}
 		],
 		"configuration": {
