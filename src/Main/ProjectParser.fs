@@ -135,7 +135,6 @@ module ProjectParser =
             alreadyLogged.Add(message) |> ignore
     // Find all dlls in project.assets.json
     let private references (assets: ProjectAssets): FileInfo list = 
-        // TODO rewrite all this parsing and traversing as a JSON-query, like jsonQuery(jsonValue, ["foo", "bar", ...])
         // Given a dependency name, for example FSharp.Core, lookup the version in $.libraries, for example FSharp.Core/4.3.4
         let lookupVersion (dependencyName: string) = 
             let mutable found: string option = None
@@ -143,41 +142,23 @@ module ProjectParser =
                 if dependencyVersion.StartsWith(dependencyName + "/") && found = None then 
                     found <- Some dependencyVersion
             found
-        // Find the names of all dependencies in keys of $.project.frameworks[*].dependencies
-        let dependencies = seq {
-            for KeyValue(frameworkName, framework) in assets.project.frameworks do 
-                for KeyValue(dependencyName, dependency) in framework.dependencies do 
-                    yield! lookupVersion dependencyName |> Option.toList
-        }
-        // Find transitive dependencies in $.targets 
-        let rec transitiveDependencies (fromDependency: string) = seq {
-            yield fromDependency
-            for KeyValue(targetName, libraryMap) in assets.targets do 
-                if libraryMap.ContainsKey fromDependency then 
-                    for KeyValue(dependencyName, version) in libraryMap.[fromDependency].dependencies do 
-                        yield! transitiveDependencies (dependencyName + "/" + version)
-                else logOnce(sprintf "Couldn't find %s in targets[%s]" fromDependency targetName)
-        }
-        let transitive = Seq.collect transitiveDependencies dependencies |> Set.ofSeq
-        // Identify which files are needed in $.targets[*][dep/version].compile
-        let compileFiles = seq {
-            for dependency in transitive do 
-                for KeyValue(targetName, libraryMap) in assets.targets do 
-                    if libraryMap.ContainsKey(dependency) then 
-                        for dll in libraryMap.[dependency].compile do 
-                            if dll.EndsWith ".dll" then 
-                                yield (dependency, dll)
-                    else logOnce(sprintf "Couldn't find %s in targets[%s]" dependency targetName)
-
-        }
-        // We want to include all contents from dependencies with autoReferenced=true,
-        // no matter what we see in $.targets[*][dep/version].compile
+        // Find all dependencies in $.project.frameworks with autoReferenced=true,
+        // We will import the whole contents of these dependencies
         let autoReferenced = seq {
             for KeyValue(frameworkName, framework) in assets.project.frameworks do 
                 for KeyValue(dependencyName, dependency) in framework.dependencies do 
                     if dependency.autoReferenced then 
                         yield! lookupVersion dependencyName |> Option.toList
         }
+        // Identify which files are called out in the keys of in $.targets[*][dep/version].compile
+        let compileFiles = seq {
+            for KeyValue(targetName, libraryMap) in assets.targets do 
+                for KeyValue(dependencyName, dependency) in libraryMap do 
+                    for dll in dependency.compile do 
+                        if dll.EndsWith ".dll" then 
+                            yield (dependencyName, dll)
+        }
+        // Look up every autoReferenced dependency in $.libraries and include all DLLs 
         let autoReferencedFiles = seq {
             for dependency in autoReferenced do 
                 if assets.libraries.ContainsKey(dependency) then 
