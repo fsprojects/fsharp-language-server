@@ -86,7 +86,7 @@ type Message =
 
 let parseMessage (jsonText: string): Message = 
     let raw = deserializeRawMessage jsonText
-    match raw.id, raw.params with
+    match raw.id, raw.``params`` with
     | Some id, Some p -> RequestMessage (id, raw.method, p)
     | Some id, None -> raise (Exception (sprintf "Request message with id %d missing params" id))
     | None, _ -> NotificationMessage (raw.method, raw.``params``)

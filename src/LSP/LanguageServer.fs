@@ -19,7 +19,8 @@ let jsonWriteOptions =
               writeCompletionItemKind;
               writeMarkedString;
               writeDocumentHighlightKind;
-              writeSymbolKind ] }
+              writeSymbolKind;
+              writeRegisterCapability ] }
 
 let private serializeInitializeResult = serializerFactory<InitializeResult> jsonWriteOptions
 let private serializeTextEditList = serializerFactory<TextEdit list> jsonWriteOptions
@@ -37,6 +38,7 @@ let private serializeDocumentLinkList = serializerFactory<DocumentLink list> jso
 let private serializeDocumentLink = serializerFactory<DocumentLink> jsonWriteOptions
 let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteOptions
 let private serializePublishDiagnostics = serializerFactory<PublishDiagnosticsParams> jsonWriteOptions
+let private serializeRegistrationParams = serializerFactory<RegistrationParams> jsonWriteOptions
 
 let private writeClient (client: BinaryWriter) (messageText: string) =
     let messageBytes = Encoding.UTF8.GetBytes messageText
@@ -142,6 +144,13 @@ type RealClient (send: BinaryWriter) =
     interface ILanguageClient with 
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
             p |> serializePublishDiagnostics |> notifyClient send "textDocument/publishDiagnostics"
+        member this.RegisterCapability (p: RegisterCapability): unit = 
+            eprintfn "Register capability %A" p
+            match p with 
+            | RegisterCapability.DidChangeWatchedFiles _ -> 
+                let register = {id=Guid.NewGuid().ToString(); method="workspace/didChangeWatchedFiles"; registerOptions=p}
+                let message = {registrations=[register]}
+                message |> serializeRegistrationParams |> notifyClient send "client/registerCapability"
 
 let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
     let server = serverFactory(RealClient(send))

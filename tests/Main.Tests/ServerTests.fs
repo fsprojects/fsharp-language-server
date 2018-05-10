@@ -27,6 +27,8 @@ type MockClient() =
     interface ILanguageClient with 
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
             this.Diagnostics.Add(p)
+        member this.RegisterCapability (p: RegisterCapability): unit = 
+            ()
 
 let private diagnosticMessages (client: MockClient): string list = 
     List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)

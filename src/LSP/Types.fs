@@ -161,9 +161,9 @@ type TextDocumentPositionParams = {
 }
 
 type DocumentFilter = {
-    language: string 
-    scheme: string 
-    pattern: string
+    language: string option
+    scheme: string option
+    pattern: string option
 }
 
 type DocumentSelector = DocumentFilter list
@@ -644,5 +644,39 @@ type PublishDiagnosticsParams = {
     diagnostics: Diagnostic list
 }
 
+module WatchKind =
+    let Create = 1
+    let Change = 2
+    let Delete = 4
+    let All = 7 // 1 | 2 | 4
+
+type FileSystemWatcher = {
+    globPattern: string
+    kind: int
+}
+
+[<RequireQualifiedAccess>]
+type RegisterCapability = 
+    | DidChangeWatchedFiles of watchers: FileSystemWatcher list
+
+type DidChangeWatchedFilesOptions = {
+    watchers: FileSystemWatcher list
+}
+
+let writeRegisterCapability (r: RegisterCapability) = 
+    match r with 
+    | RegisterCapability.DidChangeWatchedFiles watchers -> {watchers=watchers}
+
+type Registration = {
+    id: string 
+    method: string 
+    registerOptions: RegisterCapability
+}
+
+type RegistrationParams = {
+    registrations: Registration list
+}
+
 type ILanguageClient =
     abstract member PublishDiagnostics: PublishDiagnosticsParams -> unit 
+    abstract member RegisterCapability: RegisterCapability -> unit

@@ -81,6 +81,19 @@ let ``test serialize a union with a custom writer`` (t: TestContext) =
     let found = serializerFactory<FooRecord> options record
     if found <> """{"foo":10}""" then Fail(found)
 
+// type UnionWithFields =
+// | OptionA of A: string 
+// | OptionB of int 
+
+// let ``test serialize union with fields`` (t: TestContext) = 
+//     let options = defaultJsonReadOptions
+//     let serializer = serializerFactory<UnionWithFields>
+//     let found = serializer options (OptionA "foo")
+//     if found <> """{"A":"foo"}""" then Fail(found)
+//     let serializer = serializerFactory<UnionWithFields>
+//     let found = serializer options (OptionB 1)
+//     if found <> """{"A":[1]}""" then Fail(found)
+
 type IFoo =
     abstract member Foo: unit -> string 
 type MyFoo() = 
