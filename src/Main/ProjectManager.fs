@@ -10,39 +10,37 @@ open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
-module ProjectManagerUtils = 
-    // Scan the parent directories looking for a file *.fsproj
-    let findProjectFileInParents (sourceFile: FileInfo): FileInfo option = 
-        let mutable result: FileInfo option = None 
-        let mutable dir = sourceFile.Directory
-        while dir <> null && result.IsNone do 
-            for proj in dir.GetFiles("*.fsproj") do 
-                result <- Some proj
-            dir <- dir.Parent
-        result
-
-open ProjectManagerUtils
-
 // Maintains caches of parsed versions of .fsproj files
 type ProjectManager() = 
-    let projectFileCache = new Dictionary<String, FileInfo>()
-    let cachedProjectFile (sourceFile: FileInfo): FileInfo option = 
-        let sourceDir = sourceFile.Directory 
-        if projectFileCache.ContainsKey(sourceDir.FullName) then 
-            Some (projectFileCache.[sourceDir.FullName])
+    let bySourceFile = new Dictionary<String, FSharpProjectOptions>()
+    let byProjectFile = new Dictionary<String, FSharpProjectOptions>()
+    let putProjectFile (fsproj: FileInfo) = 
+        ProjectParser.invalidateProjectFile fsproj
+        let projectOptions = ProjectParser.parseProjectOptions fsproj
+        for f in projectOptions.SourceFiles do
+            bySourceFile.[f] <- projectOptions
+        byProjectFile.[fsproj.FullName] <- projectOptions
+    member this.AddWorkspaceRoot(root: DirectoryInfo) = 
+        for f in root.EnumerateFiles("*.fsproj", SearchOption.AllDirectories) do 
+            putProjectFile f
+    member this.DeleteProjectFile(fsproj: FileInfo) = 
+        ProjectParser.invalidateProjectFile fsproj
+        if byProjectFile.ContainsKey fsproj.FullName then 
+            for f in byProjectFile.[fsproj.FullName].SourceFiles do 
+                bySourceFile.Remove f |> ignore
+            byProjectFile.Remove fsproj.FullName |> ignore
+    member this.UpdateProjectFile(fsproj: FileInfo) = 
+        putProjectFile(fsproj)
+    member this.NewProjectFile(fsproj: FileInfo) = 
+        putProjectFile(fsproj)
+    member this.UpdateAssetsJson(assets: FileInfo) = 
+        for fsproj in assets.Directory.Parent.GetFiles("*.fsproj") do 
+            this.UpdateProjectFile fsproj
+    member this.FindProjectOptions(sourceFile: FileInfo): FSharpProjectOptions option = 
+        let file = sourceFile.FullName
+        if bySourceFile.ContainsKey file then 
+            bySourceFile.[file] |> Some 
         else 
-            match findProjectFileInParents sourceFile with 
-            | None -> 
-                eprintfn "No project file for %s" sourceFile.Name
-                None
-            | Some projectFile -> 
-                eprintfn "Found project file %s for %s" projectFile.FullName sourceFile.Name
-                projectFileCache.[sourceDir.FullName] <- projectFile 
-                Some projectFile 
-    member this.FindProjectFile(sourceFile: Uri): FileInfo option = 
-        let file = FileInfo(sourceFile.AbsolutePath)
-        cachedProjectFile file
-    member this.FindProjectOptions(fsproj: FileInfo): FSharpProjectOptions = 
-        ProjectParser.parseProjectOptions fsproj
+            None
     member this.OpenProjects: FSharpProjectOptions list = 
         ProjectParser.openProjects()

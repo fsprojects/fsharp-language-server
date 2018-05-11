@@ -152,7 +152,8 @@ module ProjectParser =
                 eprintfn "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
                 variables.[prop.Name] <- substitute(prop.InnerText)
         substitute fsproj
-    let parseFsProj (directory: DirectoryInfo) (fsproj: string): FsProj = 
+    // Exposed for testing
+    let doParseFsProj (directory: DirectoryInfo) (fsproj: string): FsProj = 
         let text = substituteVariables directory fsproj
         let doc = XmlDocument()
         doc.LoadXml text 
@@ -173,6 +174,8 @@ module ProjectParser =
                 yield FileInfo(normalizePath)
         })
         {compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude}
+    let parseFsProj (fsproj: FileInfo): FsProj = 
+        doParseFsProj fsproj.Directory (File.ReadAllText fsproj.FullName)
     let private parseAssets (path: FileInfo): ProjectAssets = 
         let text = File.ReadAllText path.FullName
         parseAssetsJson text
@@ -243,7 +246,7 @@ module ProjectParser =
         Seq.map findAbsolutePath files |> Seq.collect Option.toList |> List.ofSeq
     // Parse fsproj and fsproj/../obj/project.assets.json
     let private parseBoth (path: FileInfo): ParsedFsProj = 
-        let project = parseFsProj path.Directory (File.ReadAllText path.FullName)
+        let project = parseFsProj path
         let assetsFile = Path.Combine(path.DirectoryName, "obj", "project.assets.json") |> FileInfo
         let rs = 
             if assetsFile.Exists then 
@@ -325,11 +328,21 @@ module ProjectParser =
         if not (projectOptionsCache.ContainsKey fsproj.FullName) then 
             eprintfn "%s is not in the cache" fsproj.Name
             projectOptionsCache.[fsproj.FullName] <- doParseProjectOptions fsproj
-        if projectOptionsCache.[fsproj.FullName].LoadTime.CompareTo(modified) < 0 then 
-            eprintfn "%s has been modified" fsproj.Name
-            projectOptionsCache.[fsproj.FullName] <- doParseProjectOptions fsproj
         projectOptionsCache.[fsproj.FullName]
     let openProjects () = 
         projectOptionsCache.Values |> List.ofSeq
-    let invalidateProjectFile (uri: Uri) = 
-        projectOptionsCache.Clear() // TODO make more selective
+    let rec private isAncestor (ancestor: FileInfo) (candidate: string) = 
+        let mutable result = false
+        let rec walk (options: FSharpProjectOptions): unit = 
+            if options.ProjectFileName = candidate then 
+                result <- true 
+            for _, parent in options.ReferencedProjects do 
+                walk parent
+        if projectOptionsCache.ContainsKey candidate then 
+            walk projectOptionsCache.[candidate]
+        result
+    let invalidateProjectFile (fsproj: FileInfo) = 
+        let descendents = projectOptionsCache.Keys |> Seq.filter (isAncestor fsproj) |> Seq.toList
+        for d in descendents do 
+            eprintfn "Invalidate %s because %s was changed" d fsproj.FullName
+            projectOptionsCache.Remove d |> ignore

@@ -7,6 +7,20 @@ type DidChangeConfigurationParams = {
     settings: JsonValue
 }
 
+type WorkspaceFolder = {
+    uri: Uri
+    name: string
+}
+
+type WorkspaceFoldersChangeEvent = {
+    added: WorkspaceFolder list
+    removed: WorkspaceFolder list
+}
+
+type DidChangeWorkspaceFoldersParams = {
+    event: WorkspaceFoldersChangeEvent
+}
+
 type TextDocumentItem = {
     uri: Uri 
     languageId: string 
@@ -132,7 +146,7 @@ type Diagnostic = {
     severity: DiagnosticSeverity option
     code: string option
     source: string option
-    message: string;
+    message: string
 }
 
 type Command = {
@@ -186,6 +200,14 @@ type InitializeParams = {
     initializationOptions: JsonValue option
     capabilitiesMap: Map<string, bool>
     trace: Trace option
+}
+
+let defaultInitializeParams = {
+    processId = None
+    rootUri = None
+    initializationOptions = None
+    capabilitiesMap = Map.empty
+    trace = None
 }
 
 [<RequireQualifiedAccess>]
@@ -378,6 +400,7 @@ type Request =
 | DocumentOnTypeFormatting of DocumentOnTypeFormattingParams
 | Rename of RenameParams
 | ExecuteCommand of ExecuteCommandParams
+| DidChangeWorkspaceFolders of DidChangeWorkspaceFoldersParams
 
 [<RequireQualifiedAccess>]
 type TextDocumentSyncKind = 
@@ -636,6 +659,7 @@ type ILanguageServer =
     abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> TextEdit list
     abstract member Rename: RenameParams -> WorkspaceEdit
     abstract member ExecuteCommand: ExecuteCommandParams -> unit
+    abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> unit 
 
 // TODO IAsyncLanguageServer that supports request cancellation
 

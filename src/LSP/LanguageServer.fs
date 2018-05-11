@@ -99,6 +99,8 @@ let processRequest (server: ILanguageServer) (send: BinaryWriter) (id: int) (req
         server.Rename p |> serializeWorkspaceEdit |> respond send id
     | ExecuteCommand p -> 
         server.ExecuteCommand p 
+    | DidChangeWorkspaceFolders p ->
+        server.DidChangeWorkspaceFolders p
 
 let processNotification (server: ILanguageServer) (send: BinaryWriter) (n: Notification) = 
     match n with 

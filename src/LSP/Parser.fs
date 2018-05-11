@@ -245,6 +245,8 @@ let parseRenameParams = deserializerFactory<RenameParams> readOptions
 
 let parseExecuteCommandParams = deserializerFactory<ExecuteCommandParams> readOptions
 
+let parseDidChangeWorkspaceFoldersParams = deserializerFactory<DidChangeWorkspaceFoldersParams> readOptions
+
 let parseRequest (method: string) (json: JsonValue): Request = 
     match method with 
     | "initialize" -> Initialize (parseInitialize json)
@@ -268,4 +270,5 @@ let parseRequest (method: string) (json: JsonValue): Request =
     | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams json)
     | "textDocument/rename" -> Rename (parseRenameParams json)
     | "workspace/executeCommand" -> ExecuteCommand (parseExecuteCommandParams json)
+    | "workspace/didChangeWorkspaceFolders" -> DidChangeWorkspaceFolders (parseDidChangeWorkspaceFoldersParams json)
     | _ -> raise (Exception (sprintf "Unexpected request method %s" method))

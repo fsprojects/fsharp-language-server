@@ -81,6 +81,6 @@ let ``test substitute parameters in a project file`` (t: TestContext) =
   </Project>
   """
   let srcMain = Path.Combine [|projectRoot.FullName; "src"; "Main"|] |> DirectoryInfo 
-  let parse = ProjectParser.parseFsProj srcMain projectFileText
+  let parse = ProjectParser.doParseFsProj srcMain projectFileText
   let expectedFile = Path.Combine [|projectRoot.FullName; "src"; "fsharp"; "QueueList.fs"|] |> FileInfo 
   if parse.compileInclude |> List.map (fun f -> f.FullName) <> [expectedFile.FullName] then Fail(parse.compileInclude)

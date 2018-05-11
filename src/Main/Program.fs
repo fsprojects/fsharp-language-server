@@ -302,7 +302,6 @@ let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethod
 type private FindFile = 
     | NoSourceFile of sourcePath: string
     | NoProjectFile of sourcePath: string
-    | NotInProjectOptions of sourcePath: string * projectOptions: FSharpProjectOptions 
     | Found of sourcePath: string * sourceVersion: int * sourceText: string * projectOptions: FSharpProjectOptions 
 
 type private CheckFile = 
@@ -317,7 +316,7 @@ type Server(client: ILanguageClient) =
     let find (uri: Uri): FindFile = 
         let sourcePath = uri.AbsolutePath.ToString()
         let source = docs.Get uri
-        let projectOptions = projects.FindProjectFile uri |> Option.map projects.FindProjectOptions
+        let projectOptions = projects.FindProjectOptions(FileInfo(uri.AbsolutePath))
         match source, projectOptions with 
         | None, _ -> NoSourceFile sourcePath
         | _, None -> NoProjectFile sourcePath
@@ -325,7 +324,7 @@ type Server(client: ILanguageClient) =
             if Array.contains sourcePath projectOptions.SourceFiles then 
                 Found(sourcePath, sourceVersion, sourceText, projectOptions) 
             else 
-                NotInProjectOptions(sourcePath, projectOptions)
+                NoProjectFile(sourcePath)
     // Find a file and check it
     let check (uri: Uri): CheckFile = 
         eprintfn "Check %O" uri
@@ -334,9 +333,7 @@ type Server(client: ILanguageClient) =
             | NoSourceFile sourcePath -> 
                 return Errors [errorAtTop (sprintf "No source file %s" sourcePath )]
             | NoProjectFile sourcePath -> 
-                return Errors [errorAtTop (sprintf "No project file for source %s" sourcePath)]
-            | NotInProjectOptions(sourcePath, projectOptions) -> 
-                return Errors [errorAtTop (sprintf "Not in project %s" projectOptions.ProjectFileName)]
+                return Errors [errorAtTop (sprintf "No .fsproj file includes source source %s" sourcePath)]
             | Found(sourcePath, sourceVersion, sourceText, projectOptions) -> 
                 let! parseResult, checkAnswer = checker.ParseAndCheckFileInProject(sourcePath, sourceVersion, sourceText, projectOptions)
                 let parseErrors = convertDiagnostics parseResult.Errors
@@ -388,7 +385,10 @@ type Server(client: ILanguageClient) =
         {textDocument={uri=uri; version=version}; edits=List.ofSeq edits}
 
     interface ILanguageServer with 
-        member this.Initialize(p: InitializeParams): InitializeResult = 
+        member this.Initialize(p: InitializeParams): InitializeResult =
+            match p.rootUri with 
+            | Some root -> projects.AddWorkspaceRoot (DirectoryInfo(root.AbsolutePath)) 
+            | _ -> ()
             { capabilities = 
                 { defaultServerCapabilities with 
                     hoverProvider = true
@@ -423,9 +423,18 @@ type Server(client: ILanguageClient) =
             docs.Close p
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
-                eprintfn "Watched file %s %s" (change.uri.ToString()) (change.``type``.ToString())
-                if change.uri.AbsolutePath.EndsWith(".fsproj") then 
-                    ProjectParser.invalidateProjectFile change.uri
+                let file = FileInfo(change.uri.AbsolutePath)
+                eprintfn "Watched file %s %O" file.FullName change.``type``
+                if file.Name.EndsWith(".fsproj") then 
+                    match change.``type`` with 
+                    | FileChangeType.Created ->
+                        projects.NewProjectFile file
+                    | FileChangeType.Changed ->
+                        projects.UpdateProjectFile file
+                    | FileChangeType.Deleted ->
+                        projects.DeleteProjectFile file
+                elif file.Name = "project.assets.json" then 
+                    projects.UpdateAssetsJson file
         member this.Completion(p: TextDocumentPositionParams): CompletionList option =
             match check (p.textDocument.uri) with 
             | Errors errors -> 
@@ -537,6 +546,10 @@ type Server(client: ILanguageClient) =
                                 |> List.ofSeq
                 {documentChanges=edits}
         member this.ExecuteCommand(p: ExecuteCommandParams): unit = TODO()
+        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): unit = 
+            for root in p.event.added do 
+                projects.AddWorkspaceRoot(DirectoryInfo(root.uri.AbsolutePath))
+            // TODO removed
 
 [<EntryPoint>]
 let main (argv: array<string>): int =

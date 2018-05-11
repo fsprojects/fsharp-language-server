@@ -48,6 +48,9 @@ let readFile (name: string): string * string =
 
 let createServerAndReadFile (name: string): MockClient * ILanguageServer = 
     let (client, server) = createServer()
+    let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
+    let sampleRootUri = Uri("file://" + sampleRootPath)
+    server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> ignore
     let (file, fileText) = readFile name
     let openParams: DidOpenTextDocumentParams = {textDocument={uri=Uri(file); languageId="fsharp"; version=0; text=fileText}}
     server.DidOpenTextDocument(openParams)
@@ -123,7 +126,7 @@ let ``test reference indirect dependency`` (t: TestContext) =
 let ``test skip file not in project file`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "NotInFsproj.fs"
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("Not in project")) messages) then Fail(sprintf "No 'Not in project' error in %A" messages)
+    if not (List.exists (fun (m:string) -> m.Contains("No .fsproj file")) messages) then Fail(sprintf "No 'Not in project' error in %A" messages)
 
 let ``test findNamesUnderCursor`` (t: TestContext) = 
     let names = findNamesUnderCursor "foo" 2

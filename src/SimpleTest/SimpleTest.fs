@@ -28,25 +28,30 @@ let private matchesArgs (argv: array<string>) (m: MethodInfo) =
 let runAllTests(assembly: Assembly, argv: array<string>): unit =
     if not (Array.isEmpty argv) then 
         eprintf "Looking for tests that match %A" argv
-    let mutable countSucceeded, countFailed = 0, 0
+    let mutable countTests = 0
+    let mutable failures: (Type * MethodInfo * string) list = []
     for t in assembly.GetTypes() do 
         for m in t.GetMethods() do 
             if isTest(m) && (matchesArgs argv m) then 
+                countTests <- countTests + 1
                 let context = { new TestContext with 
                     member this.Placeholder = ()}
                 try 
                     eprintfn "\u001b[33mRunning: %s.%s\u001b[0m" t.Name m.Name
                     m.Invoke(null, [|context :> obj|]) |> ignore
                     eprintfn "\u001b[32mSucceeded: %s.%s\u001b[0m" t.Name m.Name
-                    countSucceeded <- countSucceeded + 1
                 with 
                 | :? TargetInvocationException as ex ->
                     match ex.InnerException with 
                     | TestFailure(message) -> 
                         eprintfn "\u001b[31mFailed: %s.%s" t.Name m.Name
                         eprintfn "  %s" message
-                        countFailed <- countFailed + 1
+                        failures <- (t, m, message)::failures
                     | _ -> reraise()
-    eprintf "\u001b[33mRan: %d  \u001b[32mSucceeded: %d " (countSucceeded + countFailed) countSucceeded
-    if countFailed > 0 then eprintf "  \u001b[31mFailed: %d" countFailed 
+    let countFailed = List.length failures
+    eprintf "\u001b[33mRan: %d  \u001b[32mSucceeded: %d " countTests (countTests - countFailed)
+    if countFailed > 0 then eprintfn "  \u001b[31mFailed: %d" countFailed 
+    for t, m, message in List.rev failures do 
+        eprintfn "Failed: %s.%s" t.Name m.Name
+        eprintfn "  %s" message
     eprintfn "\u001b[0m"
