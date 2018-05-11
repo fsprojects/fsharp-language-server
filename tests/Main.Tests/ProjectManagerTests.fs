@@ -36,6 +36,11 @@ let ``test project-file-not-found`` (t: TestContext) =
     | Some f -> Fail(eprintfn "Shouldn't have found project file %s" f.ProjectFileName)
     | None -> ()
 
+let ``test bad project file`` (t: TestContext) = 
+    let projects = ProjectManager()
+    let root = Path.Combine [|projectRoot.FullName; "sample"; "BadProject"|] |> DirectoryInfo
+    projects.AddWorkspaceRoot root 
+
 let ``test parse a project file recursively`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = ProjectParser.parseProjectOptions file
