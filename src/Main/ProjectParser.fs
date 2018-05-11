@@ -8,6 +8,7 @@ open System.Xml
 open System.Text.RegularExpressions
 open FSharp.Data
 open FSharp.Data.JsonExtensions
+open LSP.Json
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
@@ -19,10 +20,9 @@ module ProjectParser =
     }
     type Dependency = {
         ``type``: string 
-        compile: string list
+        compile: Map<string, JsonValue>
         dependencies: Map<string, string>
     }
-
     type Library = {
         // Type of dependency. 'package' is the one we want
         ``type``: string 
@@ -31,21 +31,17 @@ module ProjectParser =
         // List of dlls, relative to packageFolders[?]/path
         files: string list
     }
-
     type ProjectFrameworkDependency = {
         target: string 
         version: string 
-        autoReferenced: bool 
+        autoReferenced: bool option
     }
-
     type ProjectFramework = {
         dependencies: Map<string, ProjectFrameworkDependency>
     }
-
     type Project = {
         frameworks: Map<string, ProjectFramework>
     }
-
     type ProjectAssets = {
         targets: Map<string, Map<string, Dependency>>
         libraries: Map<string, Library>
@@ -58,78 +54,10 @@ module ProjectParser =
         projectReferenceInclude: FileInfo list
     }
 
-    let private asString (json: JsonValue) = 
-        json.AsString()
-    let private asStringList (array: JsonValue): string list = 
-        array.AsArray() |> Array.map asString |> List.ofArray
-    let private asStringStringMap (json: JsonValue): Map<string, string> = 
-        Map.ofSeq(seq {
-            for k, v in json.Properties do
-                yield k, v.AsString()
-        })
     let private fixPath (path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
-    let keys (record: JsonValue): string list = 
-        List.ofSeq(seq {
-            for key, _ in record.Properties do 
-                yield key 
-        })
-    let private parseDependency (info: JsonValue): Dependency = 
-        {
-            ``type`` = info?``type``.AsString()
-            compile = info.TryGetProperty("compile") |> Option.map keys |> Option.defaultValue []
-            dependencies = info.TryGetProperty("dependencies") |> Option.map asStringStringMap |> Option.defaultValue Map.empty
-        }
-    let private parseDependencies (dependencies: JsonValue): Map<string, Dependency> = 
-        Map.ofSeq(seq {
-            for name, info in dependencies.Properties do 
-                yield name, parseDependency info
-        })
-    let private parseTargets (targets: JsonValue): Map<string, Map<string, Dependency>> = 
-        Map.ofSeq(seq {
-            for target, dependencies in targets.Properties do 
-                yield target, parseDependencies dependencies
-        })
-    let private parseLibrary (library: JsonValue): Library = 
-        {
-            ``type`` = library?``type``.AsString()
-            path = library.TryGetProperty("path") |> Option.map asString
-            files = library.TryGetProperty("files") |> Option.map asStringList |> Option.defaultValue []
-        }
-    let private parseLibraries (libraries: JsonValue): Map<string, Library> = 
-        Map.ofSeq(seq {
-            for dependency, info in libraries.Properties do 
-                yield dependency, parseLibrary info
-        })
-    let private parseProjectFrameworkDependency (json: JsonValue): ProjectFrameworkDependency = 
-        let autoReferenced = json.TryGetProperty("autoReferenced") |> Option.map (fun j -> j.AsBoolean())
-        {
-            target = json?target.AsString() 
-            version = json?version.AsString()
-            autoReferenced = defaultArg autoReferenced false
-        }
-    let private parseProjectFramework (project: JsonValue): ProjectFramework = 
-        {
-            dependencies = Map.ofSeq(seq {
-                for dependency, info in project?dependencies.Properties do 
-                    yield dependency, parseProjectFrameworkDependency info
-            })
-        }
-    let private parseProject (project: JsonValue): Project = 
-        {
-            frameworks = Map.ofSeq(seq {
-                for framework, info in project?frameworks.Properties do 
-                    yield framework, parseProjectFramework info 
-            })
-        }
-    let parseAssetsJson (text: string): ProjectAssets = 
-        let json = JsonValue.Parse text
-        {
-            targets = parseTargets json?targets
-            libraries = parseLibraries json?libraries
-            packageFolders = keys json?packageFolders
-            project = parseProject json?project
-        }
+    let parseAssetsJson = JsonValue.Parse >> deserializerFactory<ProjectAssets> defaultJsonReadOptions
+
     // Log messages once and then silence them
     let private alreadyLogged = System.Collections.Generic.HashSet<string>()
     let private logOnce (message: string): unit = 
@@ -203,14 +131,14 @@ module ProjectParser =
         let autoReferenced = seq {
             for KeyValue(frameworkName, framework) in assets.project.frameworks do 
                 for KeyValue(dependencyName, dependency) in framework.dependencies do 
-                    if dependency.autoReferenced then 
+                    if dependency.autoReferenced |> Option.defaultValue false then 
                         yield! lookupVersion dependencyName |> Option.toList
         }
         // Identify which files are called out in the keys of in $.targets[*][dep/version].compile
         let compileFiles = seq {
             for KeyValue(targetName, libraryMap) in assets.targets do 
                 for KeyValue(dependencyName, dependency) in libraryMap do 
-                    for dll in dependency.compile do 
+                    for KeyValue(dll, _) in dependency.compile  do 
                         if dll.EndsWith ".dll" then 
                             yield (dependencyName, dll)
         }

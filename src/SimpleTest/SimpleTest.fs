@@ -35,7 +35,7 @@ let runAllTests(assembly: Assembly, argv: array<string>): unit =
             if isTest(m) && (matchesArgs argv m) then 
                 countTests <- countTests + 1
                 let context = { new TestContext with 
-                    member this.Placeholder = ()}
+                                    member this.Placeholder = ()}
                 try 
                     eprintfn "\u001b[33mRunning: %s.%s\u001b[0m" t.Name m.Name
                     m.Invoke(null, [|context :> obj|]) |> ignore

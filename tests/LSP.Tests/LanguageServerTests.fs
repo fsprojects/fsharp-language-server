@@ -72,6 +72,7 @@ type MockServer() =
         member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): TextEdit list = TODO()
         member this.Rename(p: RenameParams): WorkspaceEdit = TODO()
         member this.ExecuteCommand(p: ExecuteCommandParams): unit = TODO()
+        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): unit = TODO()
 
 let messageStream (messages: string list): BinaryReader = 
     let stdin = new MemoryStream()

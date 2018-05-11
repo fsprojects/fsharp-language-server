@@ -155,6 +155,12 @@ let ``test deserialize optional types`` (t: TestContext) =
     let found = deserializerFactory<int option list> options (JsonValue.Parse """[null]""")
     if found <> [None] then Fail(found)
 
+let ``test deserialize map`` (t: TestContext) = 
+    let options = defaultJsonReadOptions
+    let found = deserializerFactory<Map<string, int>> options (JsonValue.Parse """{"k":1}""")
+    let map = Map.add "k" 1 Map.empty
+    if found <> map then Fail(found)
+
 type TestEnum = One | Two
 
 let deserializeTestEnum (i: int) = 

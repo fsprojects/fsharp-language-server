@@ -31,6 +31,9 @@ let private implementsSeq (t: Type) =
 let private isList (t: Type) = 
     t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<list<_>>
 
+let private isMap (t: Type) = 
+    t.IsGenericType && t.GetGenericTypeDefinition() = typedefof<Map<_, _>>
+
 type JsonWriteOptions = {
     customWriters: obj list
 }
@@ -53,6 +56,8 @@ let asFun (w: obj): obj -> obj =
 type MakeHelpers = 
     static member MakeList<'T> (items: obj seq): 'T list = 
         [ for i in items do yield i :?> 'T ]
+    static member MakeMap<'T> (items: (string * obj) seq): Map<string, 'T> = 
+        items |> Seq.map (fun (k, v) -> k, v :?> 'T) |> Map.ofSeq
     static member MakeOption<'T> (item: obj option): 'T option = 
         match item with 
         | None -> None 
@@ -60,6 +65,9 @@ type MakeHelpers =
 
 let private makeList (t: Type) (items: obj seq) = 
     typeof<MakeHelpers>.GetMethod("MakeList").MakeGenericMethod([|t|]).Invoke(null, [|items|])
+
+let private makeMap (t: Type) (kvs: (string * obj) seq) = 
+    typeof<MakeHelpers>.GetMethod("MakeMap").MakeGenericMethod([|t|]).Invoke(null, [|kvs|])
 
 let private makeOption (t: Type) (item: obj option) = 
     typeof<MakeHelpers>.GetMethod("MakeOption").MakeGenericMethod([|t|]).Invoke(null, [|item|])
@@ -161,17 +169,16 @@ let rec private deserializer<'T> (options: JsonReadOptions) (t: Type): JsonValue
         fun j -> Uri(j.AsString()) |> box
     elif t = typeof<JsonValue> then 
         fun j -> j |> box
-    elif FSharpType.IsRecord t then 
-        let fields = FSharpType.GetRecordFields t 
-        let readers = Array.map (fieldDeserializer options) fields 
-        fun j -> 
-            let array = [| for field, reader in readers do 
-                                yield reader j |]
-            FSharpValue.MakeRecord(t, array)
     elif isList t then 
         let [|innerType|] = t.GetGenericArguments() 
         let deserializeInner = deserializer options innerType
         fun j -> j.AsArray() |> Seq.map deserializeInner |> makeList innerType |> box
+    elif isMap t then 
+        let [|stringType; valueType|] = t.GetGenericArguments()
+        if stringType <> typeof<string> then raise (Exception (sprintf "Keys of %A are not strings" t))
+        let deserializeInner = deserializer options valueType 
+        fun j -> 
+            j.Properties() |> Seq.map (fun (k, v) -> k, deserializeInner v) |> makeMap valueType 
     elif isOption t then 
         let [|innerType|] = t.GetGenericArguments()
         let deserializeInner = deserializer options innerType
@@ -180,6 +187,13 @@ let rec private deserializer<'T> (options: JsonReadOptions) (t: Type): JsonValue
                 None |> makeOption innerType |> box 
             else 
                 deserializeInner j |> Some |> makeOption innerType |> box
+    elif FSharpType.IsRecord t then 
+        let fields = FSharpType.GetRecordFields t 
+        let readers = Array.map (fieldDeserializer options) fields 
+        fun j -> 
+            let array = [| for field, reader in readers do 
+                                yield reader j |]
+            FSharpValue.MakeRecord(t, array)
     else 
         raise (Exception (sprintf "Don't know how to deserialize %A from JSON" t))
 and fieldDeserializer (options: JsonReadOptions) (field: PropertyInfo): string * (JsonValue -> obj) = 
