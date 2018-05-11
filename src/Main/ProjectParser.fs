@@ -5,6 +5,7 @@ open System.IO
 open System.Collections.Generic
 open System.Net
 open System.Xml
+open System.Text.RegularExpressions
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
@@ -50,6 +51,11 @@ module ProjectParser =
         libraries: Map<string, Library>
         packageFolders: string list
         project: Project
+    }
+
+    type FsProj = {
+        compileInclude: FileInfo list 
+        projectReferenceInclude: FileInfo list
     }
 
     let private asString (json: JsonValue) = 
@@ -124,6 +130,49 @@ module ProjectParser =
             packageFolders = keys json?packageFolders
             project = parseProject json?project
         }
+    let private template = Regex(@"\$\((\w+)\)")
+    let private substituteVariables (directory: DirectoryInfo) (fsproj: string): string = 
+        let doc = XmlDocument()
+        doc.LoadXml fsproj 
+        let variables = Dictionary<string, string>()
+        let substituteMatch (m: Match) = 
+            let name = m.Groups.[1].Value
+            if variables.ContainsKey(name) then 
+                eprintfn "Replace %s with %s" name variables.[name]
+                variables.[name] 
+            else 
+                eprintfn "Leave %s because %s is not in %A" m.Value name variables
+                m.Value
+        let substitute (text: string): string = 
+            template.Replace(text, substituteMatch)
+        variables.["MSBuildProjectDirectory"] <- directory.FullName
+        for propGroup in doc.DocumentElement.SelectNodes "//PropertyGroup" do 
+            eprintfn "Found %O" propGroup
+            for prop in propGroup.ChildNodes do 
+                eprintfn "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
+                variables.[prop.Name] <- substitute(prop.InnerText)
+        substitute fsproj
+    let parseFsProj (directory: DirectoryInfo) (fsproj: string): FsProj = 
+        let text = substituteVariables directory fsproj
+        let doc = XmlDocument()
+        doc.LoadXml text 
+        // Find all <Compile Include=?> elements in fsproj
+        let compileInclude = List.ofSeq(seq {
+            for n in doc.DocumentElement.SelectNodes "//Compile[@Include]" do 
+                let relativePath = n.Attributes.["Include"].Value |> fixPath
+                let absolutePath = Path.Combine(directory.FullName, relativePath)
+                let normalizePath = Path.GetFullPath(absolutePath)
+                yield FileInfo(normalizePath)
+        })
+        // Find all <ProjectReference Include=?> elements in fsproj
+        let projectReferenceInclude = List.ofSeq(seq {
+            for n in doc.DocumentElement.SelectNodes "//ProjectReference[@Include]" do 
+                let relativePath = n.Attributes.["Include"].Value |> fixPath
+                let absolutePath = Path.Combine(directory.FullName, relativePath)
+                let normalizePath = Path.GetFullPath(absolutePath)
+                yield FileInfo(normalizePath)
+        })
+        {compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude}
     let private parseAssets (path: FileInfo): ProjectAssets = 
         let text = File.ReadAllText path.FullName
         parseAssetsJson text
@@ -192,33 +241,9 @@ module ProjectParser =
                     found <- Some(FileInfo(normalizePath))
             found
         Seq.map findAbsolutePath files |> Seq.collect Option.toList |> List.ofSeq
-    // Parse fsproj
-    let private parseFsProj (fsproj: FileInfo): XmlElement = 
-        let text = File.ReadAllText fsproj.FullName
-        let doc = XmlDocument()
-        doc.LoadXml text 
-        doc.DocumentElement
     // Parse fsproj and fsproj/../obj/project.assets.json
     let private parseBoth (path: FileInfo): ParsedFsProj = 
-        let project = parseFsProj path
-        // Find all <Compile Include=?> elements in fsproj
-        let sources (fsproj: XmlNode): FileInfo list = 
-            List.ofSeq(seq {
-                for n in fsproj.SelectNodes "//Compile[@Include]" do 
-                    let relativePath = n.Attributes.["Include"].Value |> fixPath
-                    let absolutePath = Path.Combine(path.DirectoryName, relativePath)
-                    let normalizePath = Path.GetFullPath(absolutePath)
-                    yield FileInfo(normalizePath)
-            })
-        // Find all <ProjectReference Include=?> elements in fsproj
-        let projectReferences (fsproj: XmlNode): FileInfo list = 
-            List.ofSeq(seq {
-                for n in fsproj.SelectNodes "//ProjectReference[@Include]" do 
-                    let relativePath = n.Attributes.["Include"].Value |> fixPath
-                    let absolutePath = Path.Combine(path.DirectoryName, relativePath)
-                    let normalizePath = Path.GetFullPath(absolutePath)
-                    yield FileInfo(normalizePath)
-            })
+        let project = parseFsProj path.Directory (File.ReadAllText path.FullName)
         let assetsFile = Path.Combine(path.DirectoryName, "obj", "project.assets.json") |> FileInfo
         let rs = 
             if assetsFile.Exists then 
@@ -228,8 +253,8 @@ module ProjectParser =
                 eprintfn "No assets file at %O" assetsFile
                 []
         {
-            sources = sources project 
-            projectReferences = projectReferences project
+            sources = project.compileInclude
+            projectReferences = project.projectReferenceInclude
             references = rs
         }
     let private printList (files: FileInfo list) (describe: string) =

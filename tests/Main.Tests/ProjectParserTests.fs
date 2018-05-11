@@ -68,3 +68,19 @@ let ``test parsing a project file`` (t: TestContext) =
         Fail(sprintf "No LSP.dll in %A" referencedProjects)
     if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.OtherOptions) then 
         Fail(sprintf "No FSharp.Compiler.Service.dll in %A" parsed.OtherOptions)
+
+let ``test substitute parameters in a project file`` (t: TestContext) = 
+  let projectFileText = """
+  <Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+      <FSharpSourcesRoot>$(MSBuildProjectDirectory)\..\..\src</FSharpSourcesRoot>
+    </PropertyGroup>
+    <Compile Include="$(FSharpSourcesRoot)/fsharp/QueueList.fs">
+      <Link>Utilities/QueueList.fs</Link>
+    </Compile>
+  </Project>
+  """
+  let srcMain = Path.Combine [|projectRoot.FullName; "src"; "Main"|] |> DirectoryInfo 
+  let parse = ProjectParser.parseFsProj srcMain projectFileText
+  let expectedFile = Path.Combine [|projectRoot.FullName; "src"; "fsharp"; "QueueList.fs"|] |> FileInfo 
+  if parse.compileInclude |> List.map (fun f -> f.FullName) <> [expectedFile.FullName] then Fail(parse.compileInclude)
