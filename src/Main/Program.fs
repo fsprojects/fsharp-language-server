@@ -299,65 +299,68 @@ let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethod
             result <- i 
     if result = -1 then None else Some result
 
-type private FindFile = 
-    | NoSourceFile of sourcePath: string
-    | NoProjectFile of sourcePath: string
-    | Found of sourcePath: string * sourceVersion: int * sourceText: string * projectOptions: FSharpProjectOptions 
+type private FindFile = {
+    sourcePath: string
+    sourceVersion: int
+    sourceText: string
+    projectOptions: FSharpProjectOptions 
+}
 
 type private CheckFile = 
     | Errors of Diagnostic list
-    | Ok of parseResult: FSharpParseFileResults * checkResult: FSharpCheckFileResults * errors: Diagnostic list
+    | GoodFile of parseResult: FSharpParseFileResults * checkResult: FSharpCheckFileResults * errors: Diagnostic list
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
     // Find a file and its .fsproj context
-    let find (uri: Uri): FindFile = 
+    let find (uri: Uri): Result<FindFile, string> = 
         let sourcePath = uri.AbsolutePath.ToString()
         let source = docs.Get uri
         let projectOptions = projects.FindProjectOptions(FileInfo(uri.AbsolutePath))
         match source, projectOptions with 
-        | None, _ -> NoSourceFile sourcePath
-        | _, None -> NoProjectFile sourcePath
-        | Some(sourceText, sourceVersion), Some projectOptions -> 
-            if Array.contains sourcePath projectOptions.SourceFiles then 
-                Found(sourcePath, sourceVersion, sourceText, projectOptions) 
-            else 
-                NoProjectFile(sourcePath)
+        | None, _ -> Error(sprintf "No source file %O" uri)
+        | _, Error m -> Error m
+        | Some(sourceText, sourceVersion), Ok projectOptions -> 
+            let found = 
+                { 
+                    sourcePath=sourcePath
+                    sourceVersion=sourceVersion
+                    sourceText=sourceText
+                    projectOptions=projectOptions 
+                }
+            Ok found
     // Find a file and check it
     let check (uri: Uri): CheckFile = 
         eprintfn "Check %O" uri
         async {
             match find uri with 
-            | NoSourceFile sourcePath -> 
-                return Errors [errorAtTop (sprintf "No source file %s" sourcePath )]
-            | NoProjectFile sourcePath -> 
-                return Errors [errorAtTop (sprintf "No .fsproj file includes source source %s" sourcePath)]
-            | Found(sourcePath, sourceVersion, sourceText, projectOptions) -> 
-                let! parseResult, checkAnswer = checker.ParseAndCheckFileInProject(sourcePath, sourceVersion, sourceText, projectOptions)
+            | Error m -> return Errors [errorAtTop m]
+            | Ok f -> 
+                let! parseResult, checkAnswer = checker.ParseAndCheckFileInProject(f.sourcePath, f.sourceVersion, f.sourceText, f.projectOptions)
                 let parseErrors = convertDiagnostics parseResult.Errors
                 match checkAnswer with 
                 | FSharpCheckFileAnswer.Aborted -> 
-                    eprintfn "Aborted checking %s" sourcePath 
+                    eprintfn "Aborted checking %s" f.sourcePath 
                     return Errors parseErrors
                 | FSharpCheckFileAnswer.Succeeded checkResult -> 
                     let checkErrors = convertDiagnostics checkResult.Errors 
                     let allErrors = parseErrors@checkErrors 
-                    return Ok(parseResult, checkResult, allErrors)
+                    return GoodFile(parseResult, checkResult, allErrors)
         } |> Async.RunSynchronously
     // Check a file and send all errors to the client
     let lint (uri: Uri): unit = 
         match check uri with 
         | Errors errors -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
-        | Ok(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+        | GoodFile(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
     // Find the symbol at a position
     let symbolAt (textDocument: TextDocumentIdentifier) (position: Position): FSharpSymbolUse option = 
         match check (textDocument.uri) with 
         | Errors errors -> 
             eprintfn "Check failed, ignored %d errors" (List.length errors)
             None
-        | Ok(parseResult, checkResult, _) -> 
+        | GoodFile(parseResult, checkResult, _) -> 
             let line = docs.LineContent(textDocument.uri, position.line)
             match findEndOfIdentifierUnderCursor line position.character with 
             | None -> 
@@ -440,7 +443,7 @@ type Server(client: ILanguageClient) =
             | Errors errors -> 
                 eprintfn "Check failed, ignored %d errors" (List.length errors)
                 None
-            | Ok(parseResult, checkResult, _) -> 
+            | GoodFile(parseResult, checkResult, _) -> 
                 let line = docs.LineContent(p.textDocument.uri, p.position.line)
                 let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                 eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
@@ -451,7 +454,7 @@ type Server(client: ILanguageClient) =
             | Errors errors -> 
                 eprintfn "Check failed, ignored %d errors" (List.length errors)
                 None
-            | Ok(parseResult, checkResult, _) -> 
+            | GoodFile(parseResult, checkResult, _) -> 
                 let line = docs.LineContent(p.textDocument.uri, p.position.line)
                 let names = findNamesUnderCursor line p.position.character
                 let tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier) |> Async.RunSynchronously
@@ -462,7 +465,7 @@ type Server(client: ILanguageClient) =
             | Errors errors -> 
                 eprintfn "Check failed, ignored %d errors" (List.length errors)
                 None
-            | Ok(parseResult, checkResult, _) -> 
+            | GoodFile(parseResult, checkResult, _) -> 
                 let line = docs.LineContent(p.textDocument.uri, p.position.line)
                 match findMethodCallBeforeCursor line p.position.character with 
                 | None -> 
@@ -500,7 +503,7 @@ type Server(client: ILanguageClient) =
             | Errors errors -> 
                 eprintfn "Check failed, ignored %d errors" (List.length errors)
                 []
-            | Ok(parseResult, checkResult, _) -> 
+            | GoodFile(parseResult, checkResult, _) -> 
                 eprintfn "Looking for symbols in %s" parseResult.FileName
                 let all = allSymbols checkResult.PartialAssemblySignature.Entities
                 all |> Seq.filter (symbolIsInFile parseResult.FileName)

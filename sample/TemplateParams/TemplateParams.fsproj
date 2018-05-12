@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <FSharpSourcesRoot>$(MSBuildProjectDirectory)\..\..\src</FSharpSourcesRoot>
+    </PropertyGroup>
+    <Compile Include="$(FSharpSourcesRoot)/fsharp/QueueList.fs">
+        <Link>Utilities/QueueList.fs</Link>
+    </Compile>
+</Project>

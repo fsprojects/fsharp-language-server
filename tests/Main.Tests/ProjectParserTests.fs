@@ -54,33 +54,21 @@ let ``test parsing a JSON project file`` (t: TestContext) =
       }
     }"""
     let parsed = ProjectParser.parseAssetsJson json
-    if not (Map.containsKey "FSharp.Compiler.Service/22.0.3" parsed.libraries) then Fail("Failed")
-    if not (Seq.exists ((=) "/Users/george/.nuget/packages/") parsed.packageFolders) then Fail("Failed")
+    if not (Map.containsKey "FSharp.Compiler.Service/22.0.3" parsed.libraries) then Fail(sprintf "%A" parsed.libraries)
+    let packageFolders = parsed.packageFolders |> Map.toSeq |> Seq.map fst |> List.ofSeq
+    if not (Seq.exists ((=) "/Users/george/.nuget/packages/") (packageFolders)) then Fail(sprintf "%A" parsed.packageFolders)
 
 let ``test parsing a project file`` (t: TestContext) = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
-    let parsed = ProjectParser.parseProjectOptions file
-    let referencedProjects = Array.map (fun (f, _) -> f) parsed.ReferencedProjects
-    let hasName (name: string) (f: string) = f.EndsWith(name)
-    if not (Seq.exists (hasName "ProjectManager.fs") parsed.SourceFiles) then 
-        Fail(sprintf "No ProjectManager.fs in %A" parsed.SourceFiles)
-    if not (Seq.exists (hasName "LSP.dll") referencedProjects) then 
-        Fail(sprintf "No LSP.dll in %A" referencedProjects)
-    if not (Seq.exists (hasName "FSharp.Compiler.Service.dll") parsed.OtherOptions) then 
-        Fail(sprintf "No FSharp.Compiler.Service.dll in %A" parsed.OtherOptions)
+    let parsed = match ProjectParser.parseFsProj file with Ok p -> p
+    let hasName (name: string) (f: FileInfo) = f.Name = name
+    if not (Seq.exists (hasName "ProjectManager.fs") parsed.compileInclude) then 
+        Fail(sprintf "No ProjectManager.fs in %A" parsed.compileInclude)
+    if not (Seq.exists (hasName "LSP.fsproj") parsed.projectReferenceInclude) then 
+        Fail(sprintf "No LSP.fsproj in %A" parsed.projectReferenceInclude)
 
 let ``test substitute parameters in a project file`` (t: TestContext) = 
-  let projectFileText = """
-  <Project Sdk="Microsoft.NET.Sdk">
-    <PropertyGroup>
-      <FSharpSourcesRoot>$(MSBuildProjectDirectory)\..\..\src</FSharpSourcesRoot>
-    </PropertyGroup>
-    <Compile Include="$(FSharpSourcesRoot)/fsharp/QueueList.fs">
-      <Link>Utilities/QueueList.fs</Link>
-    </Compile>
-  </Project>
-  """
-  let srcMain = Path.Combine [|projectRoot.FullName; "src"; "Main"|] |> DirectoryInfo 
-  let parse = ProjectParser.doParseFsProj srcMain projectFileText
+  let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "TemplateParams"; "TemplateParams.fsproj"|] |> FileInfo 
+  let parse = match ProjectParser.parseFsProj fsproj with Ok p -> p
   let expectedFile = Path.Combine [|projectRoot.FullName; "src"; "fsharp"; "QueueList.fs"|] |> FileInfo 
   if parse.compileInclude |> List.map (fun f -> f.FullName) <> [expectedFile.FullName] then Fail(parse.compileInclude)

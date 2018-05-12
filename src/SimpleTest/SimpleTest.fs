@@ -27,7 +27,7 @@ let private matchesArgs (argv: array<string>) (m: MethodInfo) =
 
 let runAllTests(assembly: Assembly, argv: array<string>): unit =
     if not (Array.isEmpty argv) then 
-        eprintf "Looking for tests that match %A" argv
+        eprintfn "Looking for tests that match %A" argv
     let mutable countTests = 0
     let mutable failures: (Type * MethodInfo * string) list = []
     for t in assembly.GetTypes() do 

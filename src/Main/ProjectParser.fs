@@ -13,11 +13,6 @@ open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 
 module ProjectParser = 
-    type ParsedFsProj = {
-        sources: FileInfo list
-        projectReferences: FileInfo list
-        references: FileInfo list
-    }
     type Dependency = {
         ``type``: string 
         compile: Map<string, JsonValue>
@@ -45,17 +40,19 @@ module ProjectParser =
     type ProjectAssets = {
         targets: Map<string, Map<string, Dependency>>
         libraries: Map<string, Library>
-        packageFolders: string list
+        packageFolders: Map<string, JsonValue>
         project: Project
     }
 
     type FsProj = {
+        file: FileInfo
         compileInclude: FileInfo list 
         projectReferenceInclude: FileInfo list
     }
 
     let private fixPath (path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
+    // Exposed for testing
     let parseAssetsJson = JsonValue.Parse >> deserializerFactory<ProjectAssets> defaultJsonReadOptions
 
     // Log messages once and then silence them
@@ -86,10 +83,10 @@ module ProjectParser =
                 eprintfn "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
                 variables.[prop.Name] <- substitute(prop.InnerText)
         substitute fsproj
-    // Exposed for testing
-    let doParseFsProj (directory: DirectoryInfo) (fsproj: string): FsProj = 
+    let parseFsProj (fsproj: FileInfo): Result<FsProj, string> = 
         try 
-            let text = substituteVariables directory fsproj
+            let directory = fsproj.Directory
+            let text = substituteVariables directory (File.ReadAllText fsproj.FullName)
             let doc = XmlDocument()
             doc.LoadXml text 
             // Find all <Compile Include=?> elements in fsproj
@@ -108,17 +105,19 @@ module ProjectParser =
                     let normalizePath = Path.GetFullPath(absolutePath)
                     yield FileInfo(normalizePath)
             })
-            {compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude}
+            {file=fsproj; compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude} |> Ok
         with e -> 
-            eprintfn "Failed to parse %s with %O" "TODO project file" e
-            {compileInclude=[]; projectReferenceInclude=[]}
-    let parseFsProj (fsproj: FileInfo): FsProj = 
-        doParseFsProj fsproj.Directory (File.ReadAllText fsproj.FullName)
-    let private parseAssets (path: FileInfo): ProjectAssets = 
-        let text = File.ReadAllText path.FullName
-        parseAssetsJson text
+            Error e.Message
+    let parseAssets (path: FileInfo): Result<ProjectAssets, string> = 
+        if path.Exists then 
+            let text = File.ReadAllText path.FullName
+            let parsed = parseAssetsJson text
+            Ok parsed
+        else 
+            let msg = sprintf "%s does not exist; maybe you need to build your project?" path.FullName
+            Error msg
     // Find all dlls in project.assets.json
-    let private references (assets: ProjectAssets): FileInfo list = 
+    let findLibraryDlls (assets: ProjectAssets): FileInfo list = 
         // Given a dependency name, for example FSharp.Core, lookup the version in $.libraries, for example FSharp.Core/4.3.4
         let lookupVersion (dependencyName: string) = 
             let mutable found: string option = None
@@ -169,112 +168,10 @@ module ProjectParser =
         // Find .dlls by checking each key of $.packageFolders
         let findAbsolutePath (relativePath: string): FileInfo option = 
             let mutable found: FileInfo option = None
-            for packageFolder in assets.packageFolders do 
+            for KeyValue(packageFolder, _) in assets.packageFolders do 
                 let absolutePath = Path.Combine(packageFolder, relativePath)
                 let normalizePath = Path.GetFullPath(absolutePath)
                 if File.Exists normalizePath && found = None then
                     found <- Some(FileInfo(normalizePath))
             found
         Seq.map findAbsolutePath files |> Seq.collect Option.toList |> List.ofSeq
-    // Parse fsproj and fsproj/../obj/project.assets.json
-    let private parseBoth (path: FileInfo): ParsedFsProj = 
-        let project = parseFsProj path
-        let assetsFile = Path.Combine(path.DirectoryName, "obj", "project.assets.json") |> FileInfo
-        let rs = 
-            if assetsFile.Exists then 
-                let assets = parseAssets assetsFile
-                references assets
-            else 
-                eprintfn "No assets file at %O" (Path.Combine [|path.FullName; ".."; "obj"; "project.assets.json"|])
-                []
-        {
-            sources = project.compileInclude
-            projectReferences = project.projectReferenceInclude
-            references = rs
-        }
-    let private printList (files: FileInfo list) (describe: string) =
-        for f in files do 
-            eprintfn "    %s" f.FullName
-    // Find .dll corresponding to an .fsproj file 
-    // For example, sample/IndirectDep/IndirectDep.fsproj corresponds to sample/IndirectDep/bin/Debug/netcoreapp2.0/IndirectDep.dll
-    // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-    let private projectDll (fsproj: FileInfo): string = 
-        let bin = DirectoryInfo(Path.Combine(fsproj.Directory.FullName, "bin"))
-        let name = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
-        // TODO this is pretty hacky
-        // Does it actually matter if I find a real .dll? Can I just use bin/Debug/placeholder/___.dll?
-        let list = [ if bin.Exists then
-                        for target in bin.GetDirectories() do 
-                            for platform in target.GetDirectories() do 
-                                let file = Path.Combine(platform.FullName, name)
-                                if File.Exists file then 
-                                    yield file ]
-        if list.Length > 0 then 
-            list.[0] 
-        else
-            Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; name|]
-    // Traverse the tree of project references
-    let private ancestors (fsproj: FileInfo): FileInfo list = 
-        let all = List<FileInfo>()
-        let rec traverse (fsproj: FileInfo) = 
-            let head = parseBoth fsproj
-            for r in head.projectReferences do 
-                traverse r 
-            all.Add(fsproj)
-        let head = parseBoth fsproj 
-        for r in head.projectReferences do 
-            traverse r
-        List.ofSeq all
-    let private projectOptionsCache = Dictionary<string, FSharpProjectOptions>()
-    // Parse an .fsproj, looking at project.assets.json to find referenced .dlls
-    let rec private doParseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
-        let c = parseBoth(fsproj)
-        let ancestorProjects = ancestors fsproj
-        eprintfn "Project %s" fsproj.FullName
-        eprintfn "  References:"
-        printList c.references "references"
-        eprintfn "  Projects:"
-        printList ancestorProjects "projects"
-        eprintfn "  Sources:"
-        printList c.sources "sources"
-        {
-            ExtraProjectInfo = None 
-            IsIncompleteTypeCheckEnvironment = false 
-            LoadTime = fsproj.LastWriteTime
-            OriginalLoadReferences = []
-            OtherOptions = [|   yield "--noframework"
-                                // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-                                for f in ancestorProjects do
-                                    yield "-r:" + (projectDll f)
-                                for f in c.references do 
-                                    yield "-r:" + f.FullName |]
-            ProjectFileName = fsproj.FullName 
-            ReferencedProjects = ancestorProjects |> List.map (fun f -> (projectDll f, parseProjectOptions f)) |> List.toArray
-            SourceFiles = c.sources |> List.map (fun f -> f.FullName) |> List.toArray
-            Stamp = None 
-            UnresolvedReferences = None 
-            UseScriptResolutionRules = false
-        }
-    and parseProjectOptions (fsproj: FileInfo): FSharpProjectOptions = 
-        let modified = fsproj.LastWriteTime
-        if not (projectOptionsCache.ContainsKey fsproj.FullName) then 
-            eprintfn "%s is not in the cache" fsproj.Name
-            projectOptionsCache.[fsproj.FullName] <- doParseProjectOptions fsproj
-        projectOptionsCache.[fsproj.FullName]
-    let openProjects () = 
-        projectOptionsCache.Values |> List.ofSeq
-    let rec private isAncestor (ancestor: FileInfo) (candidate: string) = 
-        let mutable result = false
-        let rec walk (options: FSharpProjectOptions): unit = 
-            if options.ProjectFileName = candidate then 
-                result <- true 
-            for _, parent in options.ReferencedProjects do 
-                walk parent
-        if projectOptionsCache.ContainsKey candidate then 
-            walk projectOptionsCache.[candidate]
-        result
-    let invalidateProjectFile (fsproj: FileInfo) = 
-        let descendents = projectOptionsCache.Keys |> Seq.filter (isAncestor fsproj) |> Seq.toList
-        for d in descendents do 
-            eprintfn "Invalidate %s because %s was changed" d fsproj.FullName
-            projectOptionsCache.Remove d |> ignore
