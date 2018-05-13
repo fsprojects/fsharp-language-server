@@ -174,10 +174,13 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
                 let task = processRequest (Parser.parseRequest method json) 
                 let cancel = new CancellationTokenSource()
                 pendingRequests.[id] <- cancel
-                match Async.RunSynchronously(task, 0, cancel.Token) with 
-                | Some result -> respond send id result
-                | None -> ()
-                pendingRequests.TryRemove id |> ignore
+                try 
+                    match Async.RunSynchronously(task, 0, cancel.Token) with 
+                    | Some result -> respond send id result
+                    | None -> ()
+                    pendingRequests.TryRemove id |> ignore
+                with :? OperationCanceledException -> 
+                    log "Request %d was cancelled" id
     ).Start()
     // Read all messages on the main thread
     for m in readMessages receive do 
