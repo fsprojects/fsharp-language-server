@@ -50,7 +50,7 @@ let createServerAndReadFile (name: string): MockClient * ILanguageServer =
     let (client, server) = createServer()
     let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
     let sampleRootUri = Uri("file://" + sampleRootPath)
-    server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> ignore
+    server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> Async.RunSynchronously |> ignore
     let (file, fileText) = readFile name
     let openParams: DidOpenTextDocumentParams = {textDocument={uri=Uri(file); languageId="fsharp"; version=0; text=fileText}}
     server.DidOpenTextDocument(openParams)
@@ -142,19 +142,19 @@ let ``test findNamesUnderCursor`` (t: TestContext) =
 
 let ``test hover over function`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Hover.fs"
-    match server.Hover(position "Hover.fs" 6 23) with 
+    match server.Hover(position "Hover.fs" 6 23) |> Async.RunSynchronously with 
     | None -> Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Fail("Hover list is empty")
 
 let ``test hover over qualified name`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Hover.fs"
-    match server.Hover(position "Hover.fs" 12 38) with 
+    match server.Hover(position "Hover.fs" 12 38) |> Async.RunSynchronously with 
     | None -> Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Fail("Hover list is empty")
 
 let ``test complete List members`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Completions.fs"
-    match server.Completion(position "Completions.fs" 2 10) with 
+    match server.Completion(position "Completions.fs" 2 10) |> Async.RunSynchronously with 
     | None -> Fail("No completions")
     | Some completions -> 
         if List.isEmpty completions.items then Fail("Completion list is empty")
@@ -163,7 +163,7 @@ let ``test complete List members`` (t: TestContext) =
 
 let ``test signature help`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
-    match server.SignatureHelp(position "SignatureHelp.fs" 3 47) with 
+    match server.SignatureHelp(position "SignatureHelp.fs" 3 47) |> Async.RunSynchronously with 
     | None -> Fail("No signature help")
     | Some help -> 
         if List.isEmpty help.signatures then Fail("Signature list is empty")
@@ -201,29 +201,29 @@ let ``test findMethodCallBeforeCursor`` (t: TestContext) =
 
 let ``test find document symbols`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Reference.fs"
-    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "Reference.fs")}})
+    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "Reference.fs")}}) |> Async.RunSynchronously
     let names = found |> List.map (fun f -> f.name)
     if not (List.contains "Reference" names) then Fail(sprintf "Reference is not in %A" names)
     if List.contains "ReferenceDependsOn" names then Fail("Document symbols includes dependency")
 
 let ``test find interface inside module`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "InterfaceInModule.fs"
-    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "InterfaceInModule.fs")}})
+    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "InterfaceInModule.fs")}}) |> Async.RunSynchronously
     let names = found |> List.map (fun f -> f.name)
     if not (List.contains "IMyInterface" names) then Fail(sprintf "IMyInterface is not in %A" names)
 
 let ``test find project symbols`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
-    let found = server.WorkspaceSymbols({query = "signatureHelp"})
+    let found = server.WorkspaceSymbols({query = "signatureHelp"}) |> Async.RunSynchronously
     if List.isEmpty found then Fail("Should have found signatureHelp")
-    let found = server.WorkspaceSymbols({query = "IndirectLibrary"})
+    let found = server.WorkspaceSymbols({query = "IndirectLibrary"}) |> Async.RunSynchronously
     if List.isEmpty found then Fail("Should have found IndirectLibrary")
-    let found = server.WorkspaceSymbols({query = "IMyInterface"})
+    let found = server.WorkspaceSymbols({query = "IMyInterface"}) |> Async.RunSynchronously
     if List.isEmpty found then Fail("Should have found IMyInterface")
 
 let ``test go to definition`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "Reference.fs"
-    match server.GotoDefinition(position "Reference.fs" 3 31) with 
+    match server.GotoDefinition(position "Reference.fs" 3 31) |> Async.RunSynchronously with 
     | [] -> Fail("No symbol definition")
     | [single] -> ()
     | many -> Fail(sprintf "Multiple definitions found %A" many)
@@ -236,7 +236,7 @@ let ``test find references`` (t: TestContext) =
             position = { line=3-1; character=6-1 }
             context = { includeDeclaration=true }
         }
-    let list = server.FindReferences(p)
+    let list = server.FindReferences(p) |> Async.RunSynchronously
     let isReferenceFs (r: Location) = r.uri.AbsolutePath.EndsWith("UseSymbol.fs")
     let found = List.exists isReferenceFs list
     if not found then Fail(sprintf "Didn't find reference from UseSymbol.fs in %A" list)

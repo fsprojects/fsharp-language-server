@@ -275,9 +275,6 @@ let private useLocation (s: FSharpSymbolUse): Location =
     let uri = Uri("file://" + s.FileName)
     { uri=uri; range = asRange s.RangeAlternate }
 
-let private symbolHasLocation (s: FSharpSymbol): bool = 
-    s.DeclarationLocation.IsSome
-
 let private symbolInformation (s: FSharpSymbol): SymbolInformation = 
     {
         name = s.DisplayName
@@ -332,9 +329,9 @@ type Server(client: ILanguageClient) =
                 }
             Ok found
     // Find a file and check it
-    let check (uri: Uri): CheckFile = 
-        eprintfn "Check %O" uri
+    let check (uri: Uri): Async<CheckFile> = 
         async {
+            eprintfn "Check %O" uri
             match find uri with 
             | Error m -> return Errors [errorAtTop m]
             | Ok f -> 
@@ -348,34 +345,39 @@ type Server(client: ILanguageClient) =
                     let checkErrors = convertDiagnostics checkResult.Errors 
                     let allErrors = parseErrors@checkErrors 
                     return GoodFile(parseResult, checkResult, allErrors)
-        } |> Async.RunSynchronously
+        }
     // Check a file and send all errors to the client
-    let lint (uri: Uri): unit = 
-        match check uri with 
-        | Errors errors -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
-        | GoodFile(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+    let lint (uri: Uri): Async<unit> = 
+        async {
+            let! c = check uri
+            match c with 
+            | Errors errors -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+            | GoodFile(parseResult, checkResult, errors) -> client.PublishDiagnostics({uri=uri; diagnostics=errors})
+        }
     // Find the symbol at a position
-    let symbolAt (textDocument: TextDocumentIdentifier) (position: Position): FSharpSymbolUse option = 
-        match check (textDocument.uri) with 
-        | Errors errors -> 
-            eprintfn "Check failed, ignored %d errors" (List.length errors)
-            None
-        | GoodFile(parseResult, checkResult, _) -> 
-            let line = docs.LineContent(textDocument.uri, position.line)
-            match findEndOfIdentifierUnderCursor line position.character with 
-            | None -> 
-                eprintfn "No identifier at %d in line '%s'" position.character line 
-                None
-            | Some endOfIdentifier -> 
-                eprintfn "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
-                let names = findNamesUnderCursor line (endOfIdentifier - 1)
-                let dotName = String.concat "." names
-                eprintfn "Looking at symbol %s" dotName
-                match checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names) |> Async.RunSynchronously with 
+    let symbolAt (textDocument: TextDocumentIdentifier) (position: Position): Async<FSharpSymbolUse option> = 
+        async {
+            let! c = check (textDocument.uri)
+            match c with 
+            | Errors errors -> 
+                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                return None
+            | GoodFile(parseResult, checkResult, _) -> 
+                let line = docs.LineContent(textDocument.uri, position.line)
+                match findEndOfIdentifierUnderCursor line position.character with 
                 | None -> 
-                    eprintfn "%s in line '%s' is not a symbol use" dotName line
-                    None
-                | s -> s
+                    eprintfn "No identifier at %d in line '%s'" position.character line 
+                    return None
+                | Some endOfIdentifier -> 
+                    eprintfn "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
+                    let names = findNamesUnderCursor line (endOfIdentifier - 1)
+                    let dotName = String.concat "." names
+                    eprintfn "Looking at symbol %s" dotName
+                    let! maybeSymbol = checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names)
+                    if maybeSymbol.IsNone then
+                        eprintfn "%s in line '%s' is not a symbol use" dotName line
+                    return maybeSymbol
+        }
     // Rename one usage of a symbol
     let renameTo (newName: string) (file: string, usages: FSharpSymbolUse seq): TextDocumentEdit = 
         let uri = Uri("file://" + file)
@@ -388,25 +390,31 @@ type Server(client: ILanguageClient) =
         {textDocument={uri=uri; version=version}; edits=List.ofSeq edits}
 
     interface ILanguageServer with 
-        member this.Initialize(p: InitializeParams): InitializeResult =
-            match p.rootUri with 
-            | Some root -> projects.AddWorkspaceRoot (DirectoryInfo(root.AbsolutePath)) 
-            | _ -> ()
-            { capabilities = 
-                { defaultServerCapabilities with 
-                    hoverProvider = true
-                    completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
-                    signatureHelpProvider = Some({triggerCharacters=['('; ',']})
-                    documentSymbolProvider = true
-                    workspaceSymbolProvider = true
-                    definitionProvider = true
-                    referencesProvider = true
-                    renameProvider = true
-                    textDocumentSync = 
-                        { defaultTextDocumentSyncOptions with 
-                            openClose = true 
-                            save = Some { includeText = false }
-                            change = TextDocumentSyncKind.Incremental } } }
+        member this.Initialize(p: InitializeParams) =
+            async {
+                match p.rootUri with 
+                | Some root -> projects.AddWorkspaceRoot (DirectoryInfo(root.AbsolutePath)) 
+                | _ -> ()
+                return { 
+                    capabilities = 
+                        { defaultServerCapabilities with 
+                            hoverProvider = true
+                            completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
+                            signatureHelpProvider = Some({triggerCharacters=['('; ',']})
+                            documentSymbolProvider = true
+                            workspaceSymbolProvider = true
+                            definitionProvider = true
+                            referencesProvider = true
+                            renameProvider = true
+                            textDocumentSync = 
+                                { defaultTextDocumentSyncOptions with 
+                                    openClose = true 
+                                    save = Some({ includeText = false })
+                                    change = TextDocumentSyncKind.Incremental 
+                                } 
+                        }
+                }
+            }
         member this.Initialized(): unit = 
             ()
         member this.Shutdown(): unit = 
@@ -415,13 +423,13 @@ type Server(client: ILanguageClient) =
             eprintfn "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
             docs.Open p
-            lint p.textDocument.uri
+            lint p.textDocument.uri |> Async.RunSynchronously
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
             docs.Change p
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
-        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): TextEdit list = TODO()
+        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
-            lint p.textDocument.uri
+            lint p.textDocument.uri |> Async.RunSynchronously
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
             docs.Close p
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
@@ -438,117 +446,142 @@ type Server(client: ILanguageClient) =
                         projects.DeleteProjectFile file
                 elif file.Name = "project.assets.json" then 
                     projects.UpdateAssetsJson file
-        member this.Completion(p: TextDocumentPositionParams): CompletionList option =
-            match check (p.textDocument.uri) with 
-            | Errors errors -> 
-                eprintfn "Check failed, ignored %d errors" (List.length errors)
-                None
-            | GoodFile(parseResult, checkResult, _) -> 
-                let line = docs.LineContent(p.textDocument.uri, p.position.line)
-                let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
-                eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
-                let declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName) |> Async.RunSynchronously
-                Some (convertDeclarations declarations)
-        member this.Hover(p: TextDocumentPositionParams): Hover option = 
-            match check (p.textDocument.uri) with 
-            | Errors errors -> 
-                eprintfn "Check failed, ignored %d errors" (List.length errors)
-                None
-            | GoodFile(parseResult, checkResult, _) -> 
-                let line = docs.LineContent(p.textDocument.uri, p.position.line)
-                let names = findNamesUnderCursor line p.position.character
-                let tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier) |> Async.RunSynchronously
-                Some(asHover tips)
-        member this.ResolveCompletionItem(p: CompletionItem): CompletionItem = TODO()
-        member this.SignatureHelp(p: TextDocumentPositionParams): SignatureHelp option = 
-            match check (p.textDocument.uri) with 
-            | Errors errors -> 
-                eprintfn "Check failed, ignored %d errors" (List.length errors)
-                None
-            | GoodFile(parseResult, checkResult, _) -> 
-                let line = docs.LineContent(p.textDocument.uri, p.position.line)
-                match findMethodCallBeforeCursor line p.position.character with 
-                | None -> 
-                    eprintfn "No method call in line %s" line 
-                    None
-                | Some endOfMethodName -> 
-                    let names = findNamesUnderCursor line (endOfMethodName - 1)
-                    eprintfn "Looking for overloads of %s" (String.concat "." names)
-                    let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names) |> Async.RunSynchronously
-                    let sigs = Array.map (convertSignature overloads.MethodName) overloads.Methods |> List.ofArray
-                    let activeParameter = countCommas line endOfMethodName p.position.character
-                    let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
-                    eprintfn "Found %d overloads" overloads.Methods.Length
-                    Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
-        member this.GotoDefinition(p: TextDocumentPositionParams): Location list = 
-            match symbolAt p.textDocument p.position with 
-            | None -> []
-            | Some s -> declarationLocation s.Symbol |> Option.toList
-        member this.FindReferences(p: ReferenceParams): Location list = 
-            match symbolAt p.textDocument p.position with 
-            | None -> [] 
-            | Some s -> 
-                let openProjects = projects.OpenProjects
-                let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
-                eprintfn "Looking for references to %s in %s" s.Symbol.FullName names
-                let all = seq {
-                    for options in openProjects do 
-                        let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
-                        yield! check.GetUsesOfSymbol(s.Symbol) |> Async.RunSynchronously
-                }
-                all |> Seq.map useLocation |> List.ofSeq
-        member this.DocumentHighlight(p: TextDocumentPositionParams): DocumentHighlight list = TODO()
-        member this.DocumentSymbols(p: DocumentSymbolParams): SymbolInformation list =
-            match check (p.textDocument.uri) with 
-            | Errors errors -> 
-                eprintfn "Check failed, ignored %d errors" (List.length errors)
-                []
-            | GoodFile(parseResult, checkResult, _) -> 
-                eprintfn "Looking for symbols in %s" parseResult.FileName
-                let all = allSymbols checkResult.PartialAssemblySignature.Entities
-                all |> Seq.filter (symbolIsInFile parseResult.FileName)
-                    |> Seq.map symbolInformation 
-                    |> List.ofSeq
-        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): SymbolInformation list = 
-            // TODO consider just parsing all files and using GetNavigationItems
-            let openProjects = projects.OpenProjects
-            let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
-            eprintfn "Looking for symbols matching %s in %s" p.query names
-            let all = seq {
-                for options in openProjects do 
-                    let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
-                    yield! allSymbols check.AssemblySignature.Entities 
+        member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
+            async {
+                let! c = check p.textDocument.uri
+                match c with 
+                | Errors errors -> 
+                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    return None
+                | GoodFile(parseResult, checkResult, _) -> 
+                    let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                    let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
+                    eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
+                    let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
+                    return Some (convertDeclarations declarations)
             }
-            all |> Seq.filter (matchesQuery p.query) 
-                |> Seq.filter symbolHasLocation
-                |> Seq.truncate 50 
-                |> Seq.map symbolInformation 
-                |> List.ofSeq
-        member this.CodeActions(p: CodeActionParams): Command list = TODO()
-        member this.CodeLens(p: CodeLensParams): List<CodeLens> = TODO()
-        member this.ResolveCodeLens(p: CodeLens): CodeLens = TODO()
-        member this.DocumentLink(p: DocumentLinkParams): DocumentLink list = TODO()
-        member this.ResolveDocumentLink(p: DocumentLink): DocumentLink = TODO()
-        member this.DocumentFormatting(p: DocumentFormattingParams): TextEdit list = TODO()
-        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): TextEdit list = TODO()
-        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): TextEdit list = TODO()
-        member this.Rename(p: RenameParams): WorkspaceEdit =
-            match symbolAt p.textDocument p.position with 
-            | None -> {documentChanges=[]}
-            | Some s -> 
+        member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
+            async {
+                let! c = check p.textDocument.uri
+                match c with 
+                | Errors errors -> 
+                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    return None
+                | GoodFile(parseResult, checkResult, _) -> 
+                    let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                    let names = findNamesUnderCursor line p.position.character
+                    let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier)
+                    return Some(asHover tips)
+            }
+        member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = TODO()
+        member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
+            async {
+                let! c = check p.textDocument.uri
+                match c with 
+                | Errors errors -> 
+                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    return None
+                | GoodFile(parseResult, checkResult, _) -> 
+                    let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                    match findMethodCallBeforeCursor line p.position.character with 
+                    | None -> 
+                        eprintfn "No method call in line %s" line 
+                        return None
+                    | Some endOfMethodName -> 
+                        let names = findNamesUnderCursor line (endOfMethodName - 1)
+                        eprintfn "Looking for overloads of %s" (String.concat "." names)
+                        let! overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
+                        let sigs = Array.map (convertSignature overloads.MethodName) overloads.Methods |> List.ofArray
+                        let activeParameter = countCommas line endOfMethodName p.position.character
+                        let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
+                        eprintfn "Found %d overloads" overloads.Methods.Length
+                        return Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
+            }
+        member this.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> = 
+            async {
+                let! maybeSymbol = symbolAt p.textDocument p.position
+                match maybeSymbol with 
+                | None -> return []
+                | Some s -> return declarationLocation s.Symbol |> Option.toList
+            }
+        member this.FindReferences(p: ReferenceParams): Async<Location list> = 
+            async {
+                let! maybeSymbol = symbolAt p.textDocument p.position
+                match maybeSymbol with 
+                | None -> return [] 
+                | Some s -> 
+                    let openProjects = projects.OpenProjects
+                    let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
+                    eprintfn "Looking for references to %s in %s" s.Symbol.FullName names
+                    let all = System.Collections.Generic.List<Location>()
+                    for options in openProjects do 
+                        let! check = checker.ParseAndCheckProject options
+                        let! uses = check.GetUsesOfSymbol(s.Symbol)
+                        for u in uses do 
+                            all.Add(useLocation u)
+                    return List.ofSeq all
+            }
+        member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
+        member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
+            async {
+                let! c = check (p.textDocument.uri)
+                match c with 
+                | Errors errors -> 
+                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    return []
+                | GoodFile(parseResult, checkResult, _) -> 
+                    eprintfn "Looking for symbols in %s" parseResult.FileName
+                    let all = allSymbols checkResult.PartialAssemblySignature.Entities
+                    return all 
+                        |> Seq.filter (symbolIsInFile parseResult.FileName)
+                        |> Seq.map symbolInformation 
+                        |> List.ofSeq
+            }
+        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
+            async {
+                // TODO consider just parsing all files and using GetNavigationItems
                 let openProjects = projects.OpenProjects
                 let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
-                eprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName names
-                let all = seq {
+                eprintfn "Looking for symbols matching %s in %s" p.query names
+                // Read open projects until we find at least 50 symbols that match query
+                let all = System.Collections.Generic.List<SymbolInformation>()
+                for options in openProjects do 
+                    if all.Count < 50 then 
+                        let! c = checker.ParseAndCheckProject options
+                        for s in allSymbols c.AssemblySignature.Entities do 
+                            if matchesQuery p.query s && s.DeclarationLocation.IsSome then 
+                                all.Add (symbolInformation s)
+                return List.ofSeq all
+            }
+        member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
+        member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = TODO()
+        member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = TODO()
+        member this.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
+        member this.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
+        member this.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = TODO()
+        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = TODO()
+        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
+        member this.Rename(p: RenameParams): Async<WorkspaceEdit> =
+            async {
+                let! maybeSymbol = symbolAt p.textDocument p.position
+                match maybeSymbol with 
+                | None -> return {documentChanges=[]}
+                | Some s -> 
+                    let openProjects = projects.OpenProjects
+                    let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
+                    eprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName names
+                    let all = System.Collections.Generic.List<FSharpSymbolUse>()
                     for options in openProjects do 
-                        let check = checker.ParseAndCheckProject options |> Async.RunSynchronously
-                        yield! check.GetUsesOfSymbol(s.Symbol) |> Async.RunSynchronously
-                }
-                let edits = all |> Seq.groupBy (fun usage -> usage.FileName)
-                                |> Seq.map (renameTo p.newName)
-                                |> List.ofSeq
-                {documentChanges=edits}
-        member this.ExecuteCommand(p: ExecuteCommandParams): unit = TODO()
+                        let! check = checker.ParseAndCheckProject options
+                        let! usages = check.GetUsesOfSymbol(s.Symbol)
+                        for u in usages do 
+                            all.Add u
+                    let edits = all |> Seq.groupBy (fun usage -> usage.FileName)
+                                    |> Seq.map (renameTo p.newName)
+                                    |> List.ofSeq
+                    return {documentChanges=edits}
+            }
+        member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): unit = 
             for root in p.event.added do 
                 projects.AddWorkspaceRoot(DirectoryInfo(root.uri.AbsolutePath))

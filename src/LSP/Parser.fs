@@ -107,7 +107,7 @@ let parseDidChangeWatchedFilesParams = deserializerFactory<DidChangeWatchedFiles
 
 let parseNotification (method: string) (maybeBody: JsonValue option): Notification = 
     match method, maybeBody with 
-    | "cancel", Some json -> Cancel (json?id.AsInteger())
+    | "$/cancelRequest", Some json -> Cancel (json?id.AsInteger())
     | "initialized", _ -> Initialized
     | "shutdown", _ -> Shutdown 
     | "exit", _ -> raise (Exception "exit message should terminated stream before reaching this point") 

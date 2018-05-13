@@ -629,37 +629,37 @@ type SymbolInformation = {
 }
 
 type ILanguageServer = 
-    abstract member Initialize: InitializeParams -> InitializeResult
+    abstract member Initialize: InitializeParams -> Async<InitializeResult>
     abstract member Initialized: unit -> unit 
-    abstract member Shutdown: unit -> Unit 
+    abstract member Shutdown: unit -> unit 
     abstract member DidChangeConfiguration: DidChangeConfigurationParams -> unit 
     abstract member DidOpenTextDocument: DidOpenTextDocumentParams -> unit 
     abstract member DidChangeTextDocument: DidChangeTextDocumentParams -> unit 
     abstract member WillSaveTextDocument: WillSaveTextDocumentParams -> unit
-    abstract member WillSaveWaitUntilTextDocument: WillSaveTextDocumentParams -> TextEdit list
+    abstract member WillSaveWaitUntilTextDocument: WillSaveTextDocumentParams -> Async<TextEdit list>
     abstract member DidSaveTextDocument: DidSaveTextDocumentParams -> unit
     abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> unit
     abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> unit
-    abstract member Completion: TextDocumentPositionParams -> CompletionList option
-    abstract member Hover: TextDocumentPositionParams -> Hover option
-    abstract member ResolveCompletionItem: CompletionItem -> CompletionItem
-    abstract member SignatureHelp: TextDocumentPositionParams -> SignatureHelp option
-    abstract member GotoDefinition: TextDocumentPositionParams -> Location list
-    abstract member FindReferences: ReferenceParams -> Location list
-    abstract member DocumentHighlight: TextDocumentPositionParams -> DocumentHighlight list
-    abstract member DocumentSymbols: DocumentSymbolParams -> SymbolInformation list
-    abstract member WorkspaceSymbols: WorkspaceSymbolParams -> SymbolInformation list
-    abstract member CodeActions: CodeActionParams -> Command list
-    abstract member CodeLens: CodeLensParams -> CodeLens list
-    abstract member ResolveCodeLens: CodeLens -> CodeLens
-    abstract member DocumentLink: DocumentLinkParams -> DocumentLink list
-    abstract member ResolveDocumentLink: DocumentLink -> DocumentLink
-    abstract member DocumentFormatting: DocumentFormattingParams -> TextEdit list
-    abstract member DocumentRangeFormatting: DocumentRangeFormattingParams -> TextEdit list
-    abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> TextEdit list
-    abstract member Rename: RenameParams -> WorkspaceEdit
-    abstract member ExecuteCommand: ExecuteCommandParams -> unit
-    abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> unit 
+    abstract member Completion: TextDocumentPositionParams -> Async<CompletionList option>
+    abstract member Hover: TextDocumentPositionParams -> Async<Hover option>
+    abstract member ResolveCompletionItem: CompletionItem -> Async<CompletionItem>
+    abstract member SignatureHelp: TextDocumentPositionParams -> Async<SignatureHelp option>
+    abstract member GotoDefinition: TextDocumentPositionParams -> Async<Location list>
+    abstract member FindReferences: ReferenceParams -> Async<Location list>
+    abstract member DocumentHighlight: TextDocumentPositionParams -> Async<DocumentHighlight list>
+    abstract member DocumentSymbols: DocumentSymbolParams -> Async<SymbolInformation list>
+    abstract member WorkspaceSymbols: WorkspaceSymbolParams -> Async<SymbolInformation list>
+    abstract member CodeActions: CodeActionParams -> Async<Command list>
+    abstract member CodeLens: CodeLensParams -> Async<CodeLens list>
+    abstract member ResolveCodeLens: CodeLens -> Async<CodeLens>
+    abstract member DocumentLink: DocumentLinkParams -> Async<DocumentLink list>
+    abstract member ResolveDocumentLink: DocumentLink -> Async<DocumentLink>
+    abstract member DocumentFormatting: DocumentFormattingParams -> Async<TextEdit list>
+    abstract member DocumentRangeFormatting: DocumentRangeFormattingParams -> Async<TextEdit list>
+    abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> Async<TextEdit list>
+    abstract member Rename: RenameParams -> Async<WorkspaceEdit>
+    abstract member ExecuteCommand: ExecuteCommandParams -> Async<unit>
+    abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> unit
 
 // TODO IAsyncLanguageServer that supports request cancellation
 
