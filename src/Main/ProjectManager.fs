@@ -10,6 +10,7 @@ open FSharp.Data.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open ProjectParser
+open Log
 
 type private FoundProject = 
 | GoodProject of FsProj * ProjectAssets
@@ -81,21 +82,21 @@ type ProjectManager() =
         | ProjectFileError m -> Error m
         | ProjectAssetsError m -> Error m 
         | GoodProject(proj, assets) -> 
-            eprintfn "Analyzing %s" proj.file.FullName
+            log "Analyzing %s" proj.file.FullName
             let libraryDlls = findLibraryDlls assets
             let projectRefs = projectAncestors proj |> Seq.toArray
             let projectDlls = ancestorDlls projectRefs
-            eprintfn "Project %s" proj.file.FullName
-            eprintfn "  Libraries:"
+            log "Project %s" proj.file.FullName
+            log "  Libraries:"
             for f in libraryDlls do 
-                eprintfn "    %s" f.FullName
-            eprintfn "  Projects:"
+                log "    %s" f.FullName
+            log "  Projects:"
             for dll, options in projectRefs do 
                 let relativeDll = Path.GetRelativePath(options.ProjectFileName, dll)
-                eprintfn "    %s ~ %s" options.ProjectFileName relativeDll
-            eprintfn "  Sources:"
+                log "    %s ~ %s" options.ProjectFileName relativeDll
+            log "  Sources:"
             for f in proj.compileInclude do 
-                eprintfn "    %s" f.FullName
+                log "    %s" f.FullName
             let options = 
                 {
                     ExtraProjectInfo = None 

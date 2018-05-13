@@ -7,6 +7,7 @@ open System.IO
 open LSP
 open LSP.Types
 open System.Text.RegularExpressions
+open Log
 
 let private TODO() = raise (Exception "TODO")
 
@@ -45,7 +46,7 @@ let private hasNoLocation (err: FSharpErrorInfo): bool =
 let private alreadyLogged = System.Collections.Generic.HashSet<string>()
 let private logOnce (message: string): unit = 
     if not (alreadyLogged.Contains message) then 
-        eprintfn "%s" message 
+        log "%s" message 
         alreadyLogged.Add(message) |> ignore
 
 // Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
@@ -76,7 +77,7 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
     let found: Match list = [ for m in ms do if overlaps m then yield m ]
     match found with 
     | [] -> 
-        eprintfn "No identifiers at %d in line %s" character lineContent
+        log "No identifiers at %d in line %s" character lineContent
         [] 
     | single::[] -> 
         let r = Regex(@"(\w+|``[^`]+``)")
@@ -89,7 +90,7 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
                                     yield m.Value ]
         result
     | multiple -> 
-        eprintfn "Line %s offset %d matched multiple groups %A" lineContent character multiple 
+        log "Line %s offset %d matched multiple groups %A" lineContent character multiple 
         []
 
 // Look for a method call like foo.MyMethod() before the cursor
@@ -106,10 +107,10 @@ let findMethodCallBeforeCursor (lineContent: string) (cursor: int): int option =
     else 
         let prefix = lineContent.Substring(0, found).TrimEnd()
         if Regex(@"let[ \w]+$").IsMatch(prefix) then 
-            eprintfn "No signature help in let expression %s" lineContent 
+            log "No signature help in let expression %s" lineContent 
             None 
         else if Regex(@"member[ \w\.]+$").IsMatch(prefix) then 
-            eprintfn "No signature help in member expression %s" lineContent 
+            log "No signature help in member expression %s" lineContent 
             None 
         else Some prefix.Length
 
@@ -120,7 +121,7 @@ let findEndOfIdentifierUnderCursor (lineContent: string) (cursor: int): int opti
     let found: Match list = [ for m in ms do if overlaps m then yield m ]
     match found with 
     | [] -> 
-        eprintfn "No identifier at %d in line %s" cursor lineContent
+        log "No identifier at %d in line %s" cursor lineContent
         None
     | m::_ -> 
         Some(m.Index + m.Length)
@@ -144,7 +145,7 @@ let private asHover (FSharpToolTipText tips): Hover =
                 for e in elements do 
                     yield HighlightedString(e.MainDescription, "fsharp")
             | FSharpToolTipElement.CompositionError err -> 
-                eprintfn "Tooltip error %s" err]
+                log "Tooltip error %s" err]
     {contents=convert; range=None}
 
 let private asDocumentation (FSharpToolTipText tips): string option = 
@@ -183,7 +184,7 @@ let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): Si
     let doc = match s.Description with 
                 | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription 
                 | _ -> 
-                    eprintfn "Can't render documentation %A" s.Description 
+                    log "Can't render documentation %A" s.Description 
                     None 
     let parameterName (p: FSharpMethodGroupItemParameter) = p.ParameterName
     let parameterNames = Array.map parameterName s.Parameters
@@ -264,7 +265,7 @@ let private asRange (r: Range.range): Range =
 let private declarationLocation (s: FSharpSymbol): Location option = 
     match s.DeclarationLocation with 
     | None -> 
-        eprintfn "Symbol %s has no declaration" s.FullName 
+        log "Symbol %s has no declaration" s.FullName 
         None 
     | Some l ->
         let l = s.DeclarationLocation.Value
@@ -295,11 +296,6 @@ let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethod
         if result = -1 && (activeParameter = 0 || activeParameter < methods.[i].Parameters.Length) then 
             result <- i 
     if result = -1 then None else Some result
-
-let private elapsed (from: DateTime) (until: DateTime) = 
-    let span = until - from 
-    let millis = span.TotalMilliseconds
-    Convert.ToInt32 millis
 
 type private FindFile = {
     sourcePath: string
@@ -343,7 +339,7 @@ type Server(client: ILanguageClient) =
                 let parseErrors = convertDiagnostics parseResult.Errors
                 match checkAnswer with 
                 | FSharpCheckFileAnswer.Aborted -> 
-                    eprintfn "Aborted checking %s" f.sourcePath 
+                    log "Aborted checking %s" f.sourcePath 
                     return Errors parseErrors
                 | FSharpCheckFileAnswer.Succeeded checkResult -> 
                     let checkErrors = convertDiagnostics checkResult.Errors 
@@ -364,22 +360,22 @@ type Server(client: ILanguageClient) =
             let! c = check (textDocument.uri)
             match c with 
             | Errors errors -> 
-                eprintfn "Check failed, ignored %d errors" (List.length errors)
+                log "Check failed, ignored %d errors" (List.length errors)
                 return None
             | GoodFile(parseResult, checkResult, _) -> 
                 let line = docs.LineContent(textDocument.uri, position.line)
                 match findEndOfIdentifierUnderCursor line position.character with 
                 | None -> 
-                    eprintfn "No identifier at %d in line '%s'" position.character line 
+                    log "No identifier at %d in line '%s'" position.character line 
                     return None
                 | Some endOfIdentifier -> 
-                    eprintfn "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
+                    log "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
                     let names = findNamesUnderCursor line (endOfIdentifier - 1)
                     let dotName = String.concat "." names
-                    eprintfn "Looking at symbol %s" dotName
+                    log "Looking at symbol %s" dotName
                     let! maybeSymbol = checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names)
                     if maybeSymbol.IsNone then
-                        eprintfn "%s in line '%s' is not a symbol use" dotName line
+                        log "%s in line '%s' is not a symbol use" dotName line
                     return maybeSymbol
         }
     // Rename one usage of a symbol
@@ -423,7 +419,7 @@ type Server(client: ILanguageClient) =
         member this.Shutdown(): unit = 
             ()
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit =
-            eprintfn "New configuration %s" (p.ToString())
+            log "New configuration %s" (p.ToString())
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
             docs.Open p
             lint p.textDocument.uri |> Async.RunSynchronously
@@ -438,7 +434,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
             for change in p.changes do 
                 let file = FileInfo(change.uri.AbsolutePath)
-                eprintfn "Watched file %s %O" file.FullName change.``type``
+                log "Watched file %s %O" file.FullName change.``type``
                 if file.Name.EndsWith(".fsproj") then 
                     match change.``type`` with 
                     | FileChangeType.Created ->
@@ -451,22 +447,19 @@ type Server(client: ILanguageClient) =
                     projects.UpdateAssetsJson file
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
-                eprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.AbsolutePath p.position.line p.position.character
-                let started = DateTime.Now
+                log "Autocompleting at %s(%d,%d)" p.textDocument.uri.AbsolutePath p.position.line p.position.character
                 let! c = check p.textDocument.uri
-                let typechecked = DateTime.Now
-                eprintfn "Checked in %d ms" (elapsed started typechecked)
+                log "Finished typecheck, looking for completions..."
                 match c with 
                 | Errors errors -> 
-                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    log "Check failed, ignored %d errors" (List.length errors)
                     return None
                 | GoodFile(parseResult, checkResult, _) -> 
                     let line = docs.LineContent(p.textDocument.uri, p.position.line)
                     let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
-                    eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
+                    log "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
-                    let completed = DateTime.Now
-                    eprintfn "Completed in in %d ms" (elapsed typechecked completed)
+                    log "Found %d completions" declarations.Items.Length
                     return Some (convertDeclarations declarations)
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
@@ -474,7 +467,7 @@ type Server(client: ILanguageClient) =
                 let! c = check p.textDocument.uri
                 match c with 
                 | Errors errors -> 
-                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    log "Check failed, ignored %d errors" (List.length errors)
                     return None
                 | GoodFile(parseResult, checkResult, _) -> 
                     let line = docs.LineContent(p.textDocument.uri, p.position.line)
@@ -488,22 +481,22 @@ type Server(client: ILanguageClient) =
                 let! c = check p.textDocument.uri
                 match c with 
                 | Errors errors -> 
-                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    log "Check failed, ignored %d errors" (List.length errors)
                     return None
                 | GoodFile(parseResult, checkResult, _) -> 
                     let line = docs.LineContent(p.textDocument.uri, p.position.line)
                     match findMethodCallBeforeCursor line p.position.character with 
                     | None -> 
-                        eprintfn "No method call in line %s" line 
+                        log "No method call in line %s" line 
                         return None
                     | Some endOfMethodName -> 
                         let names = findNamesUnderCursor line (endOfMethodName - 1)
-                        eprintfn "Looking for overloads of %s" (String.concat "." names)
+                        log "Looking for overloads of %s" (String.concat "." names)
                         let! overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
                         let sigs = Array.map (convertSignature overloads.MethodName) overloads.Methods |> List.ofArray
                         let activeParameter = countCommas line endOfMethodName p.position.character
                         let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
-                        eprintfn "Found %d overloads" overloads.Methods.Length
+                        log "Found %d overloads" overloads.Methods.Length
                         return Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
             }
         member this.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> = 
@@ -521,7 +514,7 @@ type Server(client: ILanguageClient) =
                 | Some s -> 
                     let openProjects = projects.OpenProjects
                     let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
-                    eprintfn "Looking for references to %s in %s" s.Symbol.FullName names
+                    log "Looking for references to %s in %s" s.Symbol.FullName names
                     let all = System.Collections.Generic.List<Location>()
                     for options in openProjects do 
                         let! check = checker.ParseAndCheckProject options
@@ -536,10 +529,10 @@ type Server(client: ILanguageClient) =
                 let! c = check (p.textDocument.uri)
                 match c with 
                 | Errors errors -> 
-                    eprintfn "Check failed, ignored %d errors" (List.length errors)
+                    log "Check failed, ignored %d errors" (List.length errors)
                     return []
                 | GoodFile(parseResult, checkResult, _) -> 
-                    eprintfn "Looking for symbols in %s" parseResult.FileName
+                    log "Looking for symbols in %s" parseResult.FileName
                     let all = allSymbols checkResult.PartialAssemblySignature.Entities
                     return all 
                         |> Seq.filter (symbolIsInFile parseResult.FileName)
@@ -551,7 +544,7 @@ type Server(client: ILanguageClient) =
                 // TODO consider just parsing all files and using GetNavigationItems
                 let openProjects = projects.OpenProjects
                 let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
-                eprintfn "Looking for symbols matching %s in %s" p.query names
+                log "Looking for symbols matching %s in %s" p.query names
                 // Read open projects until we find at least 50 symbols that match query
                 let all = System.Collections.Generic.List<SymbolInformation>()
                 for options in openProjects do 
@@ -578,7 +571,7 @@ type Server(client: ILanguageClient) =
                 | Some s -> 
                     let openProjects = projects.OpenProjects
                     let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
-                    eprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName names
+                    log "Renaming %s to %s in %s" s.Symbol.FullName p.newName names
                     let all = System.Collections.Generic.List<FSharpSymbolUse>()
                     for options in openProjects do 
                         let! check = checker.ParseAndCheckProject options
@@ -601,10 +594,10 @@ let main (argv: array<string>): int =
     let read = new BinaryReader(Console.OpenStandardInput())
     let write = new BinaryWriter(Console.OpenStandardOutput())
     let serverFactory = fun client -> Server(client) :> ILanguageServer
-    eprintfn "Listening on stdin"
+    log "Listening on stdin"
     try 
         LanguageServer.connect serverFactory read write
         0 // return an integer exit code
     with e -> 
-        eprintfn "Exception in language server %O" e
+        log "Exception in language server %O" e
         1

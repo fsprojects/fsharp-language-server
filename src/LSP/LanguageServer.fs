@@ -8,6 +8,7 @@ open System.Text
 open FSharp.Data
 open Types 
 open Json
+open Log
 
 let private jsonWriteOptions = 
     { defaultJsonWriteOptions with 
@@ -81,7 +82,7 @@ type RealClient (send: BinaryWriter) =
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
             p |> serializePublishDiagnostics |> notifyClient send "textDocument/publishDiagnostics"
         member this.RegisterCapability (p: RegisterCapability): unit = 
-            eprintfn "Register capability %A" p
+            log "Register capability %A" p
             match p with 
             | RegisterCapability.DidChangeWatchedFiles _ -> 
                 let register = {id=Guid.NewGuid().ToString(); method="workspace/didChangeWatchedFiles"; registerOptions=p}
@@ -143,10 +144,10 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
         | Cancel id ->
             let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
             if stillRunning then
-                eprintfn "Cancelling request %d" id
+                log "Cancelling request %d" id
                 pendingRequest.Cancel()
             else 
-                eprintfn "Request %d has already finished" id
+                log "Request %d has already finished" id
         | Initialized ->
             server.Initialized()
         | Shutdown ->

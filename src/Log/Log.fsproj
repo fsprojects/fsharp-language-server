@@ -1,11 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="SimpleTest.fs" />
-    <ProjectReference Include="..\Log\Log.fsproj" />
+    <Compile Include="Log.fs" />
   </ItemGroup>
 </Project>

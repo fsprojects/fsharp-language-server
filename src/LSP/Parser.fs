@@ -5,6 +5,7 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Types
 open LSP.Json
+open Log
 
 type RawMessage = {
     id: int option 
@@ -119,10 +120,10 @@ let parseNotification (method: string) (maybeBody: JsonValue option): Notificati
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
     | _, None -> 
-        eprintfn "%s is not a known notification, or it is expected to contain a body" method
+        log "%s is not a known notification, or it is expected to contain a body" method
         OtherNotification method
     | _, _ -> 
-        eprintfn "%s is not a known notification" method
+        log "%s is not a known notification" method
         OtherNotification method
 
 type InitializeParamsRaw = {

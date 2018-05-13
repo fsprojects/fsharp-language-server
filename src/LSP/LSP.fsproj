@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\FSharp.Data\FSharp.Data.fsproj" />
+    <ProjectReference Include="..\Log\Log.fsproj" />
   </ItemGroup>
 </Project>

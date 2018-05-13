@@ -8,5 +8,6 @@
         "src/**/obj/": true,
         "tests/**/bin/": true,
         "tests/**/obj/": true
-    }
+    },
+    "fsharp.trace.server": "messages"
 }
