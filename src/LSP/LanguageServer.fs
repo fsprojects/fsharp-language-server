@@ -1,13 +1,14 @@
 module LSP.LanguageServer 
 
-open System.Collections
 open System
 open System.Threading
+open System.Threading.Tasks
 open System.IO
 open System.Text
 open FSharp.Data
 open Types 
 open Json
+open JsonExtensions
 open Log
 
 let private jsonWriteOptions = 
@@ -91,7 +92,6 @@ type RealClient (send: BinaryWriter) =
 
 let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
     let server = serverFactory(RealClient(send))
-    let pendingRequests = System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource>()
     let processRequest (request: Request): Async<string option> = 
         match request with 
         | Initialize p -> 
@@ -141,13 +141,6 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
             async { return None }
     let processNotification (n: Notification) = 
         match n with 
-        | Cancel id ->
-            let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
-            if stillRunning then
-                log "Cancelling request %d" id
-                pendingRequest.Cancel()
-            else 
-                log "Request %d has already finished" id
         | Initialized ->
             server.Initialized()
         | Shutdown ->
@@ -168,21 +161,36 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
             server.DidChangeWatchedFiles p
         | OtherNotification _ ->
             ()
-    let processMessage (m: Parser.Message) = 
-        match m with 
-        | Parser.RequestMessage (id, method, json) -> 
-            let cancel = new CancellationTokenSource()
-            let task = processRequest (Parser.parseRequest method json) 
-            let finish = task |> thenMap (fun r -> 
-                match r with
-                | Some m -> respond send id m 
+    // Process messages on a separate thread
+    let pendingRequests = new System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource>()
+    let processQueue = new System.Collections.Concurrent.BlockingCollection<Parser.Message>(10)
+    Thread(fun () -> 
+        while true do 
+            match processQueue.Take() with 
+            | Parser.NotificationMessage (method, json) -> 
+                let n = Parser.parseNotification method json
+                processNotification n
+            | Parser.RequestMessage (id, method, json) -> 
+                let task = processRequest (Parser.parseRequest method json) 
+                let cancel = new CancellationTokenSource()
+                pendingRequests.[id] <- cancel
+                match Async.RunSynchronously(task, 0, cancel.Token) with 
+                | Some result -> respond send id result
                 | None -> ()
-                pendingRequests.TryRemove(id) |> ignore
-            )
-            Async.Start(finish, cancel.Token)
-            pendingRequests.[id] <- cancel
-        | Parser.NotificationMessage (method, json) -> 
-            processNotification (Parser.parseNotification method json)
+                pendingRequests.TryRemove id |> ignore
+    ).Start()
+    // Read all messages on the main thread
     for m in readMessages receive do 
-        processMessage m
-    
+        // Process cancellations immediately
+        match m with 
+        | Parser.NotificationMessage ("$/cancelRequest", Some json) -> 
+            let id = json?id.AsInteger()
+            let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
+            if stillRunning then
+                log "Cancelling request %d" id
+                pendingRequest.Cancel()
+            else 
+                log "Request %d has already finished" id
+        // Process other requests on worker thread
+        | _ -> processQueue.Add m
+        

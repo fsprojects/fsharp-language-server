@@ -110,7 +110,6 @@ type DidChangeWatchedFilesParams = {
 }
     
 type Notification = 
-| Cancel of id: int 
 | Initialized
 | Shutdown 
 | DidChangeConfiguration of DidChangeConfigurationParams
