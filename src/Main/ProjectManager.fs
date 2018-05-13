@@ -54,9 +54,6 @@ type ProjectManager() =
             list.[0] 
         else
             Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; name|]
-    let printList (files: FileInfo list) (describe: string) =
-        for f in files do 
-            eprintfn "    %s" f.FullName
     let ancestorDlls (refs: (string * FSharpProjectOptions)[]): string list = 
         let result = HashSet<string>()
         let rec traverse (refs: (string * FSharpProjectOptions)[]) = 
@@ -65,13 +62,20 @@ type ProjectManager() =
                 traverse options.ReferencedProjects 
         traverse refs
         List.ofSeq result
-    let rec projectReferences (proj: FsProj): (string * FSharpProjectOptions)[] =   
+    let rec projectAncestors (proj: FsProj): (string * FSharpProjectOptions) seq =
         // For each successfully analyzed parent project, yield (dll, options)
-        [| for p in proj.projectReferenceInclude do
-                ensureAnalyzed p
+        seq {
+            for p in proj.projectReferenceInclude do 
+                ensureAnalyzed p 
+                match parsedByProjectFile.[p.FullName] with 
+                | GoodProject(proj, _) -> 
+                    yield! projectAncestors proj 
+                | _ -> ()
                 match analyzedByProjectFile.[p.FullName] with 
-                | Ok options -> yield projectDll p, options 
-                | _ -> () |]
+                | Ok options -> 
+                    yield projectDll p, options
+                | _ -> ()
+        }
     and analyzeProject (found: FoundProject): Result<FSharpProjectOptions, string> = 
         match found with 
         | ProjectFileError m -> Error m
@@ -79,15 +83,19 @@ type ProjectManager() =
         | GoodProject(proj, assets) -> 
             eprintfn "Analyzing %s" proj.file.FullName
             let libraryDlls = findLibraryDlls assets
-            let projectRefs = projectReferences proj 
+            let projectRefs = projectAncestors proj |> Seq.toArray
             let projectDlls = ancestorDlls projectRefs
             eprintfn "Project %s" proj.file.FullName
             eprintfn "  Libraries:"
-            printList libraryDlls "references"
+            for f in libraryDlls do 
+                eprintfn "    %s" f.FullName
             eprintfn "  Projects:"
-            printList proj.projectReferenceInclude "projects"
+            for dll, options in projectRefs do 
+                let relativeDll = Path.GetRelativePath(options.ProjectFileName, dll)
+                eprintfn "    %s ~ %s" options.ProjectFileName relativeDll
             eprintfn "  Sources:"
-            printList proj.compileInclude "sources"
+            for f in proj.compileInclude do 
+                eprintfn "    %s" f.FullName
             let options = 
                 {
                     ExtraProjectInfo = None 
