@@ -296,6 +296,11 @@ let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethod
             result <- i 
     if result = -1 then None else Some result
 
+let private elapsed (from: DateTime) (until: DateTime) = 
+    let span = until - from 
+    let millis = span.TotalMilliseconds
+    Convert.ToInt32 millis
+
 type private FindFile = {
     sourcePath: string
     sourceVersion: int
@@ -331,7 +336,6 @@ type Server(client: ILanguageClient) =
     // Find a file and check it
     let check (uri: Uri): Async<CheckFile> = 
         async {
-            eprintfn "Check %O" uri
             match find uri with 
             | Error m -> return Errors [errorAtTop m]
             | Ok f -> 
@@ -448,7 +452,11 @@ type Server(client: ILanguageClient) =
                     projects.UpdateAssetsJson file
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
+                eprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.AbsolutePath p.position.line p.position.character
+                let started = DateTime.Now
                 let! c = check p.textDocument.uri
+                let typechecked = DateTime.Now
+                eprintfn "Checked in %d ms" (elapsed started typechecked)
                 match c with 
                 | Errors errors -> 
                     eprintfn "Check failed, ignored %d errors" (List.length errors)
@@ -458,6 +466,8 @@ type Server(client: ILanguageClient) =
                     let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                     eprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
+                    let completed = DateTime.Now
+                    eprintfn "Completed in in %d ms" (elapsed typechecked completed)
                     return Some (convertDeclarations declarations)
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
