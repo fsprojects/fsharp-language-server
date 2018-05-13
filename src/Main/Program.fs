@@ -386,12 +386,11 @@ type Server(client: ILanguageClient) =
     let renameTo (newName: string) (file: string, usages: FSharpSymbolUse seq): TextDocumentEdit = 
         let uri = Uri("file://" + file)
         let version = docs.GetVersion(uri) |> Option.defaultValue 0
-        let edits = seq {
+        let edits = [
             for u in usages do 
                 let range = asRange u.RangeAlternate 
-                yield {range=range; newText=newName}
-        } 
-        {textDocument={uri=uri; version=version}; edits=List.ofSeq edits}
+                yield {range=range; newText=newName} ]
+        {textDocument={uri=uri; version=version}; edits=edits}
 
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams) =
