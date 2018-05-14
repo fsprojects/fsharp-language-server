@@ -21,7 +21,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\LSP\LSP.fsproj" />
     <ProjectReference Include="..\..\src\SimpleTest\SimpleTest.fsproj" />
-    <ProjectReference Include="..\..\src\Log\Log.fsproj" />
   </ItemGroup>
 
 </Project>

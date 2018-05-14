@@ -17,6 +17,5 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
-    <ProjectReference Include="..\Log\Log.fsproj" />
   </ItemGroup>
 </Project>

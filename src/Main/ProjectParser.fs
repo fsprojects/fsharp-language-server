@@ -11,7 +11,6 @@ open LSP.Json.JsonExtensions
 open LSP.Json
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
-open Log
 
 module ProjectParser = 
     type Dependency = {
@@ -60,7 +59,7 @@ module ProjectParser =
     let private alreadyLogged = System.Collections.Generic.HashSet<string>()
     let private logOnce (message: string): unit = 
         if not (alreadyLogged.Contains message) then 
-            log "%s" message 
+            eprintfn "%s" message 
             alreadyLogged.Add(message) |> ignore
     let private template = Regex(@"\$\((\w+)\)")
     let private substituteVariables (directory: DirectoryInfo) (fsproj: string): string = 
@@ -79,9 +78,9 @@ module ProjectParser =
             template.Replace(text, substituteMatch)
         variables.["MSBuildProjectDirectory"] <- directory.FullName
         for propGroup in doc.DocumentElement.SelectNodes "//PropertyGroup" do 
-            log "Found %O" propGroup
+            eprintfn "Found %O" propGroup
             for prop in propGroup.ChildNodes do 
-                log "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
+                eprintfn "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
                 variables.[prop.Name] <- substitute(prop.InnerText)
         substitute fsproj
     let parseFsProj (fsproj: FileInfo): Result<FsProj, string> = 
@@ -157,7 +156,7 @@ module ProjectParser =
             if assets.libraries.ContainsKey dependency then 
                 let library = assets.libraries.[dependency]
                 match library.path with 
-                | None -> log "Skipping %s because no path in %A" dependency library
+                | None -> eprintfn "Skipping %s because no path in %A" dependency library
                 | Some parentPath -> 
                     if List.contains dll library.files then 
                         yield Path.Combine(parentPath, dll)

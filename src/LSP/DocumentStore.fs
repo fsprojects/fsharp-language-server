@@ -5,7 +5,6 @@ open System.IO
 open System.Collections.Generic
 open System.Text
 open Types 
-open Log
 
 type private Version = {
     text: StringBuilder 
@@ -55,7 +54,7 @@ type DocumentStore() =
         existing.text.Append(text) |> ignore
         existing.version <- doc.version
     let notFound (uri: Uri) (): string = 
-        log "No such file %O" uri 
+        eprintfn "No such file %O" uri 
         ""
 
     member this.Open(doc: DidOpenTextDocumentParams): unit = 
@@ -66,7 +65,7 @@ type DocumentStore() =
     member this.Change(doc: DidChangeTextDocumentParams): unit = 
         let existing = activeDocuments.[doc.textDocument.uri]
         if doc.textDocument.version <= existing.version then 
-            log
+            eprintfn
                 "Change %d to doc %s is earlier than existing version %d" 
                 doc.textDocument.version 
                 (doc.textDocument.uri.ToString())
@@ -100,7 +99,7 @@ type DocumentStore() =
             reader.ReadLine() |> ignore
             line <- line + 1
         if reader.Peek() = -1 then 
-            log "Reached EOF before line %d in file %O" targetLine uri
+            eprintfn "Reached EOF before line %d in file %O" targetLine uri
             "" 
         else 
             reader.ReadLine()

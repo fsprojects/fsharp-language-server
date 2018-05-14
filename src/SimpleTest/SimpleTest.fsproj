@@ -6,6 +6,5 @@
 
   <ItemGroup>
     <Compile Include="SimpleTest.fs" />
-    <ProjectReference Include="..\Log\Log.fsproj" />
   </ItemGroup>
 </Project>

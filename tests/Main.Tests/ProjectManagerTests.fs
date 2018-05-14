@@ -6,7 +6,6 @@ open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open SimpleTest
-open Log
 
 let private fileHasName (name: string) (f: FileInfo) = f.Name = name
 
@@ -27,7 +26,7 @@ let ``test project-file-not-found`` (t: TestContext) =
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
     let project = projects.FindProjectOptions file
     match project with 
-    | Ok f -> Fail(log "Shouldn't have found project file %s" f.ProjectFileName)
+    | Ok f -> Fail(eprintfn "Shouldn't have found project file %s" f.ProjectFileName)
     | Error m -> ()
 
 let ``test bad project file`` (t: TestContext) = 

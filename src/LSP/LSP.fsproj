@@ -14,6 +14,5 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LSP.Json\LSP.Json.fsproj" />
-    <ProjectReference Include="..\Log\Log.fsproj" />
   </ItemGroup>
 </Project>
