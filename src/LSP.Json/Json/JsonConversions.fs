@@ -2,10 +2,10 @@
 // Helper operations for converting converting json values to other types
 // --------------------------------------------------------------------------------------
 
-namespace FSharp.Data.Runtime
+namespace LSP.Json.Runtime
 
 open System
-open FSharp.Data
+open LSP.Json
 
 /// Conversions from JsonValue to string/int/int64/decimal/float/boolean/datetime/guid options
 type JsonConversions =

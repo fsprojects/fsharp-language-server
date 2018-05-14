@@ -1,14 +1,14 @@
 ﻿/// Extension methods that can be used to work with JsonValue in a less safe, but more convenient way.
 /// This module also provides the dynamic operator.
 
-namespace FSharp.Data
+namespace LSP.Json
 
 open System
 open System.Globalization
 open System.Runtime.CompilerServices
 open System.Runtime.InteropServices
-open FSharp.Data
-open FSharp.Data.Runtime
+open LSP.Json
+open LSP.Json.Runtime
 open Microsoft.FSharp.Core
 
 [<Extension>]

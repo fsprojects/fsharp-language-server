@@ -5,7 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open System.IO
 open System.Text
-open FSharp.Data
+open LSP.Json
 open Types 
 open Json
 open JsonExtensions
@@ -54,7 +54,7 @@ let private writeClient (client: BinaryWriter) (messageText: string) =
     client.Write headerBytes
     client.Write messageBytes
 
-let private respond (client: BinaryWriter) (requestId: int) (jsonText: string) = 
+let respond (client: BinaryWriter) (requestId: int) (jsonText: string) = 
     let messageText = sprintf """{"id":%d,"result":%s}""" requestId jsonText
     writeClient client messageText
 
@@ -196,4 +196,6 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
                 log "Request %d has already finished" id
         // Process other requests on worker thread
         | _ -> processQueue.Add m
-        
+    while processQueue.Count > 0 do 
+        log "Waiting for %d pending requests to be processed" processQueue.Count
+        Thread.Sleep 500

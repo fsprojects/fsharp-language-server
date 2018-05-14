@@ -4,7 +4,7 @@ open Types
 open System
 open Parser
 open SimpleTest
-open FSharp.Data
+open LSP.Json
 
 let ``test parse a RequestMessage`` (t: TestContext) = 
     let json = """{
@@ -45,14 +45,6 @@ let ``test parse a NotificationMessage with params`` (t: TestContext) =
     }"""
     let found = parseMessage json
     let expected = NotificationMessage ("helloNotification", Some (JsonValue.Parse """{"hello":"world"}"""))
-    if found <> expected then Fail(found)
-
-let ``test parse a Cancel notification`` (t: TestContext) = 
-    let json = JsonValue.Parse """{
-        "id": 1
-    }""" 
-    let found = parseNotification "cancel" (Some json) 
-    let expected = Cancel 1
     if found <> expected then Fail(found)
 
 let ``test parse an Initialized notification`` (t: TestContext) = 

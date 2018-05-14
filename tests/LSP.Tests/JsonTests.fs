@@ -2,7 +2,7 @@ module LSP.JsonTests
 
 open System
 open System.Text.RegularExpressions
-open FSharp.Data
+open LSP.Json
 open Json
 open SimpleTest
 

@@ -15,6 +15,7 @@
 - Re-lint when a parent file is edited
 - Autocompleting in strings
 - Rename symbol renames whole Path.To.symbol
+- Process notifications asynchronously on same thread
 
 # Features
 - Docstrings on autocomplete and hover

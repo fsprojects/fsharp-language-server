@@ -6,8 +6,8 @@ open System.Collections.Generic
 open System.Net
 open System.Xml
 open System.Text.RegularExpressions
-open FSharp.Data
-open FSharp.Data.JsonExtensions
+open LSP.Json
+open LSP.Json.JsonExtensions
 open LSP.Json
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices

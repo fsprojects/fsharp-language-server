@@ -7,7 +7,7 @@
 // A simple F# portable parser for JSON data
 // --------------------------------------------------------------------------------------
 
-namespace FSharp.Data
+namespace LSP.Json
 
 open System
 open System.IO
@@ -15,7 +15,7 @@ open System.ComponentModel
 open System.Globalization
 open System.Runtime.InteropServices
 open System.Text
-open FSharp.Data
+open LSP.Json
 
 /// Specifies the formatting behaviour of JSON values
 [<RequireQualifiedAccess>]

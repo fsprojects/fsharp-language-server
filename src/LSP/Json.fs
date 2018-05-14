@@ -5,7 +5,7 @@ open System.Reflection
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Reflection.FSharpReflectionExtensions
 open System.Text.RegularExpressions
-open FSharp.Data
+open LSP.Json
 
 let private escapeChars = Regex("[\n\r\"]", RegexOptions.Compiled)
 let private replaceChars = 

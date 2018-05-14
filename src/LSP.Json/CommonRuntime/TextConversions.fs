@@ -2,7 +2,7 @@
 // Helper operations for converting converting string values to other types
 // --------------------------------------------------------------------------------------
 
-namespace FSharp.Data
+namespace LSP.Json
 
 open System
 open System.Globalization

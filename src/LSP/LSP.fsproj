@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FSharp.Data\FSharp.Data.fsproj" />
+    <ProjectReference Include="..\LSP.Json\LSP.Json.fsproj" />
     <ProjectReference Include="..\Log\Log.fsproj" />
   </ItemGroup>
 </Project>

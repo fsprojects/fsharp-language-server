@@ -13,7 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{520503FB
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "LSP.Tests", "tests\LSP.Tests\LSP.Tests.fsproj", "{D9DA28FD-0027-4B97-8112-C89A20B13DF0}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharp.Data", "src\FSharp.Data\FSharp.Data.fsproj", "{72DA2A69-2854-4DD5-A6EA-060F6709A605}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "LSP.Json", "src\LSP.Json\LSP.Json.fsproj", "{72DA2A69-2854-4DD5-A6EA-060F6709A605}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

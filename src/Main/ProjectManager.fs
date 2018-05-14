@@ -5,8 +5,8 @@ open System.IO
 open System.Collections.Generic
 open System.Net
 open System.Xml
-open FSharp.Data
-open FSharp.Data.JsonExtensions
+open LSP.Json
+open LSP.Json.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open ProjectParser

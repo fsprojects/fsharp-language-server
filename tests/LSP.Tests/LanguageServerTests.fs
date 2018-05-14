@@ -4,7 +4,7 @@ open System
 open System.IO 
 open System.Text
 open SimpleTest
-open FSharp.Data
+open LSP.Json
 open LSP.Types
 
 let binaryWriter () = 
@@ -41,37 +41,39 @@ let TODO() = raise (Exception "TODO")
 
 type MockServer() = 
     interface ILanguageServer with 
-        member this.Initialize(p: InitializeParams): InitializeResult = 
-            { capabilities = defaultServerCapabilities }
+        member this.Initialize(p: InitializeParams): Async<InitializeResult> = 
+            async {
+                return { capabilities = defaultServerCapabilities }
+            }
         member this.Initialized(): unit = TODO() 
         member this.Shutdown(): unit = TODO() 
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit  = TODO()
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit  = TODO()
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit  = TODO()
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
-        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): TextEdit list = TODO()
+        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = TODO()
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = TODO()
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = TODO()
-        member this.Completion(p: TextDocumentPositionParams): CompletionList option = TODO()
-        member this.Hover(p: TextDocumentPositionParams): Hover option = TODO()
-        member this.ResolveCompletionItem(p: CompletionItem): CompletionItem = TODO()
-        member this.SignatureHelp(p: TextDocumentPositionParams): SignatureHelp option = TODO()
-        member this.GotoDefinition(p: TextDocumentPositionParams): Location list = TODO()
-        member this.FindReferences(p: ReferenceParams): Location list = TODO()
-        member this.DocumentHighlight(p: TextDocumentPositionParams): DocumentHighlight list = TODO()
-        member this.DocumentSymbols(p: DocumentSymbolParams): SymbolInformation list = TODO()
-        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): SymbolInformation list = TODO()
-        member this.CodeActions(p: CodeActionParams): Command list = TODO()
-        member this.CodeLens(p: CodeLensParams): List<CodeLens> = TODO()
-        member this.ResolveCodeLens(p: CodeLens): CodeLens = TODO()
-        member this.DocumentLink(p: DocumentLinkParams): DocumentLink list = TODO()
-        member this.ResolveDocumentLink(p: DocumentLink): DocumentLink = TODO()
-        member this.DocumentFormatting(p: DocumentFormattingParams): TextEdit list = TODO()
-        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): TextEdit list = TODO()
-        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): TextEdit list = TODO()
-        member this.Rename(p: RenameParams): WorkspaceEdit = TODO()
-        member this.ExecuteCommand(p: ExecuteCommandParams): unit = TODO()
+        member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> = TODO()
+        member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = TODO()
+        member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = TODO()
+        member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = TODO()
+        member this.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> = TODO()
+        member this.FindReferences(p: ReferenceParams): Async<Location list> = TODO()
+        member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
+        member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> = TODO()
+        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = TODO()
+        member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
+        member this.CodeLens(p: CodeLensParams): Async<CodeLens list> = TODO()
+        member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = TODO()
+        member this.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
+        member this.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
+        member this.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = TODO()
+        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = TODO()
+        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
+        member this.Rename(p: RenameParams): Async<WorkspaceEdit> = TODO()
+        member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): unit = TODO()
 
 let messageStream (messages: string list): BinaryReader = 

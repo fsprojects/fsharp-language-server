@@ -1,7 +1,7 @@
 module LSP.Types 
 
 open System
-open FSharp.Data
+open LSP.Json
 
 type DidChangeConfigurationParams = {
     settings: JsonValue
