@@ -407,37 +407,49 @@ type Server(client: ILanguageClient) =
                         }
                 }
             }
-        member this.Initialized(): unit = 
-            ()
-        member this.Shutdown(): unit = 
-            ()
-        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit =
-            log "New configuration %s" (p.ToString())
-        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
-            docs.Open p
-            lint p.textDocument.uri |> Async.RunSynchronously
-        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit = 
-            docs.Change p
-        member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
+        member this.Initialized(): Async<unit> = 
+            async { () }
+        member this.Shutdown(): Async<unit> = 
+            async { () }
+        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
+            async {
+                log "New configuration %s" (p.ToString())
+            }
+        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
+            async {
+                docs.Open p
+                return! lint p.textDocument.uri
+            }
+        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
+            async {
+                docs.Change p
+            }
+        member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
-        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
-            lint p.textDocument.uri |> Async.RunSynchronously
-        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
-            docs.Close p
-        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = 
-            for change in p.changes do 
-                let file = FileInfo(change.uri.AbsolutePath)
-                log "Watched file %s %O" file.FullName change.``type``
-                if file.Name.EndsWith(".fsproj") then 
-                    match change.``type`` with 
-                    | FileChangeType.Created ->
-                        projects.NewProjectFile file
-                    | FileChangeType.Changed ->
-                        projects.UpdateProjectFile file
-                    | FileChangeType.Deleted ->
-                        projects.DeleteProjectFile file
-                elif file.Name = "project.assets.json" then 
-                    projects.UpdateAssetsJson file
+        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
+            async {
+                return! lint p.textDocument.uri
+            }
+        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
+            async {
+                docs.Close p
+            }
+        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
+            async {
+                for change in p.changes do 
+                    let file = FileInfo(change.uri.AbsolutePath)
+                    log "Watched file %s %O" file.FullName change.``type``
+                    if file.Name.EndsWith(".fsproj") then 
+                        match change.``type`` with 
+                        | FileChangeType.Created ->
+                            projects.NewProjectFile file
+                        | FileChangeType.Changed ->
+                            projects.UpdateProjectFile file
+                        | FileChangeType.Deleted ->
+                            projects.DeleteProjectFile file
+                    elif file.Name = "project.assets.json" then 
+                        projects.UpdateAssetsJson file
+            }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
                 log "Autocompleting at %s(%d,%d)" p.textDocument.uri.AbsolutePath p.position.line p.position.character
@@ -581,10 +593,12 @@ type Server(client: ILanguageClient) =
                     return {documentChanges=edits}
             }
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
-        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): unit = 
-            for root in p.event.added do 
-                projects.AddWorkspaceRoot(DirectoryInfo(root.uri.AbsolutePath))
-            // TODO removed
+        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
+            async {
+                for root in p.event.added do 
+                    projects.AddWorkspaceRoot(DirectoryInfo(root.uri.AbsolutePath))
+                // TODO removed
+            }
 
 [<EntryPoint>]
 let main (argv: array<string>): int =

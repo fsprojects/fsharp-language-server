@@ -629,16 +629,16 @@ type SymbolInformation = {
 
 type ILanguageServer = 
     abstract member Initialize: InitializeParams -> Async<InitializeResult>
-    abstract member Initialized: unit -> unit 
-    abstract member Shutdown: unit -> unit 
-    abstract member DidChangeConfiguration: DidChangeConfigurationParams -> unit 
-    abstract member DidOpenTextDocument: DidOpenTextDocumentParams -> unit 
-    abstract member DidChangeTextDocument: DidChangeTextDocumentParams -> unit 
-    abstract member WillSaveTextDocument: WillSaveTextDocumentParams -> unit
+    abstract member Initialized: unit -> Async<unit> 
+    abstract member Shutdown: unit -> Async<unit> 
+    abstract member DidChangeConfiguration: DidChangeConfigurationParams -> Async<unit> 
+    abstract member DidOpenTextDocument: DidOpenTextDocumentParams -> Async<unit> 
+    abstract member DidChangeTextDocument: DidChangeTextDocumentParams -> Async<unit> 
+    abstract member WillSaveTextDocument: WillSaveTextDocumentParams -> Async<unit>
     abstract member WillSaveWaitUntilTextDocument: WillSaveTextDocumentParams -> Async<TextEdit list>
-    abstract member DidSaveTextDocument: DidSaveTextDocumentParams -> unit
-    abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> unit
-    abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> unit
+    abstract member DidSaveTextDocument: DidSaveTextDocumentParams -> Async<unit>
+    abstract member DidCloseTextDocument: DidCloseTextDocumentParams -> Async<unit>
+    abstract member DidChangeWatchedFiles: DidChangeWatchedFilesParams -> Async<unit>
     abstract member Completion: TextDocumentPositionParams -> Async<CompletionList option>
     abstract member Hover: TextDocumentPositionParams -> Async<Hover option>
     abstract member ResolveCompletionItem: CompletionItem -> Async<CompletionItem>
@@ -658,7 +658,7 @@ type ILanguageServer =
     abstract member DocumentOnTypeFormatting: DocumentOnTypeFormattingParams -> Async<TextEdit list>
     abstract member Rename: RenameParams -> Async<WorkspaceEdit>
     abstract member ExecuteCommand: ExecuteCommandParams -> Async<unit>
-    abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> unit
+    abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> Async<unit>
 
 // TODO IAsyncLanguageServer that supports request cancellation
 

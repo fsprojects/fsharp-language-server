@@ -160,7 +160,7 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
         | DidChangeWatchedFiles p -> 
             server.DidChangeWatchedFiles p
         | OtherNotification _ ->
-            ()
+            async { () }
     // Process messages on a separate thread
     let pendingRequests = new System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource>()
     let processQueue = new System.Collections.Concurrent.BlockingCollection<Parser.Message>(10)
@@ -169,7 +169,11 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
             match processQueue.Take() with 
             | Parser.NotificationMessage (method, json) -> 
                 let n = Parser.parseNotification method json
-                processNotification n
+                let task = processNotification n
+                try 
+                    Async.RunSynchronously(task)
+                with :? OperationCanceledException -> 
+                    log "Notification %s was cancelled" method
             | Parser.RequestMessage (id, method, json) -> 
                 let task = processRequest (Parser.parseRequest method json) 
                 let cancel = new CancellationTokenSource()

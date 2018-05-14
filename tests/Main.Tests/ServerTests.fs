@@ -53,7 +53,7 @@ let createServerAndReadFile (name: string): MockClient * ILanguageServer =
     server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> Async.RunSynchronously |> ignore
     let (file, fileText) = readFile name
     let openParams: DidOpenTextDocumentParams = {textDocument={uri=Uri(file); languageId="fsharp"; version=0; text=fileText}}
-    server.DidOpenTextDocument(openParams)
+    server.DidOpenTextDocument(openParams) |> Async.RunSynchronously
     (client, server)
 
 let ``test report a type error when a file is opened`` (t: TestContext) = 
@@ -103,8 +103,8 @@ let position (file: string) (line: int) (character: int): TextDocumentPositionPa
 let ``test report a type error when a file is saved`` (t: TestContext) = 
     let (client, server) = createServerAndReadFile "CreateTypeError.fs"
     client.Diagnostics.Clear()
-    server.DidChangeTextDocument(edit "CreateTypeError.fs" 4 18 "1" "\"1\"")
-    server.DidSaveTextDocument(save "CreateTypeError.fs")
+    server.DidChangeTextDocument(edit "CreateTypeError.fs" 4 18 "1" "\"1\"") |> Async.RunSynchronously
+    server.DidSaveTextDocument(save "CreateTypeError.fs") |> Async.RunSynchronously
     let messages = diagnosticMessages(client)
     if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Fail(sprintf "No type error in %A" messages)
 

@@ -45,16 +45,16 @@ type MockServer() =
             async {
                 return { capabilities = defaultServerCapabilities }
             }
-        member this.Initialized(): unit = TODO() 
-        member this.Shutdown(): unit = TODO() 
-        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit  = TODO()
-        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit  = TODO()
-        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit  = TODO()
-        member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = TODO()
+        member this.Initialized(): Async<unit> = TODO() 
+        member this.Shutdown(): Async<unit> = TODO() 
+        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit>  = TODO()
+        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit>  = TODO()
+        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit>  = TODO()
+        member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
-        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = TODO()
-        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = TODO()
-        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = TODO()
+        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = TODO()
+        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = TODO()
+        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = TODO()
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> = TODO()
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = TODO()
         member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = TODO()
@@ -74,7 +74,7 @@ type MockServer() =
         member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
         member this.Rename(p: RenameParams): Async<WorkspaceEdit> = TODO()
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
-        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): unit = TODO()
+        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = TODO()
 
 let messageStream (messages: string list): BinaryReader = 
     let stdin = new MemoryStream()
