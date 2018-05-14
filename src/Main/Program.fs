@@ -8,6 +8,9 @@ open LSP
 open LSP.Types
 open System.Text.RegularExpressions
 open Log
+open FSharp.Data
+open FSharp.Data.JsonExtensions
+open Json
 
 let private TODO() = raise (Exception "TODO")
 
@@ -161,13 +164,13 @@ let private convertCompletionItemKind (k: Microsoft.FSharp.Compiler.SourceCodeSe
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Event -> None
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Argument -> Some CompletionItemKind.Variable
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Other -> None
-
+    
 let private convertDeclaration (i: FSharpDeclarationListItem): CompletionItem = 
     { defaultCompletionItem with 
         label = i.Name 
         kind = convertCompletionItemKind i.Kind
         detail = Some i.FullName
-        documentation = asDocumentation i.DescriptionText
+        data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
     }
 
 let private convertDeclarations (ds: FSharpDeclarationListInfo): CompletionList = 
@@ -388,6 +391,20 @@ type Server(client: ILanguageClient) =
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
+    // Remember the last completion list for ResolveCompletionItem
+    let mutable lastCompletion: FSharpDeclarationListInfo option = None 
+
+    // Add documentation to a completion item
+    // Generating documentation is an expensive step, so we want to defer it until the user is actually looking at it
+    let resolveCompletion (i: CompletionItem): CompletionItem = 
+        let mutable result = i 
+        if lastCompletion.IsSome then 
+            for candidate in lastCompletion.Value.Items do 
+                if candidate.FullName = i.data?FullName.AsString() then 
+                    log "Resolve description for %s" candidate.FullName
+                    result <- {i with documentation=asDocumentation candidate.DescriptionText}
+        result
+
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams) =
             async {
@@ -398,7 +415,7 @@ type Server(client: ILanguageClient) =
                     capabilities = 
                         { defaultServerCapabilities with 
                             hoverProvider = true
-                            completionProvider = Some({resolveProvider=false; triggerCharacters=['.']})
+                            completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
                             signatureHelpProvider = Some({triggerCharacters=['('; ',']})
                             documentSymbolProvider = true
                             workspaceSymbolProvider = true
@@ -459,6 +476,7 @@ type Server(client: ILanguageClient) =
                     let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                     log "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
+                    lastCompletion <- Some declarations 
                     log "Found %d completions" declarations.Items.Length
                     return Some (convertDeclarations declarations)
             }
@@ -475,7 +493,10 @@ type Server(client: ILanguageClient) =
                     let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier)
                     return Some(asHover tips)
             }
-        member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = TODO()
+        member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = 
+            async {
+                return resolveCompletion p
+            }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
                 let! c = check p.textDocument.uri
