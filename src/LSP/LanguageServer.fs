@@ -206,6 +206,6 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
             let cancel = new CancellationTokenSource()
             processQueue.Add(ProcessRequest(id, task, cancel))
             pendingRequests.[id] <- cancel
-    while processQueue.Count > 0 do 
-        dprintfn "Waiting for %d pending requests to be processed" processQueue.Count
+    while pendingRequests.Count > 0 do 
+        dprintfn "Waiting for %d pending requests to be processed" pendingRequests.Count
         Thread.Sleep 500
