@@ -11,29 +11,26 @@ open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open ProjectParser
 
-type private FoundProject = 
-| GoodProject of FsProj * ProjectAssets
-| ProjectFileError of string 
-| ProjectAssetsError of string
-
 // Maintains caches of parsed versions of .fsproj files
 type ProjectManager() = 
     // Index mapping .fs source files to .fsproj project files that reference them
     let projectFileBySourceFile = new Dictionary<String, FileInfo>()
-    // Once we find an .fsproj, parse it and the corresponding project.assets.json
-    let parsedByProjectFile = new Dictionary<String, FoundProject>()
     // Parse ?.fsproj and project.assets.json, but dont trace the dependencies yet
-    let ensureParsed (fsproj: FileInfo) = 
-        if not(parsedByProjectFile.ContainsKey fsproj.FullName) then
-            let assetsFile = FileInfo(Path.Combine [|fsproj.Directory.FullName; "obj"; "project.assets.json"|])
-            let found, sources = 
-                match parseFsProj fsproj, parseAssets assetsFile with 
-                | Error e, _ -> ProjectFileError e, []
-                | Ok proj, Error e -> ProjectAssetsError e, proj.compileInclude
-                | Ok proj, Ok assets -> GoodProject(proj, assets), proj.compileInclude
-            for f in sources do
+    let parseProject (fsproj: FileInfo) = 
+        let assetsFile = FileInfo(Path.Combine [|fsproj.Directory.FullName; "obj"; "project.assets.json"|])
+        let proj = parseFsProj fsproj
+        let assets = parseAssets assetsFile
+        // Register all sources as children of this .fsproj file
+        match proj with 
+        | Ok p -> 
+            for f in p.compileInclude do
                 projectFileBySourceFile.[f.FullName] <- fsproj
-            parsedByProjectFile.[fsproj.FullName] <- found 
+        | _ -> ()
+        // If both .fsproj and project.assets.json are Ok, return result
+        match proj, assets with 
+        | Error e, _ -> Error e
+        | _, Error e -> Error e
+        | Ok proj, Ok assets -> Ok(proj, assets)
     // If ?.fsproj and project.assets.json can both be found and parsed, combine them into FSharpProjectOptions
     let analyzedByProjectFile = new Dictionary<String, Result<FSharpProjectOptions, string>>()
     // Find .dll corresponding to an .fsproj file 
@@ -62,74 +59,76 @@ type ProjectManager() =
                 traverse options.ReferencedProjects 
         traverse refs
         List.ofSeq result
-    let rec projectAncestors (proj: FsProj): (string * FSharpProjectOptions) seq =
-        // For each successfully analyzed parent project, yield (dll, options)
-        seq {
-            for p in proj.projectReferenceInclude do 
-                ensureAnalyzed p 
-                match parsedByProjectFile.[p.FullName] with 
-                | GoodProject(proj, _) -> 
-                    yield! projectAncestors proj 
-                | _ -> ()
-                match analyzedByProjectFile.[p.FullName] with 
+    // For each successfully analyzed parent project, yield (dll, options)
+    let rec projectReferences (proj: FsProj): (string * FSharpProjectOptions) list =
+        let result = Dictionary<string, string * FSharpProjectOptions>()
+        for parent in proj.projectReferenceInclude do 
+            let found, maybeOptions = analyzedByProjectFile.TryGetValue(parent.FullName)
+            if found then 
+                match maybeOptions with 
+                | Error e -> 
+                    eprintfn "Project %s parent %s was excluded because analysis failed with error %s" proj.file.Name parent.Name e
                 | Ok options -> 
-                    yield projectDll p, options
-                | _ -> ()
-        }
-    and analyzeProject (found: FoundProject): Result<FSharpProjectOptions, string> = 
-        match found with 
-        | ProjectFileError m -> Error m
-        | ProjectAssetsError m -> Error m 
-        | GoodProject(proj, assets) -> 
-            eprintfn "Analyzing %s" proj.file.FullName
-            let libraryDlls = findLibraryDlls assets
-            let projectRefs = projectAncestors proj |> Seq.toArray
-            let projectDlls = ancestorDlls projectRefs
-            eprintfn "Project %s" proj.file.FullName
-            eprintfn "  Libraries:"
-            for f in libraryDlls do 
-                eprintfn "    %s" f.FullName
-            eprintfn "  Projects:"
-            for dll, options in projectRefs do 
-                let relativeDll = Path.GetRelativePath(options.ProjectFileName, dll)
-                eprintfn "    %s ~ %s" options.ProjectFileName relativeDll
-            eprintfn "  Sources:"
-            for f in proj.compileInclude do 
-                eprintfn "    %s" f.FullName
-            let options = 
-                {
-                    ExtraProjectInfo = None 
-                    IsIncompleteTypeCheckEnvironment = false 
-                    LoadTime = proj.file.LastWriteTime
-                    OriginalLoadReferences = []
-                    OtherOptions = [|   yield "--noframework"
-                                        // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-                                        for f in projectDlls do
-                                            yield "-r:" + f
-                                        for f in libraryDlls do 
-                                            yield "-r:" + f.FullName |]
-                    ProjectFileName = proj.file.FullName 
-                    ReferencedProjects = projectRefs
-                    SourceFiles = [| for f in proj.compileInclude do yield f.FullName |]
-                    Stamp = None 
-                    UnresolvedReferences = None 
-                    UseScriptResolutionRules = false
-                }
-            Ok options
+                    // Add direct reference to parent 
+                    let projectFile = FileInfo(options.ProjectFileName)
+                    let projectDll = projectDll projectFile 
+                    result.[options.ProjectFileName] <- (projectDll, options)
+                    // Add indirect references
+                    for (ancestorDll, ancestorOptions) in options.ReferencedProjects do 
+                        result.[ancestorOptions.ProjectFileName] <- (ancestorDll, ancestorOptions)
+            else eprintfn "Project %s parent %s was excluded because it was not analyzed" proj.file.Name parent.Name
+        List.ofSeq result.Values
+    and analyzeProject (proj: FsProj, assets: ProjectAssets): Result<FSharpProjectOptions, string> = 
+        eprintfn "Analyzing %s" proj.file.FullName
+        // Recursively ensure that all ancestors are analyzed and cached
+        for parent in proj.projectReferenceInclude do 
+            ensureAnalyzed parent
+        let libraryDlls = findLibraryDlls assets
+        let projectRefs = projectReferences proj |> Seq.toArray
+        let projectDlls = ancestorDlls projectRefs
+        eprintfn "Project %s" proj.file.FullName
+        eprintfn "  Libraries:"
+        for f in libraryDlls do 
+            eprintfn "    %s" f.FullName
+        eprintfn "  Projects:"
+        for dll, options in projectRefs do 
+            let relativeDll = Path.GetRelativePath(options.ProjectFileName, dll)
+            eprintfn "    %s ~ %s" options.ProjectFileName relativeDll
+        eprintfn "  Sources:"
+        for f in proj.compileInclude do 
+            eprintfn "    %s" f.FullName
+        let options = 
+            {
+                ExtraProjectInfo = None 
+                IsIncompleteTypeCheckEnvironment = false 
+                LoadTime = proj.file.LastWriteTime
+                OriginalLoadReferences = []
+                OtherOptions = [|   yield "--noframework"
+                                    // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
+                                    for f in projectDlls do
+                                        yield "-r:" + f
+                                    for f in libraryDlls do 
+                                        yield "-r:" + f.FullName |]
+                ProjectFileName = proj.file.FullName 
+                ReferencedProjects = projectRefs
+                SourceFiles = [| for f in proj.compileInclude do yield f.FullName |]
+                Stamp = None 
+                UnresolvedReferences = None 
+                UseScriptResolutionRules = false
+            }
+        Ok options
     and ensureAnalyzed (fsproj: FileInfo) = 
-        ensureParsed fsproj
         if not (analyzedByProjectFile.ContainsKey fsproj.FullName) then 
-            analyzedByProjectFile.[fsproj.FullName] <- analyzeProject parsedByProjectFile.[fsproj.FullName]
+            analyzedByProjectFile.[fsproj.FullName] <- parseProject fsproj |> Result.bind analyzeProject
     // Remove project file and all its sources from caches
     // TODO invalidate descendents
     let rec invalidate (fsproj: FileInfo) = 
-        if parsedByProjectFile.ContainsKey fsproj.FullName then
-            match parsedByProjectFile.[fsproj.FullName] with 
-            | GoodProject(proj, assets) -> 
-                for source in proj.compileInclude do 
-                    projectFileBySourceFile.Remove source.FullName |> ignore
+        if analyzedByProjectFile.ContainsKey fsproj.FullName then
+            match analyzedByProjectFile.[fsproj.FullName] with 
+            | Ok options -> 
+                for source in options.SourceFiles do 
+                    projectFileBySourceFile.Remove source |> ignore
             | _ -> () 
-        parsedByProjectFile.Remove fsproj.FullName |> ignore
         analyzedByProjectFile.Remove fsproj.FullName |> ignore
     member this.AddWorkspaceRoot(root: DirectoryInfo) = 
         let all = root.EnumerateFiles("*.fsproj", SearchOption.AllDirectories)
@@ -139,10 +138,10 @@ type ProjectManager() =
         invalidate fsproj
     member this.UpdateProjectFile(fsproj: FileInfo) = 
         invalidate fsproj
-        ensureParsed fsproj
+        ensureAnalyzed fsproj
     member this.NewProjectFile(fsproj: FileInfo) = 
         invalidate fsproj
-        ensureParsed fsproj
+        ensureAnalyzed fsproj
     member this.UpdateAssetsJson(assets: FileInfo) = 
         for fsproj in assets.Directory.Parent.GetFiles("*.fsproj") do 
             this.UpdateProjectFile fsproj
