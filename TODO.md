@@ -17,5 +17,8 @@
 - Rename symbol renames whole Path.To.symbol
 - Invalidate descendent projects when .fsproj or project.assets.json is changed
 
+# Optimizations
+Don't check entire project for rename if symbol is local
+
 # Features
 - Docstrings on autocomplete and hover

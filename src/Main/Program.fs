@@ -343,7 +343,7 @@ type Server(client: ILanguageClient) =
                         return Error e.Message
         }
     // Typecheck a file
-    let typecheck (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+    let checkFile (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             let file = FileInfo(uri.AbsolutePath)
             match projects.FindProjectOptions(file), docs.Get uri with 
@@ -362,7 +362,7 @@ type Server(client: ILanguageClient) =
     // Check a file and send all errors to the client
     let lint (uri: Uri): Async<unit> = 
         async {
-            let! check = typecheck uri
+            let! check = checkFile uri
             let errors = 
                 match check with
                 | Error errors -> errors
@@ -372,7 +372,7 @@ type Server(client: ILanguageClient) =
     // Find the symbol at a position
     let symbolAt (textDocument: TextDocumentIdentifier) (position: Position): Async<FSharpSymbolUse option> = 
         async {
-            let! c = typecheck (textDocument.uri)
+            let! c = checkFile textDocument.uri
             match c with 
             | Error errors -> 
                 dprintfn "Check failed, ignored %d errors" (List.length errors)
@@ -478,7 +478,7 @@ type Server(client: ILanguageClient) =
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
                 dprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.AbsolutePath p.position.line p.position.character
-                let! c = typecheck p.textDocument.uri
+                let! c = checkFile p.textDocument.uri
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
                 | Error errors -> 
@@ -495,7 +495,7 @@ type Server(client: ILanguageClient) =
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
-                let! c = typecheck p.textDocument.uri
+                let! c = checkFile p.textDocument.uri
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
@@ -520,7 +520,7 @@ type Server(client: ILanguageClient) =
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
-                let! c = typecheck p.textDocument.uri
+                let! c = checkFile p.textDocument.uri
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
