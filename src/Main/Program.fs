@@ -52,7 +52,7 @@ let private logOnce (message: string): unit =
         alreadyLogged.Add(message) |> ignore
 
 // Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
-let private convertDiagnostics (errors: FSharpErrorInfo[]): Diagnostic list =
+let private asDiagnostics (errors: FSharpErrorInfo[]): Diagnostic list =
     [ 
         for err in errors do 
             if hasNoLocation err then 
@@ -72,6 +72,7 @@ let private errorAtTop (message: string): Diagnostic =
     }
 
 // Look for a fully qualified name leading up to the cursor
+// Exposed for testing
 let findNamesUnderCursor (lineContent: string) (character: int): string list = 
     let r = Regex(@"(\w+|``[^`]+``)([\.?](\w+|``[^`]+``))*")
     let ms = r.Matches(lineContent)
@@ -96,6 +97,7 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
         []
 
 // Look for a method call like foo.MyMethod() before the cursor
+// Exposed for testing
 let findMethodCallBeforeCursor (lineContent: string) (cursor: int): int option = 
     let mutable found = -1
     let mutable parenDepth = 0
@@ -116,7 +118,8 @@ let findMethodCallBeforeCursor (lineContent: string) (cursor: int): int option =
             None 
         else Some prefix.Length
 
-let findEndOfIdentifierUnderCursor (lineContent: string) (cursor: int): int option = 
+// Look for an identifier under the cursor and find the end of it
+let private findEndOfIdentifierUnderCursor (lineContent: string) (cursor: int): int option = 
     let r = Regex(@"\w+|``[^`]+``")
     let ms = r.Matches(lineContent)
     let overlaps (m: Match) = m.Index <= cursor && cursor <= m.Index + m.Length 
@@ -130,7 +133,7 @@ let findEndOfIdentifierUnderCursor (lineContent: string) (cursor: int): int opti
 
 
 // Figure out the active parameter by counting ',' characters
-let countCommas (lineContent: string) (endOfMethodName: int) (cursor: int): int = 
+let private countCommas (lineContent: string) (endOfMethodName: int) (cursor: int): int = 
     let mutable count = 0
     for i in endOfMethodName .. (min (cursor-1) lineContent.Length) do 
         if lineContent.[i] = ',' then 
@@ -150,12 +153,14 @@ let private asHover (FSharpToolTipText tips): Hover =
                 dprintfn "Tooltip error %s" err]
     {contents=convert; range=None}
 
+// Convert an F# `FSharpToolTipText` to text
 let private asDocumentation (FSharpToolTipText tips): string option = 
     match tips with 
     | [FSharpToolTipElement.Group [e]] -> Some e.MainDescription
     | _ -> None // When there are zero or multiple overloads, don't display docs
 
-let private convertCompletionItemKind (k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
+// Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
+let private asCompletionItemKind (k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
     match k with 
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Field -> Some CompletionItemKind.Field
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Property -> Some CompletionItemKind.Property
@@ -163,26 +168,32 @@ let private convertCompletionItemKind (k: Microsoft.FSharp.Compiler.SourceCodeSe
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Event -> None
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Argument -> Some CompletionItemKind.Variable
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Other -> None
-    
-let private convertDeclaration (i: FSharpDeclarationListItem): CompletionItem = 
+
+// Convert an F# `FSharpDeclarationListItem` to an LSP `CompletionItem`
+let private asCompletionItem (i: FSharpDeclarationListItem): CompletionItem = 
     { defaultCompletionItem with 
         label = i.Name 
-        kind = convertCompletionItemKind i.Kind
+        kind = asCompletionItemKind i.Kind
         detail = Some i.FullName
         data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
     }
 
-let private convertDeclarations (ds: FSharpDeclarationListInfo): CompletionList = 
-    let items = List.map convertDeclaration (List.ofArray ds.Items)
+// Convert an F# `FSharpDeclarationListInfo` to an LSP `CompletionList`
+// Used in rendering autocomplete lists
+let private asCompletionList (ds: FSharpDeclarationListInfo): CompletionList = 
+    let items = List.map asCompletionItem (List.ofArray ds.Items)
     {isIncomplete=false; items=items}
 
-let private convertParameter (p: FSharpMethodGroupItemParameter): ParameterInformation = 
+// Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
+let private asParameterInformation (p: FSharpMethodGroupItemParameter): ParameterInformation = 
     {
         label = p.ParameterName
         documentation = Some p.Display
     }
 
-let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): SignatureInformation = 
+// Convert an F# method name + `FSharpMethodGroupItem` to an LSP `SignatureInformation`
+// Used in providing signature help after autocompleting
+let private asSignatureInformation (methodName: string) (s: FSharpMethodGroupItem): SignatureInformation = 
     let doc = match s.Description with 
                 | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription 
                 | _ -> 
@@ -193,11 +204,12 @@ let private convertSignature (methodName: string) (s: FSharpMethodGroupItem): Si
     {
         label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames) 
         documentation = doc 
-        parameters = Array.map convertParameter s.Parameters |> List.ofArray
+        parameters = Array.map asParameterInformation s.Parameters |> List.ofArray
     }
 
-// Lazily all symbols in a file or project
-let rec private allSymbols (es: FSharpEntity seq) = 
+// Lazily enumerate all symbols in a file or project
+// Used in DocumentSymbols and WorkspaceSymbols
+let rec private findAllSymbols (es: FSharpEntity seq) = 
     seq {
         for e in es do 
             yield e :> FSharpSymbol
@@ -207,7 +219,7 @@ let rec private allSymbols (es: FSharpEntity seq) =
                 yield x :> FSharpSymbol
             for x in e.FSharpFields do
                 yield x :> FSharpSymbol
-            yield! allSymbols e.NestedEntities
+            yield! findAllSymbols e.NestedEntities
     }
 
 // Check if candidate contains all the characters of find, in-order, case-insensitive
@@ -218,6 +230,7 @@ let private containsChars (find: string) (candidate: string): bool =
         if iFind < find.Length && c = find.[iFind] then iFind <- iFind + 1
     iFind = find.Length
 
+// Check if an F# symbol matches a query typed by the user
 let private matchesQuery (query: string) (candidate: FSharpSymbol): bool = 
     containsChars (query.ToLower()) (candidate.DisplayName.ToLower())
 
@@ -247,6 +260,7 @@ let private symbolKind (s: FSharpSymbol): SymbolKind =
     | :? FSharpParameter as x -> SymbolKind.Variable
     | :? FSharpActivePatternCase as x -> SymbolKind.Constant
 
+// Find the name of the namespace, type or module that contains `s`
 let private containerName (s: FSharpSymbol): string option = 
     if s.FullName = s.DisplayName then 
         None
@@ -255,30 +269,41 @@ let private containerName (s: FSharpSymbol): string option =
     else 
         Some s.FullName
 
+// Convert an F# `Range.pos` to an LSP `Position`
 let private asPosition (p: Range.pos): Position = 
-    {line=p.Line-1; character=p.Column}
+    {
+        line=p.Line-1
+        character=p.Column
+    }
 
+// Convert an F# `Range.range` to an LSP `Range`
 let private asRange (r: Range.range): Range = 
     {
         start=asPosition r.Start
         ``end``=asPosition r.End
     }
 
+let private asLocation (l: Range.range): Location = 
+    { 
+        uri=Uri("file://" + l.FileName)
+        range = asRange l 
+    }
+
+// Get the lcation where `s` was declared
 let private declarationLocation (s: FSharpSymbol): Location option = 
     match s.DeclarationLocation with 
     | None -> 
         dprintfn "Symbol %s has no declaration" s.FullName 
         None 
     | Some l ->
-        let l = s.DeclarationLocation.Value
-        let uri = Uri("file://" + l.FileName)
-        Some({ uri=uri; range = asRange l })
+        asLocation l |> Some
 
+// Get the location where `s` was used
 let private useLocation (s: FSharpSymbolUse): Location = 
-    let uri = Uri("file://" + s.FileName)
-    { uri=uri; range = asRange s.RangeAlternate }
+    asLocation s.RangeAlternate
 
-let private symbolInformation (s: FSharpSymbol): SymbolInformation = 
+// Convert an F# `FSharpSymbol` to an LSP `SymbolInformation`
+let private asSymbolInformation (s: FSharpSymbol): SymbolInformation = 
     {
         name = s.DisplayName
         containerName = containerName s
@@ -286,11 +311,13 @@ let private symbolInformation (s: FSharpSymbol): SymbolInformation =
         location = declarationLocation(s).Value
     }
 
+// Is `s` located in `file`?
 let private symbolIsInFile (file: string) (s: FSharpSymbol): bool = 
     match s.DeclarationLocation with 
     | Some l -> l.FileName = file 
     | None -> false
 
+// Find the first overload in `method` that is compatible with `activeParameter`
 // TODO actually consider types
 let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethodGroupItem[]): int option = 
     let mutable result = -1 
@@ -319,7 +346,7 @@ type Server(client: ILanguageClient) =
                 | _ -> 
                     let! force = checker.ParseAndCheckFileInProject(uri.AbsolutePath, sourceVersion, sourceText, projectOptions)
                     match force with 
-                    | parseResult, FSharpCheckFileAnswer.Aborted -> return Error (convertDiagnostics parseResult.Errors)
+                    | parseResult, FSharpCheckFileAnswer.Aborted -> return Error (asDiagnostics parseResult.Errors)
                     | parseResult, FSharpCheckFileAnswer.Succeeded checkResult -> return Ok(parseResult, checkResult)
         }
     // Check a file and send all errors to the client
@@ -329,7 +356,7 @@ type Server(client: ILanguageClient) =
             let errors = 
                 match check with
                 | Error errors -> errors
-                | Ok(parseResult, checkResult) -> (convertDiagnostics parseResult.Errors)@(convertDiagnostics checkResult.Errors)
+                | Ok(parseResult, checkResult) -> (asDiagnostics parseResult.Errors)@(asDiagnostics checkResult.Errors)
             client.PublishDiagnostics({uri=uri; diagnostics=errors})
         }
     // Find the symbol at a position
@@ -465,7 +492,7 @@ type Server(client: ILanguageClient) =
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
                     lastCompletion <- Some declarations 
                     dprintfn "Found %d completions" declarations.Items.Length
-                    return Some (convertDeclarations declarations)
+                    return Some (asCompletionList declarations)
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
@@ -501,7 +528,7 @@ type Server(client: ILanguageClient) =
                         let names = findNamesUnderCursor line (endOfMethodName - 1)
                         dprintfn "Looking for overloads of %s" (String.concat "." names)
                         let! overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
-                        let sigs = Array.map (convertSignature overloads.MethodName) overloads.Methods |> List.ofArray
+                        let sigs = Array.map (asSignatureInformation overloads.MethodName) overloads.Methods |> List.ofArray
                         let activeParameter = countCommas line endOfMethodName p.position.character
                         let activeDeclaration = findCompatibleOverload activeParameter overloads.Methods
                         dprintfn "Found %d overloads" overloads.Methods.Length
@@ -541,10 +568,10 @@ type Server(client: ILanguageClient) =
                     return []
                 | Ok(parseResult, checkResult) -> 
                     dprintfn "Looking for symbols in %s" parseResult.FileName
-                    let all = allSymbols checkResult.PartialAssemblySignature.Entities
+                    let all = findAllSymbols checkResult.PartialAssemblySignature.Entities
                     return all 
                         |> Seq.filter (symbolIsInFile parseResult.FileName)
-                        |> Seq.map symbolInformation 
+                        |> Seq.map asSymbolInformation 
                         |> List.ofSeq
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
@@ -558,9 +585,9 @@ type Server(client: ILanguageClient) =
                 for options in openProjects do 
                     if all.Count < 50 then 
                         let! c = checker.ParseAndCheckProject options
-                        for s in allSymbols c.AssemblySignature.Entities do 
+                        for s in findAllSymbols c.AssemblySignature.Entities do 
                             if matchesQuery p.query s && s.DeclarationLocation.IsSome then 
-                                all.Add (symbolInformation s)
+                                all.Add (asSymbolInformation s)
                 return List.ofSeq all
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
