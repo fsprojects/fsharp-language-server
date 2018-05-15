@@ -231,34 +231,8 @@ let private containsChars (find: string) (candidate: string): bool =
     iFind = find.Length
 
 // Check if an F# symbol matches a query typed by the user
-let private matchesQuery (query: string) (candidate: FSharpSymbol): bool = 
-    containsChars (query.ToLower()) (candidate.DisplayName.ToLower())
-
-// FSharpEntity, FSharpUnionCase
-/// FSharpField, FSharpGenericParameter, FSharpStaticParameter, FSharpMemberOrFunctionOrValue, FSharpParameter,
-/// or FSharpActivePatternCase.
-let private symbolKind (s: FSharpSymbol): SymbolKind = 
-    match s with 
-    | :? FSharpEntity as x -> 
-        if x.IsFSharpModule then SymbolKind.Module 
-        else if x.IsNamespace then SymbolKind.Namespace 
-        else if x.IsClass then SymbolKind.Class
-        else if x.IsEnum then SymbolKind.Enum 
-        else if x.IsInterface then SymbolKind.Interface 
-        else SymbolKind.Variable 
-    | :? FSharpUnionCase as x -> SymbolKind.Constant
-    | :? FSharpField as x -> SymbolKind.Field
-    | :? FSharpGenericParameter as x -> SymbolKind.Interface
-    | :? FSharpStaticParameter as x -> SymbolKind.Variable 
-    | :? FSharpMemberOrFunctionOrValue as x -> 
-        if x.IsConstructor then SymbolKind.Constructor 
-        else if x.IsTypeFunction then SymbolKind.Function
-        else if x.IsValue then SymbolKind.Property 
-        else if x.IsProperty then SymbolKind.Property 
-        else if x.IsMember then SymbolKind.Method 
-        else SymbolKind.Function
-    | :? FSharpParameter as x -> SymbolKind.Variable
-    | :? FSharpActivePatternCase as x -> SymbolKind.Constant
+let private matchesQuery (query: string) (candidate: FSharpNavigationDeclarationItem): bool = 
+    containsChars (query.ToLower()) (candidate.Name.ToLower())
 
 // Find the name of the namespace, type or module that contains `s`
 let private containerName (s: FSharpSymbol): string option = 
@@ -303,21 +277,6 @@ let private declarationLocation (s: FSharpSymbol): Location option =
 let private useLocation (s: FSharpSymbolUse): Location = 
     asLocation s.RangeAlternate
 
-// Convert an F# `FSharpSymbol` to an LSP `SymbolInformation`
-let private asSymbolInformation (s: FSharpSymbol): SymbolInformation = 
-    {
-        name = s.DisplayName
-        containerName = containerName s
-        kind = symbolKind(s)
-        location = declarationLocation(s).Value
-    }
-
-// Is `s` located in `file`?
-let private symbolIsInFile (file: string) (s: FSharpSymbol): bool = 
-    match s.DeclarationLocation with 
-    | Some l -> l.FileName = file 
-    | None -> false
-
 // Find the first overload in `method` that is compatible with `activeParameter`
 // TODO actually consider types
 let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethodGroupItem[]): int option = 
@@ -327,10 +286,58 @@ let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethod
             result <- i 
     if result = -1 then None else Some result
 
+let private asSymbolKind (k: FSharpNavigationDeclarationItemKind): SymbolKind = 
+    match k with 
+    | NamespaceDecl -> SymbolKind.Namespace
+    | ModuleFileDecl -> SymbolKind.Module
+    | ExnDecl -> SymbolKind.Class
+    | ModuleDecl -> SymbolKind.Module
+    | TypeDecl -> SymbolKind.Interface
+    | MethodDecl -> SymbolKind.Method
+    | PropertyDecl -> SymbolKind.Property
+    | FieldDecl -> SymbolKind.Field
+    | OtherDecl -> SymbolKind.Variable
+
+let private asSymbolInformation (d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
+    {
+        name=d.Name 
+        kind=asSymbolKind d.Kind 
+        location=asLocation d.Range 
+        containerName=container |> Option.map(fun d -> d.Name)
+    }
+
+let private flattenSymbols (parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
+    [ for d in parse.GetNavigationItems().Declarations do 
+        yield d.Declaration, None
+        for n in d.Nested do 
+            yield n, Some d.Declaration ]
+
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
+    let getOrRead (uri: Uri): string option = 
+        match docs.GetText uri with 
+        | Some text -> Some text 
+        | None when File.Exists uri.AbsolutePath -> Some (File.ReadAllText uri.AbsolutePath)
+        | None -> None
+    // Parse a file 
+    let parseFile (uri: Uri): Async<Result<FSharpParseFileResults, string>> = 
+        async {
+            let file = FileInfo(uri.AbsolutePath)
+            match projects.FindProjectOptions(file), getOrRead(uri) with 
+            | Error e, _ ->
+                return sprintf "Can't find symbols in %s because of error in project options: %s" file.Name e |> Error
+            | _, None -> 
+                return sprintf "Can't find symbols in non-existant file %s" file.FullName |> Error
+            | Ok(projectOptions), Some sourceText -> 
+                try
+                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                    let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
+                    return Ok parse
+                with e -> 
+                    return Error e.Message
+        }
     // Typecheck a file
     let typecheck (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
@@ -559,18 +566,13 @@ type Server(client: ILanguageClient) =
         member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
             async {
-                let! c = typecheck (p.textDocument.uri)
-                match c with 
-                | Error errors -> 
-                    dprintfn "Check failed, ignored %d errors" (List.length errors)
+                let! maybeParse = parseFile p.textDocument.uri
+                match maybeParse with 
+                | Error e -> 
+                    dprintfn "%s" e 
                     return []
-                | Ok(parseResult, checkResult) -> 
-                    dprintfn "Looking for symbols in %s" parseResult.FileName
-                    let all = findAllSymbols checkResult.PartialAssemblySignature.Entities
-                    return all 
-                        |> Seq.filter (symbolIsInFile parseResult.FileName)
-                        |> Seq.map asSymbolInformation 
-                        |> List.ofSeq
+                | Ok parse ->
+                    return flattenSymbols parse |> List.map asSymbolInformation
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
             async {
@@ -580,12 +582,19 @@ type Server(client: ILanguageClient) =
                 dprintfn "Looking for symbols matching %s in %s" p.query names
                 // Read open projects until we find at least 50 symbols that match query
                 let all = System.Collections.Generic.List<SymbolInformation>()
-                for options in openProjects do 
-                    if all.Count < 50 then 
-                        let! c = checker.ParseAndCheckProject options
-                        for s in findAllSymbols c.AssemblySignature.Entities do 
-                            if matchesQuery p.query s && s.DeclarationLocation.IsSome then 
-                                all.Add (asSymbolInformation s)
+                for projectOptions in openProjects do 
+                    for sourceFile in projectOptions.SourceFiles do 
+                        if all.Count < 50 then 
+                            let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                            let uri = Uri("file://" + sourceFile)
+                            let! maybeParse = parseFile uri
+                            match maybeParse with 
+                            | Error e -> 
+                                dprintfn "%s" e 
+                            | Ok parse ->
+                                for declaration, container in flattenSymbols parse do 
+                                    if matchesQuery p.query declaration then 
+                                        all.Add(asSymbolInformation(declaration, container))
                 return List.ofSeq all
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
