@@ -331,12 +331,16 @@ type Server(client: ILanguageClient) =
             | _, None -> 
                 return sprintf "Can't find symbols in non-existant file %s" file.FullName |> Error
             | Ok(projectOptions), Some sourceText -> 
-                try
-                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                    let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
+                match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
+                | Some(parse, _, _) -> 
                     return Ok parse
-                with e -> 
-                    return Error e.Message
+                | None ->
+                    try
+                        let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                        let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
+                        return Ok parse
+                    with e -> 
+                        return Error e.Message
         }
     // Typecheck a file
     let typecheck (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
@@ -346,10 +350,8 @@ type Server(client: ILanguageClient) =
             | Error e, _ -> return Error [errorAtTop e]
             | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
-                let cached = checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions)
-                match cached with 
+                match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
                 | Some(parseResult, checkResult, version) when version = sourceVersion -> 
-                    dprintfn "Use cached version %d of %s" version file.Name
                     return Ok(parseResult, checkResult)
                 | _ -> 
                     let! force = checker.ParseAndCheckFileInProject(uri.AbsolutePath, sourceVersion, sourceText, projectOptions)
