@@ -1,5 +1,6 @@
 module LSP.LanguageServer 
 
+open LSP.Log
 open System
 open System.Threading
 open System.Threading.Tasks
@@ -82,7 +83,7 @@ type RealClient (send: BinaryWriter) =
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
             p |> serializePublishDiagnostics |> notifyClient send "textDocument/publishDiagnostics"
         member this.RegisterCapability (p: RegisterCapability): unit = 
-            eprintfn "Register capability %A" p
+            dprintfn "Register capability %A" p
             match p with 
             | RegisterCapability.DidChangeWatchedFiles _ -> 
                 let register = {id=Guid.NewGuid().ToString(); method="workspace/didChangeWatchedFiles"; registerOptions=p}
@@ -172,7 +173,7 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
                 try 
                     Async.RunSynchronously(task)
                 with :? OperationCanceledException -> 
-                    eprintfn "Notification %s was cancelled" method
+                    dprintfn "Notification %s was cancelled" method
             | Parser.RequestMessage (id, method, json) -> 
                 let task = processRequest (Parser.parseRequest method json) 
                 let cancel = new CancellationTokenSource()
@@ -183,7 +184,7 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
                     | None -> ()
                     pendingRequests.TryRemove id |> ignore
                 with :? OperationCanceledException -> 
-                    eprintfn "Request %d was cancelled" id
+                    dprintfn "Request %d was cancelled" id
     ).Start()
     // Read all messages on the main thread
     for m in readMessages receive do 
@@ -193,12 +194,12 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
             let id = json?id.AsInteger()
             let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
             if stillRunning then
-                eprintfn "Cancelling request %d" id
+                dprintfn "Cancelling request %d" id
                 pendingRequest.Cancel()
             else 
-                eprintfn "Request %d has already finished" id
+                dprintfn "Request %d has already finished" id
         // Process other requests on worker thread
         | _ -> processQueue.Add m
     while processQueue.Count > 0 do 
-        eprintfn "Waiting for %d pending requests to be processed" processQueue.Count
+        dprintfn "Waiting for %d pending requests to be processed" processQueue.Count
         Thread.Sleep 500

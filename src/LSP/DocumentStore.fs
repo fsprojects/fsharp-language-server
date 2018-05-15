@@ -1,5 +1,6 @@
 namespace LSP 
 
+open LSP.Log
 open System
 open System.IO
 open System.Collections.Generic
@@ -54,7 +55,7 @@ type DocumentStore() =
         existing.text.Append(text) |> ignore
         existing.version <- doc.version
     let notFound (uri: Uri) (): string = 
-        eprintfn "No such file %O" uri 
+        dprintfn "No such file %O" uri 
         ""
 
     member this.Open(doc: DidOpenTextDocumentParams): unit = 
@@ -65,7 +66,7 @@ type DocumentStore() =
     member this.Change(doc: DidChangeTextDocumentParams): unit = 
         let existing = activeDocuments.[doc.textDocument.uri]
         if doc.textDocument.version <= existing.version then 
-            eprintfn
+            dprintfn
                 "Change %d to doc %s is earlier than existing version %d" 
                 doc.textDocument.version 
                 (doc.textDocument.uri.ToString())
@@ -99,7 +100,7 @@ type DocumentStore() =
             reader.ReadLine() |> ignore
             line <- line + 1
         if reader.Peek() = -1 then 
-            eprintfn "Reached EOF before line %d in file %O" targetLine uri
+            dprintfn "Reached EOF before line %d in file %O" targetLine uri
             "" 
         else 
             reader.ReadLine()

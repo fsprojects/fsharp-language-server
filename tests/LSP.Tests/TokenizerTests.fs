@@ -2,46 +2,57 @@ module LSP.TokenizerTests
 
 open System.IO
 open System.Text
-open SimpleTest
+open NUnit.Framework
 
-let ``test parse content length header`` (t: TestContext) = 
+[<SetUp>]
+let setup () = 
+    LSP.Log.diagnosticsLog := stdout
+
+[<Test>]
+let ``parse content length header`` () = 
     let sample = "Content-Length: 10"
     let found = Tokenizer.parseHeader sample
-    if found <> (Tokenizer.ContentLength 10) then Fail(found)
+    Assert.AreEqual((Tokenizer.ContentLength 10), found)
 
-let ``test parse content type header`` (t: TestContext) = 
+[<Test>]
+let ``parse content type header`` () = 
     let sample = "Content-Type: application/vscode-jsonrpc; charset=utf-8"
     let found = Tokenizer.parseHeader sample
-    if found <> Tokenizer.OtherHeader then Fail(found)
+    Assert.AreEqual(Tokenizer.OtherHeader, found)
 
-let ``test parse empty line indicating start of message`` (t: TestContext) = 
+[<Test>]
+let ``parse empty line indicating start of message`` () = 
     let found = Tokenizer.parseHeader ""
-    if found <> Tokenizer.EmptyHeader then Fail(found)
+    Assert.AreEqual(Tokenizer.EmptyHeader, found)
 
 let binaryReader (sample: string): BinaryReader = 
     let bytes = Encoding.UTF8.GetBytes(sample)
     let stream = new MemoryStream(bytes)
     new BinaryReader(stream, Encoding.UTF8)
 
-let ``test take header token`` (t: TestContext) = 
+[<Test>]
+let ``take header token`` () = 
     let sample = "Line 1\r\n\
                     Line 2"
     let found = Tokenizer.readLine (binaryReader sample)
-    if found <> (Some "Line 1") then Fail(found)
+    Assert.AreEqual((Some "Line 1"), found)
 
-let ``test allow newline without carriage-return`` (t: TestContext) = 
+[<Test>]
+let ``allow newline without carriage-return`` () = 
     let sample = "Line 1\n\
                     Line 2"
     let found = Tokenizer.readLine (binaryReader sample)
-    if found <> (Some "Line 1") then Fail(found)
+    Assert.AreEqual((Some "Line 1"), found)
 
-let ``test take message token`` (t: TestContext) = 
+[<Test>]
+let ``take message token`` () = 
     let sample = "{}\r\n\
                     next line..."
     let found = Tokenizer.readLength 2 (binaryReader sample)
-    if found <> "{}" then Fail(found)
+    Assert.AreEqual("{}", found)
 
-let ``test tokenize stream`` (t: TestContext) = 
+[<Test>]
+let ``tokenize stream`` () = 
     let sample = "Content-Length: 2\r\n\
                     \r\n\
                     {}\
@@ -49,9 +60,10 @@ let ``test tokenize stream`` (t: TestContext) =
                     \r\n\
                     1"
     let found = Tokenizer.tokenize (binaryReader sample) |> Seq.toList
-    if found <> ["{}"; "1"] then Fail(found)
+    Assert.AreEqual(["{}"; "1"], found)
 
-let ``test tokenize stream with multibyte characters`` (t: TestContext) = 
+[<Test>]
+let ``tokenize stream with multibyte characters`` () = 
     let sample = "Content-Length: 4\r\n\
                     \r\n\
                     🔥\
@@ -59,4 +71,4 @@ let ``test tokenize stream with multibyte characters`` (t: TestContext) =
                     \r\n\
                     🐼"
     let found = Tokenizer.tokenize (binaryReader sample) |> Seq.toList
-    if found <> ["🔥"; "🐼"] then Fail(found)
+    Assert.AreEqual(["🔥"; "🐼"], found)

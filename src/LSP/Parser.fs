@@ -1,5 +1,6 @@
 module LSP.Parser
 
+open LSP.Log
 open System
 open LSP.Json
 open LSP.Json.JsonExtensions
@@ -118,10 +119,10 @@ let parseNotification (method: string) (maybeBody: JsonValue option): Notificati
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
     | _, None -> 
-        eprintfn "%s is not a known notification, or it is expected to contain a body" method
+        dprintfn "%s is not a known notification, or it is expected to contain a body" method
         OtherNotification method
     | _, _ -> 
-        eprintfn "%s is not a known notification" method
+        dprintfn "%s is not a known notification" method
         OtherNotification method
 
 type InitializeParamsRaw = {

@@ -4,95 +4,111 @@ open System
 open System.Text.RegularExpressions
 open LSP.Json
 open Json
-open SimpleTest
+open NUnit.Framework
+
+[<SetUp>]
+let setup () = 
+    LSP.Log.diagnosticsLog := stdout
 
 let removeSpace (expected: string) = 
     Regex.Replace(expected, @"\s", "")
 
-let ``test remove space from string`` (t: TestContext) = 
+[<Test>]
+let ``remove space from string`` () = 
     let found = removeSpace "foo bar"
-    if found <> "foobar" then Fail(found)
+    Assert.AreEqual("foobar", found)
 
-let ``test remove newline from string`` (t: TestContext) = 
+[<Test>]
+let ``remove newline from string`` () = 
     let actual = """foo 
     bar"""
     let found = removeSpace actual
-    if found <> "foobar" then Fail(found)
+    Assert.AreEqual("foobar", found)
 
-let ``test serialize primitive types to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize primitive types to JSON`` () = 
     let found = serializerFactory<bool> defaultJsonWriteOptions true
-    if found <> "true" then Fail(found)
+    Assert.AreEqual("true", found)
     let found = serializerFactory<int> defaultJsonWriteOptions 1
-    if found <> "1" then Fail(found)
+    Assert.AreEqual("1", found)
     let found = serializerFactory<string> defaultJsonWriteOptions "foo"
-    if found <> "\"foo\"" then Fail(found)
+    Assert.AreEqual("\"foo\"", found)
     let found = serializerFactory<char> defaultJsonWriteOptions 'f'
-    if found <> "\"f\"" then Fail(found)
+    Assert.AreEqual("\"f\"", found)
 
-let ``test serialize URI to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize URI to JSON`` () = 
     let example = Uri("https://google.com")
     let found = serializerFactory<Uri> defaultJsonWriteOptions example
-    if found <> "\"https://google.com/\"" then Fail(found)
+    Assert.AreEqual("\"https://google.com/\"", found)
 
-let ``test serialize JsonValue to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize JsonValue to JSON`` () = 
     let example = JsonValue.Parse "{}"
     let found = serializerFactory<JsonValue> defaultJsonWriteOptions example
-    if found <> "{}" then Fail(found)
+    Assert.AreEqual("{}", found)
 
-let ``test serialize option to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize option to JSON`` () = 
     let found = serializerFactory<int option> defaultJsonWriteOptions (Some 1)
-    if found <> "1" then Fail(found)
+    Assert.AreEqual("1", found)
     let found = serializerFactory<int option> defaultJsonWriteOptions (None)
-    if found <> "null" then Fail(found)
+    Assert.AreEqual("null", found)
 
 type SimpleRecord = {simpleMember: int}
 
-let ``test serialize record to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize record to JSON`` () = 
     let record = {simpleMember = 1}
     let found = serializerFactory<SimpleRecord> defaultJsonWriteOptions record
-    if found <> """{"simpleMember":1}""" then Fail(found)
+    Assert.AreEqual("""{"simpleMember":1}""", found)
 
-let ``test serialize list of ints to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize list of ints to JSON`` () = 
     let example = [1; 2]
     let found = serializerFactory<int list> defaultJsonWriteOptions example
-    if found <> """[1,2]""" then Fail(found)
+    Assert.AreEqual("""[1,2]""", found)
 
-let ``test serialize list of strings to JSON`` (t: TestContext) = 
+[<Test>]
+let ``serialize list of strings to JSON`` () = 
     let example = ["foo"; "bar"]
     let found = serializerFactory<string list> defaultJsonWriteOptions example
-    if found <> """["foo","bar"]""" then Fail(found)
+    Assert.AreEqual("""["foo","bar"]""", found)
 
-let ``test serialize a record with a custom writer`` (t: TestContext) = 
+[<Test>]
+let ``serialize a record with a custom writer`` () = 
     let record = {simpleMember = 1}
     let customWriter (r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     let found = serializerFactory<SimpleRecord> options record
-    if found <> "\"simpleMember=1\"" then Fail(found)
+    Assert.AreEqual("\"simpleMember=1\"", found)
 
 type Foo = Bar | Doh 
 type FooRecord = {foo: Foo}
 
-let ``test serialize a union with a custom writer`` (t: TestContext) = 
+[<Test>]
+let ``serialize a union with a custom writer`` () = 
     let record = {foo = Bar}
     let customWriter = function 
     | Bar -> 10
     | Doh -> 20
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     let found = serializerFactory<FooRecord> options record
-    if found <> """{"foo":10}""" then Fail(found)
+    Assert.AreEqual("""{"foo":10}""", found)
 
 // type UnionWithFields =
 // | OptionA of A: string 
 // | OptionB of int 
 
-// let ``test serialize union with fields`` (t: TestContext) = 
+// [<Test>]
+// let ``serialize union with fields`` () = 
 //     let options = defaultJsonReadOptions
 //     let serializer = serializerFactory<UnionWithFields>
 //     let found = serializer options (OptionA "foo")
-//     if found <> """{"A":"foo"}""" then Fail(found)
+//     Assert.AreEqual("""{"A":"foo"}""", found)
 //     let serializer = serializerFactory<UnionWithFields>
 //     let found = serializer options (OptionB 1)
-//     if found <> """{"A":[1]}""" then Fail(found)
+//     Assert.AreEqual("""{"A":[1]}""", found)
 
 type IFoo =
     abstract member Foo: unit -> string 
@@ -100,66 +116,71 @@ type MyFoo() =
     interface IFoo with 
         member this.Foo() = "foo"
 
-let ``test serialize an interface with a custom writer`` (t: TestContext) = 
+[<Test>]
+let ``serialize an interface with a custom writer`` () = 
     let customWriter (foo: IFoo): string = 
         foo.Foo()
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     let example = MyFoo()
     let found = serializerFactory<IFoo> options example
-    if found <> "\"foo\"" then Fail(found)
+    Assert.AreEqual("\"foo\"", found)
     let found = serializerFactory<MyFoo> options example
-    if found <> "\"foo\"" then Fail(found)
+    Assert.AreEqual("\"foo\"", found)
 
-let ``test deserialize simple types`` (t: TestContext) = 
+[<Test>]
+let ``deserialize simple types`` () = 
     let options = defaultJsonReadOptions
     let found = deserializerFactory<bool> options (JsonValue.Parse "true")
-    if found <> true then Fail(found)
+    Assert.AreEqual(true, found)
     let found = deserializerFactory<int> options (JsonValue.Parse "1")
-    if found <> 1 then Fail(found)
+    Assert.AreEqual(1, found)
     let found = deserializerFactory<char> options (JsonValue.Parse "\"x\"")
-    if found <> 'x' then Fail(found)
+    Assert.AreEqual('x', found)
     let found = deserializerFactory<string> options (JsonValue.Parse "\"foo\"")
-    if found <> "foo" then Fail(found)
+    Assert.AreEqual("foo", found)
     let found = deserializerFactory<Uri> options (JsonValue.Parse "\"https://github.com\"")
-    if found <> Uri("https://github.com") then Fail(found)
+    Assert.AreEqual(Uri("https://github.com"), found)
 
 type TestSimpleRead = {
     oneField: int
 }
 
-let ``test deserialize complex types`` (t: TestContext) = 
+[<Test>]
+let ``deserialize complex types`` () = 
     let options = defaultJsonReadOptions
     let found = deserializerFactory<TestSimpleRead> options (JsonValue.Parse """{"oneField":1}""")
-    if found <> {oneField=1} then Fail(found)
+    Assert.AreEqual({oneField=1}, found)
     let found = deserializerFactory<int list> options (JsonValue.Parse """[1]""")
-    if found <> [1] then Fail(found)
+    Assert.AreEqual([1], found)
     let found = deserializerFactory<int option> options (JsonValue.Parse """1""")
-    if found <> Some 1 then Fail(found)
+    Assert.AreEqual(Some 1, found)
     let found = deserializerFactory<int option> options (JsonValue.Parse """null""")
-    if found <> None then Fail(found)
+    Assert.AreEqual(None, found)
 
 type TestOptionalRead = {
     optionField: int option
 }
 
-let ``test deserialize optional types`` (t: TestContext) = 
+[<Test>]
+let ``deserialize optional types`` () = 
     let options = defaultJsonReadOptions
     let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{"optionField":1}""")
-    if found <> {optionField=Some 1} then Fail(found)
+    Assert.AreEqual({optionField=Some 1}, found)
     let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{"optionField":null}""")
-    if found <> {optionField=None} then Fail(found)
+    Assert.AreEqual({optionField=None}, found)
     let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{}""")
-    if found <> {optionField=None} then Fail(found)
+    Assert.AreEqual({optionField=None}, found)
     let found = deserializerFactory<int option list> options (JsonValue.Parse """[1]""")
-    if found <> [Some 1] then Fail(found)
+    Assert.AreEqual([Some 1], found)
     let found = deserializerFactory<int option list> options (JsonValue.Parse """[null]""")
-    if found <> [None] then Fail(found)
+    Assert.AreEqual([None], found)
 
-let ``test deserialize map`` (t: TestContext) = 
+[<Test>]
+let ``deserialize map`` () = 
     let options = defaultJsonReadOptions
     let found = deserializerFactory<Map<string, int>> options (JsonValue.Parse """{"k":1}""")
     let map = Map.add "k" 1 Map.empty
-    if found <> map then Fail(found)
+    Assert.AreEqual(map, found)
 
 type TestEnum = One | Two
 
@@ -168,7 +189,8 @@ let deserializeTestEnum (i: int) =
     | 1 -> One  
     | 2 -> Two
 
-let ``test deserialize enum`` (t: TestContext) = 
+[<Test>]
+let ``deserialize enum`` () = 
     let options = { defaultJsonReadOptions with customReaders = [deserializeTestEnum]}
     let found = deserializerFactory<TestEnum> options (JsonValue.Parse """1""")
-    if found <> One then Fail(found)
+    Assert.AreEqual(One, found)

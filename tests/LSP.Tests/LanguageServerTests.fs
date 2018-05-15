@@ -3,9 +3,13 @@ module LSP.LanguageServerTests
 open System
 open System.IO 
 open System.Text
-open SimpleTest
 open LSP.Json
 open LSP.Types
+open NUnit.Framework
+
+[<SetUp>]
+let setup () = 
+    LSP.Log.diagnosticsLog := stdout
 
 let binaryWriter () = 
     let stream = new MemoryStream()
@@ -15,27 +19,30 @@ let binaryWriter () =
         Encoding.UTF8.GetString bytes
     (writer, toString)
 
-let ``test write text`` (t: TestContext) = 
+[<Test>]
+let ``write text`` () = 
     let (writer, toString) = binaryWriter() 
     writer.Write (Encoding.UTF8.GetBytes "foo")
     let found = toString()
-    if found <> "foo" then Fail(found)
+    Assert.AreEqual("foo", found)
 
-let ``test write response`` (t: TestContext) = 
+[<Test>]
+let ``write response`` () = 
     let (writer, toString) = binaryWriter() 
     LanguageServer.respond writer 1 "2"
     let expected = "Content-Length: 19\r\n\r\n\
                     {\"id\":1,\"result\":2}"
     let found = toString()
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test write multibyte characters`` (t: TestContext) = 
+[<Test>]
+let ``write multibyte characters`` () = 
     let (writer, toString) = binaryWriter() 
     LanguageServer.respond writer 1 "🔥"
     let expected = "Content-Length: 22\r\n\r\n\
                     {\"id\":1,\"result\":🔥}"
     let found = toString()
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
 let TODO() = raise (Exception "TODO")
 
@@ -95,11 +102,12 @@ let initializeMessage = """
 }
 """
 
-let ``test read messages from a stream`` (t: TestContext) = 
+[<Test>]
+let ``read messages from a stream`` () = 
     let stdin = messageStream [initializeMessage]
     let messages = LanguageServer.readMessages stdin
     let found = Seq.toList messages
-    if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
+    Assert.AreEqual([Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")], found)
 
 let exitMessage = """
 {
@@ -108,17 +116,19 @@ let exitMessage = """
 }
 """
     
-let ``test exit message terminates stream`` (t: TestContext) = 
+[<Test>]
+let ``exit message terminates stream`` () = 
     let stdin = messageStream [initializeMessage; exitMessage; initializeMessage]
     let messages = LanguageServer.readMessages stdin
     let found = Seq.toList messages
-    if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
+    Assert.AreEqual([Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")], found)
     
-let ``test end of bytes terminates stream`` (t: TestContext) = 
+[<Test>]
+let ``end of bytes terminates stream`` () = 
     let stdin = messageStream [initializeMessage]
     let messages = LanguageServer.readMessages stdin
     let found = Seq.toList messages
-    if found <> [Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")] then Fail(found)
+    Assert.AreEqual([Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")], found)
 
 let mock (server: ILanguageServer) (messages: string list): string = 
     let stdout = new MemoryStream()
@@ -127,7 +137,8 @@ let mock (server: ILanguageServer) (messages: string list): string =
     LanguageServer.connect (fun _ -> server) readIn writeOut
     Encoding.UTF8.GetString(stdout.ToArray())
 
-let ``test send Initialize`` (t: TestContext) = 
+[<Test>]
+let ``send Initialize`` () = 
     let message = """
     {
         "jsonrpc": "2.0",
@@ -138,4 +149,4 @@ let ``test send Initialize`` (t: TestContext) =
     """
     let server = MockServer()
     let result = mock server [message]
-    if not (result.Contains("capabilities")) then Fail(result)
+    if not (result.Contains("capabilities")) then Assert.Fail(sprintf "%A does not contain capabilities" result)

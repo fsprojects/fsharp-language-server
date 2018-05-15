@@ -1,5 +1,6 @@
 namespace Main 
 
+open LSP.Log
 open System
 open System.IO
 open System.Collections.Generic
@@ -67,7 +68,7 @@ type ProjectManager() =
             if found then 
                 match maybeOptions with 
                 | Error e -> 
-                    eprintfn "Project %s parent %s was excluded because analysis failed with error %s" proj.file.Name parent.Name e
+                    dprintfn "Project %s parent %s was excluded because analysis failed with error %s" proj.file.Name parent.Name e
                 | Ok options -> 
                     // Add direct reference to parent 
                     let projectFile = FileInfo(options.ProjectFileName)
@@ -76,27 +77,27 @@ type ProjectManager() =
                     // Add indirect references
                     for (ancestorDll, ancestorOptions) in options.ReferencedProjects do 
                         result.[ancestorOptions.ProjectFileName] <- (ancestorDll, ancestorOptions)
-            else eprintfn "Project %s parent %s was excluded because it was not analyzed" proj.file.Name parent.Name
+            else dprintfn "Project %s parent %s was excluded because it was not analyzed" proj.file.Name parent.Name
         List.ofSeq result.Values
     and analyzeProject (proj: FsProj, assets: ProjectAssets): Result<FSharpProjectOptions, string> = 
-        eprintfn "Analyzing %s" proj.file.FullName
+        dprintfn "Analyzing %s" proj.file.FullName
         // Recursively ensure that all ancestors are analyzed and cached
         for parent in proj.projectReferenceInclude do 
             ensureAnalyzed parent
         let libraryDlls = findLibraryDlls assets
         let projectRefs = projectReferences proj |> Seq.toArray
         let projectDlls = ancestorDlls projectRefs
-        eprintfn "Project %s" proj.file.FullName
-        eprintfn "  Libraries:"
+        dprintfn "Project %s" proj.file.FullName
+        dprintfn "  Libraries:"
         for f in libraryDlls do 
-            eprintfn "    %s" f.FullName
-        eprintfn "  Projects:"
+            dprintfn "    %s" f.FullName
+        dprintfn "  Projects:"
         for dll, options in projectRefs do 
             let relativeDll = Path.GetRelativePath(options.ProjectFileName, dll)
-            eprintfn "    %s ~ %s" options.ProjectFileName relativeDll
-        eprintfn "  Sources:"
+            dprintfn "    %s ~ %s" options.ProjectFileName relativeDll
+        dprintfn "  Sources:"
         for f in proj.compileInclude do 
-            eprintfn "    %s" f.FullName
+            dprintfn "    %s" f.FullName
         let options = 
             {
                 ExtraProjectInfo = None 

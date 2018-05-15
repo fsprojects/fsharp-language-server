@@ -2,10 +2,15 @@ module LSP.DocumentStoreTests
 
 open System
 open System.Text
-open SimpleTest
 open Types
+open NUnit.Framework
 
-let ``test convert prefix Range to offsets`` (t: TestContext) = 
+[<SetUp>]
+let setup () = 
+    LSP.Log.diagnosticsLog := stdout
+
+[<Test>]
+let ``convert prefix Range to offsets`` () = 
     let text = "foo\r\n\
                 bar\r\n\
                 doh" 
@@ -14,9 +19,10 @@ let ``test convert prefix Range to offsets`` (t: TestContext) =
         { start = {line = 0; character = 0}
           ``end`` = {line = 0; character = 3} }
     let found = DocumentStoreUtils.findRange textBuilder range
-    if found <> (0, 3) then Fail(found)
+    Assert.AreEqual((0, 3), found)
 
-let ``test convert suffix Range to offsets`` (t: TestContext) = 
+[<Test>]
+let ``convert suffix Range to offsets`` () = 
     let text = "foo\r\n\
                 bar\r\n\
                 doh" 
@@ -25,9 +31,10 @@ let ``test convert suffix Range to offsets`` (t: TestContext) =
         { start = {line = 2; character = 1}
           ``end`` = {line = 2; character = 3} }
     let found = DocumentStoreUtils.findRange textBuilder range
-    if found <> (11, 13) then Fail(found)
+    Assert.AreEqual((11, 13), found)
 
-let ``test convert line-spanning Range to offsets`` (t: TestContext) = 
+[<Test>]
+let ``convert line-spanning Range to offsets`` () = 
     let text = "foo\r\n\
                 bar\r\n\
                 doh" 
@@ -36,9 +43,10 @@ let ``test convert line-spanning Range to offsets`` (t: TestContext) =
         { start = {line = 1; character = 2}
           ``end`` = {line = 2; character = 1} }
     let found = DocumentStoreUtils.findRange textBuilder range
-    if found <> (7, 11) then Fail(found)
+    Assert.AreEqual((7, 11), found)
 
-let ``test open document`` (t: TestContext) = 
+[<Test>]
+let ``open document`` () = 
     let store = DocumentStore() 
     let exampleUri = Uri("file://example.txt")
     let helloWorld = "Hello world!"
@@ -50,7 +58,7 @@ let ``test open document`` (t: TestContext) =
               text = helloWorld } }
     store.Open(openDoc)
     let found = store.GetText(exampleUri)
-    if found <> (Some helloWorld) then Fail(found)
+    Assert.AreEqual((Some helloWorld), found)
 
 let exampleUri = Uri("file://example.txt")
 let helloStore() = 
@@ -65,7 +73,8 @@ let helloStore() =
     store.Open(openDoc)
     store
 
-let ``test replace a document`` (t: TestContext) = 
+[<Test>]
+let ``replace a document`` () = 
     let store = helloStore()
     let newText = "Replaced everything"
     let replaceAll: DidChangeTextDocumentParams = 
@@ -78,9 +87,10 @@ let ``test replace a document`` (t: TestContext) =
                 text = newText } ] }
     store.Change(replaceAll)
     let found = store.GetText(exampleUri)
-    if found <> (Some newText) then Fail(found)
+    Assert.AreEqual((Some newText), found)
 
-let ``test patch a document`` (t: TestContext) = 
+[<Test>]
+let ``patch a document`` () = 
     let store = helloStore()
     let newText = "George"
     let replaceAll: DidChangeTextDocumentParams = 
@@ -94,4 +104,4 @@ let ``test patch a document`` (t: TestContext) =
                 text = newText } ] }
     store.Change(replaceAll)
     let found = store.GetText(exampleUri)
-    if found <> (Some "Hello George!") then Fail(found)
+    Assert.AreEqual((Some "Hello George!"), found)

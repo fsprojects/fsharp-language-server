@@ -3,10 +3,15 @@ module LSP.ParserTests
 open Types
 open System
 open Parser
-open SimpleTest
 open LSP.Json
+open NUnit.Framework
 
-let ``test parse a RequestMessage`` (t: TestContext) = 
+[<SetUp>]
+let setup () = 
+    LSP.Log.diagnosticsLog := stdout
+
+[<Test>]
+let ``parse a RequestMessage`` () = 
     let json = """{
         "jsonrpc": "2.0",
         "id": 1,
@@ -15,9 +20,10 @@ let ``test parse a RequestMessage`` (t: TestContext) =
     }"""
     let found = parseMessage json
     let expected = (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}"""))
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a RequestMessage with params`` (t: TestContext) = 
+[<Test>]
+let ``parse a RequestMessage with params`` () = 
     let json = """{
         "jsonrpc": "2.0",
         "id": 1,
@@ -26,18 +32,20 @@ let ``test parse a RequestMessage with params`` (t: TestContext) =
     }"""
     let found = parseMessage json
     let expected = (RequestMessage (1, "helloWorld", JsonValue.Parse """{"hello":"world"}"""))
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a NotificationMessage`` (t: TestContext) = 
+[<Test>]
+let ``parse a NotificationMessage`` () = 
     let json = """{
         "jsonrpc": "2.0",
         "method": "helloNotification"
     }"""
     let found = parseMessage json
     let expected = (NotificationMessage ("helloNotification", None))
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a NotificationMessage with params`` (t: TestContext) = 
+[<Test>]
+let ``parse a NotificationMessage with params`` () = 
     let json = """{
         "jsonrpc": "2.0",
         "method": "helloNotification",
@@ -45,13 +53,15 @@ let ``test parse a NotificationMessage with params`` (t: TestContext) =
     }"""
     let found = parseMessage json
     let expected = NotificationMessage ("helloNotification", Some (JsonValue.Parse """{"hello":"world"}"""))
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse an Initialized notification`` (t: TestContext) = 
+[<Test>]
+let ``parse an Initialized notification`` () = 
     let found = parseNotification "initialized" None
-    if found <> Initialized then Fail(found)
+    Assert.AreEqual(Initialized, found)
 
-let ``test parse a DidChangeConfiguration notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidChangeConfiguration notification`` () = 
     let json = JsonValue.Parse """{
         "settings": {"hello": "world"}
     }"""
@@ -59,9 +69,10 @@ let ``test parse a DidChangeConfiguration notification`` (t: TestContext) =
     let expected = (DidChangeConfiguration {
             settings = JsonValue.Parse """{"hello":"world"}"""
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidOpenTextDocument notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidOpenTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs",
@@ -80,9 +91,10 @@ let ``test parse a DidOpenTextDocument notification`` (t: TestContext) =
                     text = "let x = 1"
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidChangeTextDocument notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidChangeTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs",
@@ -108,9 +120,10 @@ let ``test parse a DidChangeTextDocument notification`` (t: TestContext) =
                 }
             ]
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidChangeTextDocument notification with range`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidChangeTextDocument notification with range`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs",
@@ -142,9 +155,10 @@ let ``test parse a DidChangeTextDocument notification with range`` (t: TestConte
                 text = "let x = 1"
             }]
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a WillSaveTextDocument notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a WillSaveTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -156,9 +170,10 @@ let ``test parse a WillSaveTextDocument notification`` (t: TestContext) =
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             reason = TextDocumentSaveReason.AfterDelay
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a WillSaveWaitUntilTextDocument request`` (t: TestContext) = 
+[<Test>]
+let ``parse a WillSaveWaitUntilTextDocument request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -170,9 +185,10 @@ let ``test parse a WillSaveWaitUntilTextDocument request`` (t: TestContext) =
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             reason = TextDocumentSaveReason.AfterDelay
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidSaveTextDocument notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidSaveTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -183,9 +199,10 @@ let ``test parse a DidSaveTextDocument notification`` (t: TestContext) =
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             text = None
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidSaveTextDocument notification with text`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidSaveTextDocument notification with text`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -197,9 +214,10 @@ let ``test parse a DidSaveTextDocument notification with text`` (t: TestContext)
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             text = Some "let x = 1"
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidCloseTextDocument notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidCloseTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -209,9 +227,10 @@ let ``test parse a DidCloseTextDocument notification`` (t: TestContext) =
     let expected = (DidCloseTextDocument {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a DidChangeWatchedFiles notification`` (t: TestContext) = 
+[<Test>]
+let ``parse a DidChangeWatchedFiles notification`` () = 
     let json = JsonValue.Parse """{
         "changes": [{
             "uri": "file://workspace/Main.fs",
@@ -226,9 +245,10 @@ let ``test parse a DidChangeWatchedFiles notification`` (t: TestContext) =
                     ``type`` = FileChangeType.Changed
                 }]
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse a minimal Initialize request`` (t: TestContext) = 
+[<Test>]
+let ``parse a minimal Initialize request`` () = 
     let json = JsonValue.Parse """{
         "processId": 1,
         "rootUri": "file://workspace",
@@ -245,9 +265,10 @@ let ``test parse a minimal Initialize request`` (t: TestContext) =
                 trace = None
             }
         )
-    if i <> expected then Fail(i)
+    Assert.AreEqual(expected, i)
 
-let ``test processId can be null`` (t: TestContext) = 
+[<Test>]
+let ``processId can be null`` () = 
     let json = JsonValue.Parse """{
         "processId": null,
         "rootUri": "file://workspace",
@@ -255,9 +276,10 @@ let ``test processId can be null`` (t: TestContext) =
         }
     }"""
     let (Initialize i) = parseRequest "initialize" json 
-    if i.processId <> None then Fail(i.processId)
+    Assert.AreEqual(None, i.processId)
     
-let ``test parse capabilities as map`` (t: TestContext) = 
+[<Test>]
+let ``parse capabilities as map`` () = 
     let json = JsonValue.Parse """{
         "processId": 1,
         "rootUri": "file://workspace",
@@ -271,9 +293,10 @@ let ``test parse capabilities as map`` (t: TestContext) =
     }"""
     let (Initialize i) = parseRequest "initialize" json 
     let expected = Map.empty.Add("workspace.workspaceEdit.documentChanges", true)
-    if i.capabilitiesMap <> expected then Fail(i.capabilitiesMap)
+    Assert.AreEqual(expected, i.capabilitiesMap)
 
-let ``test parse Completion request`` (t: TestContext) = 
+[<Test>]
+let ``parse Completion request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -295,9 +318,10 @@ let ``test parse Completion request`` (t: TestContext) =
                     character = 5
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse minimal ResolveCompletionItem request`` (t: TestContext) = 
+[<Test>]
+let ``parse minimal ResolveCompletionItem request`` () = 
     let json = JsonValue.Parse """{
         "label": "foo"
     }"""
@@ -317,9 +341,10 @@ let ``test parse minimal ResolveCompletionItem request`` (t: TestContext) =
             command = None 
             data = JsonValue.Null
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse maximal ResolveCompletionItem request`` (t: TestContext) = 
+[<Test>]
+let ``parse maximal ResolveCompletionItem request`` () = 
     let json = JsonValue.Parse """{
         "label": "foo",
         "kind": 1,
@@ -386,9 +411,10 @@ let ``test parse maximal ResolveCompletionItem request`` (t: TestContext) =
             } 
             data = JsonValue.Parse """{"hello":"world"}"""
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse SignatureHelp request`` (t: TestContext) = 
+[<Test>]
+let ``parse SignatureHelp request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -407,9 +433,10 @@ let ``test parse SignatureHelp request`` (t: TestContext) =
                     character = 5
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse GotoDefinition request`` (t: TestContext) = 
+[<Test>]
+let ``parse GotoDefinition request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -428,9 +455,10 @@ let ``test parse GotoDefinition request`` (t: TestContext) =
                     character = 5
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse FindReferences request`` (t: TestContext) = 
+[<Test>]
+let ``parse FindReferences request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -449,9 +477,10 @@ let ``test parse FindReferences request`` (t: TestContext) =
             position = { line = 0; character = 5 }
             context = { includeDeclaration = true }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse DocumentHighlight request`` (t: TestContext) = 
+[<Test>]
+let ``parse DocumentHighlight request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -466,9 +495,10 @@ let ``test parse DocumentHighlight request`` (t: TestContext) =
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             position = { line = 0; character = 5 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse DocumentSymbols request`` (t: TestContext) = 
+[<Test>]
+let ``parse DocumentSymbols request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -478,9 +508,10 @@ let ``test parse DocumentSymbols request`` (t: TestContext) =
     let expected = (DocumentSymbols {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse WorkspaceSymbols request`` (t: TestContext) = 
+[<Test>]
+let ``parse WorkspaceSymbols request`` () = 
     let json = JsonValue.Parse """{
         "query": "foo"
     }"""
@@ -488,9 +519,10 @@ let ``test parse WorkspaceSymbols request`` (t: TestContext) =
     let expected = (WorkspaceSymbols {
             query = "foo"
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse minimal CodeActions request`` (t: TestContext) = 
+[<Test>]
+let ``parse minimal CodeActions request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -533,9 +565,10 @@ let ``test parse minimal CodeActions request`` (t: TestContext) =
                         }]
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse maximal CodeActions request`` (t: TestContext) = 
+[<Test>]
+let ``parse maximal CodeActions request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -581,9 +614,10 @@ let ``test parse maximal CodeActions request`` (t: TestContext) =
                         }]
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse CodeActions request with an integer code`` (t: TestContext) = 
+[<Test>]
+let ``parse CodeActions request with an integer code`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -627,9 +661,10 @@ let ``test parse CodeActions request with an integer code`` (t: TestContext) =
                         }]
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse CodeLens request`` (t: TestContext) = 
+[<Test>]
+let ``parse CodeLens request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -639,9 +674,10 @@ let ``test parse CodeLens request`` (t: TestContext) =
     let expected = (Request.CodeLens {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse minimal ResolveCodeLens request`` (t: TestContext) = 
+[<Test>]
+let ``parse minimal ResolveCodeLens request`` () = 
     let json = JsonValue.Parse """{
         "range": {
             "start": {"line": 1, "character": 0},
@@ -658,9 +694,10 @@ let ``test parse minimal ResolveCodeLens request`` (t: TestContext) =
             command = None 
             data = JsonValue.Null
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse maximal ResolveCodeLens request`` (t: TestContext) = 
+[<Test>]
+let ``parse maximal ResolveCodeLens request`` () = 
     let json = JsonValue.Parse """{
         "range": {
             "start": {"line": 1, "character": 0},
@@ -687,9 +724,10 @@ let ``test parse maximal ResolveCodeLens request`` (t: TestContext) =
             } 
             data = JsonValue.String "hi"
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse DocumentLink request`` (t: TestContext) = 
+[<Test>]
+let ``parse DocumentLink request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -699,9 +737,10 @@ let ``test parse DocumentLink request`` (t: TestContext) =
     let expected = (DocumentLink {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse ResolveDocumentLink request`` (t: TestContext) = 
+[<Test>]
+let ``parse ResolveDocumentLink request`` () = 
     let json = JsonValue.Parse """{
         "range": {
             "start": {"line": 1, "character": 0},
@@ -717,9 +756,10 @@ let ``test parse ResolveDocumentLink request`` (t: TestContext) =
                 }
             target = None
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse DocumentFormatting request`` (t: TestContext) = 
+[<Test>]
+let ``parse DocumentFormatting request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -749,9 +789,10 @@ let ``test parse DocumentFormatting request`` (t: TestContext) =
                     "stringOption", "foo"
                 ]
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse DocumentRangeFormatting request`` (t: TestContext) = 
+[<Test>]
+let ``parse DocumentRangeFormatting request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -790,9 +831,10 @@ let ``test parse DocumentRangeFormatting request`` (t: TestContext) =
                     ``end`` = {line = 1; character = 0}
                 }
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse DocumentOnTypeFormatting request`` (t: TestContext) = 
+[<Test>]
+let ``parse DocumentOnTypeFormatting request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -833,9 +875,10 @@ let ``test parse DocumentOnTypeFormatting request`` (t: TestContext) =
                 }
             ch = 'a'
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse Rename request`` (t: TestContext) = 
+[<Test>]
+let ``parse Rename request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
             "uri": "file://workspace/Main.fs"
@@ -856,9 +899,10 @@ let ``test parse Rename request`` (t: TestContext) =
                 }
             newName = "foo"
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse ExecuteCommand request with no arguments`` (t: TestContext) = 
+[<Test>]
+let ``parse ExecuteCommand request with no arguments`` () = 
     let json = JsonValue.Parse """{
         "command": "foo"
     }"""
@@ -867,9 +911,10 @@ let ``test parse ExecuteCommand request with no arguments`` (t: TestContext) =
             command = "foo"
             arguments = []
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
 
-let ``test parse ExecuteCommand request with arguments`` (t: TestContext) = 
+[<Test>]
+let ``parse ExecuteCommand request with arguments`` () = 
     let json = JsonValue.Parse """{
         "command": "foo",
         "arguments": ["bar"]
@@ -879,4 +924,4 @@ let ``test parse ExecuteCommand request with arguments`` (t: TestContext) =
             command = "foo"
             arguments = [JsonValue.String "bar"]
         })
-    if found <> expected then Fail(found)
+    Assert.AreEqual(expected, found)
