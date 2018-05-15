@@ -3,7 +3,7 @@ module LSP.JsonTests
 open System
 open System.Text.RegularExpressions
 open LSP.Json
-open Json
+open LSP.Json.Ser
 open NUnit.Framework
 
 [<SetUp>]

@@ -9,7 +9,7 @@ open System.Xml
 open System.Text.RegularExpressions
 open LSP.Json
 open LSP.Json.JsonExtensions
-open LSP.Json
+open LSP.Json.Ser
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 

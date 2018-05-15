@@ -4,8 +4,8 @@ open LSP.Log
 open System
 open LSP.Json
 open LSP.Json.JsonExtensions
+open LSP.Json.Ser
 open Types
-open LSP.Json
 
 type RawMessage = {
     id: int option 

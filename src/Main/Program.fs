@@ -10,7 +10,6 @@ open LSP.Types
 open System.Text.RegularExpressions
 open LSP.Json
 open LSP.Json.JsonExtensions
-open Json
 
 let private TODO() = raise (Exception "TODO")
 

@@ -8,7 +8,7 @@ open System.IO
 open System.Text
 open LSP.Json
 open Types 
-open Json
+open LSP.Json.Ser
 open JsonExtensions
 
 let private jsonWriteOptions = 

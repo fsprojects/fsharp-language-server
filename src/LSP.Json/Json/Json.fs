@@ -1,4 +1,4 @@
-module LSP.Json
+module LSP.Json.Ser
 
 open System
 open System.Reflection
