@@ -121,31 +121,28 @@ type ProjectManager() =
     and ensureAnalyzed (fsproj: FileInfo) = 
         if not (analyzedByProjectFile.ContainsKey fsproj.FullName) then 
             analyzedByProjectFile.[fsproj.FullName] <- parseProject fsproj |> Result.bind analyzeProject
-    // Remove project file and all its sources from caches
-    // TODO invalidate descendents
-    let rec invalidate (fsproj: FileInfo) = 
-        if analyzedByProjectFile.ContainsKey fsproj.FullName then
-            match analyzedByProjectFile.[fsproj.FullName] with 
-            | Ok options -> 
-                for source in options.SourceFiles do 
-                    projectFileBySourceFile.Remove source |> ignore
-            | _ -> () 
-        analyzedByProjectFile.Remove fsproj.FullName |> ignore
+    // Re-analyze all projects
+    let resetCaches () = 
+        let projects = analyzedByProjectFile.Keys |> Seq.map FileInfo |> List.ofSeq 
+        dprintfn "Re-analyze %A" [for p in projects do yield p.Name]
+        analyzedByProjectFile.Clear()
+        projectFileBySourceFile.Clear()
+        for p in projects do 
+            ensureAnalyzed(p)
     member this.AddWorkspaceRoot(root: DirectoryInfo) = 
         let all = root.EnumerateFiles("*.fsproj", SearchOption.AllDirectories)
         for f in all do 
             ensureAnalyzed f
     member this.DeleteProjectFile(fsproj: FileInfo) = 
-        invalidate fsproj
+        analyzedByProjectFile.Remove fsproj.FullName |> ignore
+        resetCaches()
     member this.UpdateProjectFile(fsproj: FileInfo) = 
-        invalidate fsproj
-        ensureAnalyzed fsproj
+        resetCaches()
     member this.NewProjectFile(fsproj: FileInfo) = 
-        invalidate fsproj
+        resetCaches()
         ensureAnalyzed fsproj
     member this.UpdateAssetsJson(assets: FileInfo) = 
-        for fsproj in assets.Directory.Parent.GetFiles("*.fsproj") do 
-            this.UpdateProjectFile fsproj
+        resetCaches()
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, string> = 
         if projectFileBySourceFile.ContainsKey sourceFile.FullName then 
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
