@@ -283,6 +283,7 @@ let private asRange (r: Range.range): Range =
         ``end``=asPosition r.End
     }
 
+// Convert an F# `Range.range` to an LSP `Location`
 let private asLocation (l: Range.range): Location = 
     { 
         uri=Uri("file://" + l.FileName)
@@ -396,17 +397,6 @@ type Server(client: ILanguageClient) =
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
 
-    // Add documentation to a completion item
-    // Generating documentation is an expensive step, so we want to defer it until the user is actually looking at it
-    let resolveCompletion (i: CompletionItem): CompletionItem = 
-        let mutable result = i 
-        if lastCompletion.IsSome then 
-            for candidate in lastCompletion.Value.Items do 
-                if candidate.FullName = i.data?FullName.AsString() then 
-                    dprintfn "Resolve description for %s" candidate.FullName
-                    result <- {i with documentation=asDocumentation candidate.DescriptionText}
-        result
-
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams) =
             async {
@@ -507,9 +497,17 @@ type Server(client: ILanguageClient) =
                     let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier)
                     return Some(asHover tips)
             }
+        // Add documentation to a completion item
+        // Generating documentation is an expensive step, so we want to defer it until the user is actually looking at it
         member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = 
             async {
-                return resolveCompletion p
+                let mutable result = p
+                if lastCompletion.IsSome then 
+                    for candidate in lastCompletion.Value.Items do 
+                        if candidate.FullName = p.data?FullName.AsString() then 
+                            dprintfn "Resolve description for %s" candidate.FullName
+                            result <- {p with documentation=asDocumentation candidate.DescriptionText}
+                return result
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
