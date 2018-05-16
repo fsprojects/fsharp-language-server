@@ -80,7 +80,7 @@ let findNamesUnderCursor (lineContent: string) (character: int): string list =
     let found: Match list = [ for m in ms do if overlaps m then yield m ]
     match found with 
     | [] -> 
-        dprintfn "No identifiers at %d in line %s" character lineContent
+        dprintfn "No identifiers at %d in line '%s'" character lineContent
         [] 
     | single::[] -> 
         let r = Regex(@"(\w+|``[^`]+``)")
@@ -343,26 +343,35 @@ type Server(client: ILanguageClient) =
                         return Error e.Message
         }
     // Typecheck a file
-    let checkOpenFile (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+    let forceCheckOpenFile (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             let file = FileInfo(uri.AbsolutePath)
             match projects.FindProjectOptions(file), docs.Get uri with 
             | Error e, _ -> return Error [errorAtTop e]
             | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
+                let! force = checker.ParseAndCheckFileInProject(uri.AbsolutePath, sourceVersion, sourceText, projectOptions)
+                match force with 
+                | parseResult, FSharpCheckFileAnswer.Aborted -> return Error (asDiagnostics parseResult.Errors)
+                | parseResult, FSharpCheckFileAnswer.Succeeded checkResult -> return Ok(parseResult, checkResult)
+        }
+    let checkOpenFile (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+        async {
+            let file = FileInfo(uri.AbsolutePath)
+            match projects.FindProjectOptions(file), docs.GetVersion uri with 
+            | Error e, _ -> return Error [errorAtTop e]
+            | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
+            | Ok(projectOptions), Some(sourceVersion) -> 
                 match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
                 | Some(parseResult, checkResult, version) when version = sourceVersion -> 
                     return Ok(parseResult, checkResult)
                 | _ -> 
-                    let! force = checker.ParseAndCheckFileInProject(uri.AbsolutePath, sourceVersion, sourceText, projectOptions)
-                    match force with 
-                    | parseResult, FSharpCheckFileAnswer.Aborted -> return Error (asDiagnostics parseResult.Errors)
-                    | parseResult, FSharpCheckFileAnswer.Succeeded checkResult -> return Ok(parseResult, checkResult)
+                    return! forceCheckOpenFile uri
         }
     // Check a file and send all errors to the client
     let lint (uri: Uri): Async<unit> = 
         async {
-            let! check = checkOpenFile uri
+            let! check = forceCheckOpenFile uri
             let errors = 
                 match check with
                 | Error errors -> errors
@@ -402,6 +411,32 @@ type Server(client: ILanguageClient) =
                 let range = asRange u.RangeAlternate 
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
+
+    // Determine if one .fs file is an ancestor of another, so that we can correctly invalidate descendents when the user saves changes
+    let isAncestorInProject (project: FSharpProjectOptions) (parent: FileInfo) (child: FileInfo) = 
+        match Array.tryFindIndex ((=) parent.FullName) project.SourceFiles, Array.tryFindIndex ((=) child.FullName) project.SourceFiles with 
+        | Some iParent, Some iChild -> iParent < iChild 
+        | _, _ -> false
+    let isAncestorProject (parentProject: FSharpProjectOptions) (childProject: FSharpProjectOptions) = 
+        let rec traverse (p: FSharpProjectOptions): bool = 
+            let traverseNext (_, next) = traverse next
+            let stop = p.ProjectFileName = parentProject.ProjectFileName
+            stop || Array.exists traverseNext p.ReferencedProjects
+        parentProject.ProjectFileName <> childProject.ProjectFileName && traverse childProject
+    let isAncestor (parent: Uri) (child: Uri): bool = 
+        let parentFile = FileInfo(parent.AbsolutePath)
+        let childFile = FileInfo(child.AbsolutePath)
+        match projects.FindProjectOptions(parentFile), projects.FindProjectOptions(childFile) with 
+        | Ok parentProject, Ok childProject -> 
+            isAncestorInProject parentProject parentFile childFile || isAncestorProject parentProject childProject
+        | _, _ -> false
+    
+    // List of all .fs files that depend on `uri`
+    // These are the files that are invalidated when the user saves changes to `uri`
+    let openDescendentFiles (uri: Uri): Uri list = 
+        [for candidate in docs.OpenFiles() do 
+            if isAncestor uri candidate then 
+                yield candidate ]
 
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
@@ -453,7 +488,10 @@ type Server(client: ILanguageClient) =
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
-                return! lint p.textDocument.uri
+                let files = p.textDocument.uri::(openDescendentFiles p.textDocument.uri)
+                dprintfn "Lint %s" (String.Join(", ", List.map (fun (uri:Uri) -> FileInfo(uri.AbsolutePath).Name) files))
+                for f in files do 
+                    do! lint f
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {

@@ -18,6 +18,8 @@
     <Compile Include="DeclareSymbol.fs" />
     <Compile Include="UseSymbol.fs" />
     <Compile Include="InterfaceInModule.fs" />
+    <Compile Include="BreakParentTarget.fs" />
+    <Compile Include="BreakParentReference.fs" />
   </ItemGroup>
 
   <ItemGroup>

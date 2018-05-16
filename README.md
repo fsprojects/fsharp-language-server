@@ -4,3 +4,4 @@
 - src/Main: F# language server
 - tests/LSP.Tests
 - tests/Main.Tests
+- sample: Example projects used by tests/Main.Tests

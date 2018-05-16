@@ -92,6 +92,9 @@ type DocumentStore() =
     member this.Close(doc: DidCloseTextDocumentParams): unit = 
         activeDocuments.Remove doc.textDocument.uri |> ignore
 
+    member this.OpenFiles(): Uri list = 
+        activeDocuments.Keys |> List.ofSeq
+
     member this.LineContent(uri: Uri, targetLine: int): string = 
         let text = this.GetText uri |> Option.defaultWith (notFound uri)
         let reader = new StringReader(text)

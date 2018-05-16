@@ -4,6 +4,7 @@ open Main.Tests.Common
 open Main.Program
 open LSP.Types
 open LSP
+open LSP.Log
 open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
@@ -31,6 +32,7 @@ type MockClient() =
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
+            dprintfn "Received %d diagnostics for %s" p.diagnostics.Length (FileInfo(p.uri.AbsolutePath).Name)
             this.Diagnostics.Add(p)
         member this.RegisterCapability (p: RegisterCapability): unit = 
             ()
@@ -50,15 +52,25 @@ let readFile (name: string): string * string =
     let file = absPath name
     let fileText = File.ReadAllText(file)
     (file, fileText)
+    
+let openFile (name: string): DidOpenTextDocumentParams = 
+    let (file, fileText) = readFile name
+    {
+        textDocument = 
+            { 
+                uri=Uri(absPath file) 
+                languageId="fsharp"
+                version=0
+                text=fileText
+            }
+    }
 
 let createServerAndReadFile (name: string): MockClient * ILanguageServer = 
     let (client, server) = createServer()
     let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
     let sampleRootUri = Uri("file://" + sampleRootPath)
     server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> Async.RunSynchronously |> ignore
-    let (file, fileText) = readFile name
-    let openParams: DidOpenTextDocumentParams = {textDocument={uri=Uri(file); languageId="fsharp"; version=0; text=fileText}}
-    server.DidOpenTextDocument(openParams) |> Async.RunSynchronously
+    server.DidOpenTextDocument(openFile name) |> Async.RunSynchronously
     (client, server)
 
 [<Test>]
@@ -113,7 +125,19 @@ let ``report a type error when a file is saved`` () =
     server.DidChangeTextDocument(edit "CreateTypeError.fs" 4 18 "1" "\"1\"") |> Async.RunSynchronously
     server.DidSaveTextDocument(save "CreateTypeError.fs") |> Async.RunSynchronously
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Assert.Fail(sprintf "No type error in %A" messages)
+    let isTypeError (m: string) = m.Contains("This expression was expected to have type")
+    if not (List.exists isTypeError messages) then Assert.Fail(sprintf "No type error in %A" messages)
+
+[<Test>]
+let ``report a type error when a referenced file is changed`` () = 
+    let (client, server) = createServerAndReadFile "BreakParentReference.fs"
+    server.DidOpenTextDocument(openFile "BreakParentTarget.fs") |> Async.RunSynchronously
+    client.Diagnostics.Clear()
+    server.DidChangeTextDocument(edit "BreakParentTarget.fs" 3 17 "1" "\"1\"") |> Async.RunSynchronously
+    server.DidSaveTextDocument(save "BreakParentTarget.fs") |> Async.RunSynchronously
+    let files = [for group in client.Diagnostics do yield group.uri]
+    let isBreakParent (uri: Uri) = uri.AbsolutePath.EndsWith "BreakParentReference.fs"
+    if not (List.exists isBreakParent files) then Assert.Fail(sprintf "Didn't lint BreakParentReference.fs in %A" files)
 
 [<Test>]
 let ``reference other file in same project`` () = 
