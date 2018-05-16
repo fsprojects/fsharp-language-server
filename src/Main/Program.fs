@@ -286,6 +286,8 @@ let private findCompatibleOverload (activeParameter: int) (methods: FSharpMethod
             result <- i 
     if result = -1 then None else Some result
 
+// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
+// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
 let private asSymbolKind (k: FSharpNavigationDeclarationItemKind): SymbolKind = 
     match k with 
     | NamespaceDecl -> SymbolKind.Namespace
@@ -298,6 +300,9 @@ let private asSymbolKind (k: FSharpNavigationDeclarationItemKind): SymbolKind =
     | FieldDecl -> SymbolKind.Field
     | OtherDecl -> SymbolKind.Variable
 
+// Convert an F# `FSharpNavigationDeclarationItem` to an LSP `SymbolInformation`
+// `FSharpNavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
+// `container` is present when `d` is part of a module or type
 let private asSymbolInformation (d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
     {
         name=d.Name 
@@ -306,6 +311,7 @@ let private asSymbolInformation (d: FSharpNavigationDeclarationItem, container: 
         containerName=container |> Option.map(fun d -> d.Name)
     }
 
+// Find all symbols in a parsed AST
 let private flattenSymbols (parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
     [ for d in parse.GetNavigationItems().Declarations do 
         yield d.Declaration, None
@@ -359,7 +365,7 @@ type Server(client: ILanguageClient) =
                     with e -> 
                         return Error e.Message
         }
-    // Typecheck a file
+    // Typecheck a file, ignoring caches
     let forceCheckOpenFile (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             let file = FileInfo(uri.AbsolutePath)
@@ -372,6 +378,7 @@ type Server(client: ILanguageClient) =
                 | parseResult, FSharpCheckFileAnswer.Aborted -> return Error (asDiagnostics parseResult.Errors)
                 | parseResult, FSharpCheckFileAnswer.Succeeded checkResult -> return Ok(parseResult, checkResult)
         }
+    // Typecheck a file
     let checkOpenFile (uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             let file = FileInfo(uri.AbsolutePath)
@@ -420,7 +427,8 @@ type Server(client: ILanguageClient) =
                     return maybeSymbol
         }
 
-    // Rename one usage of a symbol
+    // Find the exact location of a symbol within a fully-qualified name
+    // For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`
     let refineRenameRange (s: FSharpSymbol) (file: string) (range: Range.range): Range = 
         let uri = Uri("file://" + file)
         let line = range.End.Line - 1
@@ -436,6 +444,7 @@ type Server(client: ILanguageClient) =
                 start={line=line; character=find}
                 ``end``={line=line; character=find + s.DisplayName.Length}
             }
+    // Rename one usage of a symbol
     let renameTo (newName: string) (file: string, usages: FSharpSymbolUse seq): TextDocumentEdit = 
         let uri = Uri("file://" + file)
         let version = docs.GetVersion(uri) |> Option.defaultValue 0
@@ -649,7 +658,6 @@ type Server(client: ILanguageClient) =
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
             async {
-                // TODO consider just parsing all files and using GetNavigationItems
                 let openProjects = projects.OpenProjects
                 let names = openProjects |> List.map (fun f -> f.ProjectFileName) |> String.concat ", "
                 dprintfn "Looking for symbols matching %s in %s" p.query names
