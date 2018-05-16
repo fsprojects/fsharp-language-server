@@ -20,6 +20,8 @@
     <Compile Include="InterfaceInModule.fs" />
     <Compile Include="BreakParentTarget.fs" />
     <Compile Include="BreakParentReference.fs" />
+    <Compile Include="RenameTarget.fs" />
+    <Compile Include="RenameReference.fs" />
   </ItemGroup>
 
   <ItemGroup>

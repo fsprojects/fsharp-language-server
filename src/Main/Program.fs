@@ -316,11 +316,28 @@ type Server(client: ILanguageClient) =
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
+
+    // Get a file from docs, or read it from disk
     let getOrRead (uri: Uri): string option = 
         match docs.GetText uri with 
         | Some text -> Some text 
         | None when File.Exists uri.AbsolutePath -> Some (File.ReadAllText uri.AbsolutePath)
         | None -> None
+
+    // Read a specific line from a file
+    let lineContent (uri: Uri) (targetLine: int): string = 
+        let text = getOrRead uri |> Option.defaultValue ""
+        let reader = new StringReader(text)
+        let mutable line = 0
+        while line < targetLine && reader.Peek() <> -1 do 
+            reader.ReadLine() |> ignore
+            line <- line + 1
+        if reader.Peek() = -1 then 
+            dprintfn "Reached EOF before line %d in file %O" targetLine uri
+            "" 
+        else 
+            reader.ReadLine()
+
     // Parse a file 
     let parseFile (uri: Uri): Async<Result<FSharpParseFileResults, string>> = 
         async {
@@ -387,7 +404,7 @@ type Server(client: ILanguageClient) =
                 dprintfn "Check failed, ignored %d errors" (List.length errors)
                 return None
             | Ok(parseResult, checkResult) -> 
-                let line = docs.LineContent(textDocument.uri, position.line)
+                let line = lineContent textDocument.uri position.line
                 match findEndOfIdentifierUnderCursor line position.character with 
                 | None -> 
                     dprintfn "No identifier at %d in line '%s'" position.character line 
@@ -402,13 +419,29 @@ type Server(client: ILanguageClient) =
                         dprintfn "%s in line '%s' is not a symbol use" dotName line
                     return maybeSymbol
         }
+
     // Rename one usage of a symbol
+    let refineRenameRange (s: FSharpSymbol) (file: string) (range: Range.range): Range = 
+        let uri = Uri("file://" + file)
+        let line = range.End.Line - 1
+        let startColumn = if range.Start.Line - 1 < line then 0 else range.Start.Column
+        let endColumn = range.End.Column
+        let lineText = lineContent uri line 
+        let find = lineText.LastIndexOf(s.DisplayName, endColumn, endColumn - startColumn)
+        if find = -1 then
+            dprintfn "Couldn't find '%s' in line '%s'" s.DisplayName lineText 
+            asRange range
+        else 
+            {
+                start={line=line; character=find}
+                ``end``={line=line; character=find + s.DisplayName.Length}
+            }
     let renameTo (newName: string) (file: string, usages: FSharpSymbolUse seq): TextDocumentEdit = 
         let uri = Uri("file://" + file)
         let version = docs.GetVersion(uri) |> Option.defaultValue 0
         let edits = [
             for u in usages do 
-                let range = asRange u.RangeAlternate 
+                let range = refineRenameRange u.Symbol u.FileName u.RangeAlternate 
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
@@ -523,7 +556,7 @@ type Server(client: ILanguageClient) =
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                    let line = lineContent p.textDocument.uri p.position.line
                     let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                     dprintfn "Autocompleting %s" (String.concat "." (partialName.QualifyingIdents@[partialName.PartialIdent]))
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
@@ -539,7 +572,7 @@ type Server(client: ILanguageClient) =
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                    let line = lineContent p.textDocument.uri p.position.line
                     let names = findNamesUnderCursor line p.position.character
                     let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier)
                     return Some(asHover tips)
@@ -564,7 +597,7 @@ type Server(client: ILanguageClient) =
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = docs.LineContent(p.textDocument.uri, p.position.line)
+                    let line = lineContent p.textDocument.uri p.position.line
                     match findMethodCallBeforeCursor line p.position.character with 
                     | None -> 
                         dprintfn "No method call in line %s" line 

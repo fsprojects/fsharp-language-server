@@ -94,16 +94,3 @@ type DocumentStore() =
 
     member this.OpenFiles(): Uri list = 
         activeDocuments.Keys |> List.ofSeq
-
-    member this.LineContent(uri: Uri, targetLine: int): string = 
-        let text = this.GetText uri |> Option.defaultWith (notFound uri)
-        let reader = new StringReader(text)
-        let mutable line = 0
-        while line < targetLine && reader.Peek() <> -1 do 
-            reader.ReadLine() |> ignore
-            line <- line + 1
-        if reader.Peek() = -1 then 
-            dprintfn "Reached EOF before line %d in file %O" targetLine uri
-            "" 
-        else 
-            reader.ReadLine()

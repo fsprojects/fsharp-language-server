@@ -12,9 +12,7 @@
   - done
 
 # Bugs
-- Re-lint when a parent file is edited
 - Autocompleting in strings
-- Rename symbol renames whole Path.To.symbol
 
 # Optimizations
 Don't check entire project for rename if symbol is local

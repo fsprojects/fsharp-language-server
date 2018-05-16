@@ -2,15 +2,15 @@ module Main.Tests.ServerTests
 
 open Main.Tests.Common
 open Main.Program
-open LSP.Types
-open LSP
-open LSP.Log
 open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System.Reflection
 open System.Diagnostics
 open NUnit.Framework
+open LSP.Types
+open LSP
+open LSP.Log
 
 [<SetUp>]
 let setup () = 
@@ -112,10 +112,21 @@ let save (file: string): DidSaveTextDocumentParams =
         text = None
     }
 
-let position (file: string) (line: int) (character: int): TextDocumentPositionParams = 
+let textDocument (file: string): TextDocumentIdentifier = 
     {
-        textDocument = { uri=Uri(absPath file) }
-        position = { line=line-1; character=character-1 }
+        uri=Uri(absPath file)
+    }
+
+let position (line: int) (character: int): Position = 
+    { 
+        line=line-1
+        character=character-1 
+    }
+
+let textDocumentPosition (file: string) (line: int) (character: int): TextDocumentPositionParams = 
+    {
+        textDocument = textDocument file
+        position = position line character
     }
 
 [<Test>]
@@ -179,21 +190,21 @@ let ``findNamesUnderCursor`` () =
 [<Test>]
 let ``hover over function`` () = 
     let (client, server) = createServerAndReadFile "Hover.fs"
-    match server.Hover(position "Hover.fs" 6 23) |> Async.RunSynchronously with 
+    match server.Hover(textDocumentPosition "Hover.fs" 6 23) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
 
 [<Test>]
 let ``hover over qualified name`` () = 
     let (client, server) = createServerAndReadFile "Hover.fs"
-    match server.Hover(position "Hover.fs" 12 38) |> Async.RunSynchronously with 
+    match server.Hover(textDocumentPosition "Hover.fs" 12 38) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
 
 [<Test>]
 let ``complete List members`` () = 
     let (client, server) = createServerAndReadFile "Completions.fs"
-    match server.Completion(position "Completions.fs" 2 10) |> Async.RunSynchronously with 
+    match server.Completion(textDocumentPosition "Completions.fs" 2 10) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No completions")
     | Some completions -> 
         if List.isEmpty completions.items then Assert.Fail("Completion list is empty")
@@ -203,7 +214,7 @@ let ``complete List members`` () =
 [<Test>]
 let ``signature help`` () = 
     let (client, server) = createServerAndReadFile "SignatureHelp.fs"
-    match server.SignatureHelp(position "SignatureHelp.fs" 3 47) |> Async.RunSynchronously with 
+    match server.SignatureHelp(textDocumentPosition "SignatureHelp.fs" 3 47) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No signature help")
     | Some help -> 
         if List.isEmpty help.signatures then Assert.Fail("Signature list is empty")
@@ -243,7 +254,7 @@ let ``findMethodCallBeforeCursor`` () =
 [<Test>]
 let ``find document symbols`` () = 
     let (client, server) = createServerAndReadFile "Reference.fs"
-    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "Reference.fs")}}) |> Async.RunSynchronously
+    let found = server.DocumentSymbols({textDocument=textDocument "Reference.fs"}) |> Async.RunSynchronously
     let names = found |> List.map (fun f -> f.name)
     if not (List.contains "Reference" names) then Assert.Fail(sprintf "Reference is not in %A" names)
     if List.contains "ReferenceDependsOn" names then Assert.Fail("Document symbols includes dependency")
@@ -251,7 +262,7 @@ let ``find document symbols`` () =
 [<Test>]
 let ``find interface inside module`` () = 
     let (client, server) = createServerAndReadFile "InterfaceInModule.fs"
-    let found = server.DocumentSymbols({textDocument={uri=Uri(absPath "InterfaceInModule.fs")}}) |> Async.RunSynchronously
+    let found = server.DocumentSymbols({textDocument=textDocument "InterfaceInModule.fs"}) |> Async.RunSynchronously
     let names = found |> List.map (fun f -> f.name)
     if not (List.contains "IMyInterface" names) then Assert.Fail(sprintf "IMyInterface is not in %A" names)
 
@@ -268,7 +279,7 @@ let ``find project symbols`` () =
 [<Test>]
 let ``go to definition`` () = 
     let (client, server) = createServerAndReadFile "Reference.fs"
-    match server.GotoDefinition(position "Reference.fs" 3 31) |> Async.RunSynchronously with 
+    match server.GotoDefinition(textDocumentPosition "Reference.fs" 3 31) |> Async.RunSynchronously with 
     | [] -> Assert.Fail("No symbol definition")
     | [single] -> ()
     | many -> Assert.Fail(sprintf "Multiple definitions found %A" many)
@@ -278,7 +289,7 @@ let ``find references`` () =
     let (client, server) = createServerAndReadFile "DeclareSymbol.fs"
     let p = 
         {
-            textDocument = { uri=Uri(absPath "DeclareSymbol.fs") }
+            textDocument = textDocument "DeclareSymbol.fs"
             position = { line=3-1; character=6-1 }
             context = { includeDeclaration=true }
         }
@@ -286,3 +297,19 @@ let ``find references`` () =
     let isReferenceFs (r: Location) = r.uri.AbsolutePath.EndsWith("UseSymbol.fs")
     let found = List.exists isReferenceFs list
     if not found then Assert.Fail(sprintf "Didn't find reference from UseSymbol.fs in %A" list)
+
+[<Test>]
+let ``rename across files`` () = 
+    let (client, server) = createServerAndReadFile "RenameTarget.fs"
+    let p = {
+        textDocument=textDocument "RenameTarget.fs"
+        position=position 3 11
+        newName = "renamedSymbol" 
+    }
+    let edit = server.Rename(p) |> Async.RunSynchronously
+    let ranges = [
+        for doc in edit.documentChanges do 
+            for e in doc.edits do 
+                let file = FileInfo(doc.textDocument.uri.AbsolutePath).Name
+                yield file, e.range.start.line + 1, e.range.start.character + 1, e.range.``end``.character + 1 ]
+    if not (List.contains ("RenameReference.fs", 3, 45, 59) ranges) then Assert.Fail(sprintf "%A" ranges)
