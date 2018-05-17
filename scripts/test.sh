@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
+echo 'Building sample projects, there will be errors...'
 dotnet build sample/MainProject/MainProject.fsproj
+echo 'Running tests...'
 dotnet test tests/LSP.Tests
 dotnet test tests/Main.Tests
 

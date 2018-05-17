@@ -3,6 +3,7 @@ module LSP.Tokenizer
 open System
 open System.IO
 open System.Text
+open Log
 
 type Header = ContentLength of int | EmptyHeader | OtherHeader
 
@@ -15,10 +16,20 @@ let parseHeader(header: string): Header =
     elif header = "" then EmptyHeader
     else OtherHeader
 
+let rec private eatWhitespace(client: BinaryReader): char = 
+    let c = client.ReadChar()
+    if Char.IsWhiteSpace(c) then 
+        eatWhitespace(client) 
+    else 
+        c
+
 let readLength(byteLength: int, client: BinaryReader): string = 
-    let bytes = client.ReadBytes(byteLength)
-    Encoding.UTF8.GetString(bytes)
-    
+    // Somehow, we are getting extra \r\n sequences, only when we compile to a standalone executable
+    let head = eatWhitespace(client)
+    let tail = client.ReadBytes(byteLength - 1)
+    let string = Encoding.UTF8.GetString(tail)
+    Convert.ToString(head) + string
+  
 let readLine(client: BinaryReader): string option = 
     let buffer = StringBuilder()
     try
@@ -35,8 +46,8 @@ let readLine(client: BinaryReader): string option =
         Some(buffer.ToString())
     with 
     | :? EndOfStreamException -> 
-        if buffer.Length > 0
-            then Some(buffer.ToString())
+        if buffer.Length > 0 then
+            Some(buffer.ToString())
         else
             None
 

@@ -6,8 +6,10 @@ set -e
 # Needed once
 npm install
 
-# Build fat jar
-dotnet build src/Main
+# Build self-contained archives for windows and mac
+dotnet clean
+dotnet publish -c Release -r win10-x64 src/Main
+dotnet publish -c Release -r osx.10.11-x64 src/Main
 
 # Build vsix
 vsce package -o build.vsix

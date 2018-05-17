@@ -13,6 +13,7 @@
 
 # Bugs
 - Autocompleting in strings
+- Process doesn't quit
 
 # Optimizations
 Don't check entire project for rename if symbol is local
