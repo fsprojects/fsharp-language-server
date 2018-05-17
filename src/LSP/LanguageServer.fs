@@ -47,20 +47,20 @@ let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteO
 let private serializePublishDiagnostics = serializerFactory<PublishDiagnosticsParams> jsonWriteOptions
 let private serializeRegistrationParams = serializerFactory<RegistrationParams> jsonWriteOptions
 
-let private writeClient (client: BinaryWriter) (messageText: string) =
-    let messageBytes = Encoding.UTF8.GetBytes messageText
+let private writeClient (client: BinaryWriter, messageText: string) =
+    let messageBytes = Encoding.UTF8.GetBytes(messageText)
     let headerText = sprintf "Content-Length: %d\r\n\r\n" messageBytes.Length
-    let headerBytes = Encoding.UTF8.GetBytes headerText
-    client.Write headerBytes
-    client.Write messageBytes
+    let headerBytes = Encoding.UTF8.GetBytes(headerText)
+    client.Write(headerBytes)
+    client.Write(messageBytes)
 
-let respond (client: BinaryWriter) (requestId: int) (jsonText: string) = 
+let respond(client: BinaryWriter, requestId: int, jsonText: string) = 
     let messageText = sprintf """{"id":%d,"result":%s}""" requestId jsonText
-    writeClient client messageText
+    writeClient(client, messageText)
 
-let private notifyClient (client: BinaryWriter) (method: string) (jsonText: string) = 
+let private notifyClient(client: BinaryWriter, method: string, jsonText: string) = 
     let messageText = sprintf """{"method":"%s","params":%s}""" method jsonText
-    writeClient client messageText
+    writeClient(client, messageText)
 
 let private thenMap (f: 'A -> 'B) (result: Async<'A>): Async<'B> =
     async {
@@ -72,98 +72,101 @@ let private thenNone(result: Async<'A>): Async<string option> = result |> thenMa
 
 let private notExit (message: Parser.Message) = 
     match message with 
-    | Parser.NotificationMessage ("exit", _) -> false 
+    | Parser.NotificationMessage("exit", _) -> false 
     | _ -> true
 
-let readMessages (receive: BinaryReader): seq<Parser.Message> = 
-    Tokenizer.tokenize receive |> Seq.map Parser.parseMessage |> Seq.takeWhile notExit
+let readMessages(receive: BinaryReader): seq<Parser.Message> = 
+    let tokens = Tokenizer.tokenize(receive)
+    let parse = Seq.map Parser.parseMessage tokens
+    Seq.takeWhile notExit parse
 
 type RealClient (send: BinaryWriter) = 
     interface ILanguageClient with 
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
-            p |> serializePublishDiagnostics |> notifyClient send "textDocument/publishDiagnostics"
+            let json = serializePublishDiagnostics(p)
+            notifyClient(send, "textDocument/publishDiagnostics", json)
         member this.RegisterCapability (p: RegisterCapability): unit = 
             dprintfn "Register capability %A" p
             match p with 
             | RegisterCapability.DidChangeWatchedFiles _ -> 
                 let register = {id=Guid.NewGuid().ToString(); method="workspace/didChangeWatchedFiles"; registerOptions=p}
                 let message = {registrations=[register]}
-                message |> serializeRegistrationParams |> notifyClient send "client/registerCapability"
+                let json = serializeRegistrationParams(message)
+                notifyClient(send, "client/registerCapability", json)
 
 type private PendingTask = 
 | ProcessNotification of method: string * task: Async<unit> 
 | ProcessRequest of id: int * task: Async<string option> * cancel: CancellationTokenSource
 
-let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: BinaryReader) (send: BinaryWriter) = 
+let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryReader, send: BinaryWriter) = 
     let server = serverFactory(RealClient(send))
-    let processRequest (request: Request): Async<string option> = 
+    let processRequest(request: Request): Async<string option> = 
         match request with 
-        | Initialize p -> 
-            server.Initialize p |> thenMap serializeInitializeResult |> thenSome
-        | WillSaveWaitUntilTextDocument p -> 
-            server.WillSaveWaitUntilTextDocument p |> thenMap serializeTextEditList |> thenSome
-        | Completion p -> 
-            server.Completion p |> thenMap serializeCompletionListOption
-        | Hover p -> 
-            server.Hover p |> thenMap serializeHoverOption |> thenMap (Option.defaultValue "null") |> thenSome
-        | ResolveCompletionItem p -> 
-            server.ResolveCompletionItem p |> thenMap serializeCompletionItem |> thenSome 
-        | SignatureHelp p -> 
-            server.SignatureHelp p |> thenMap serializeSignatureHelpOption |> thenMap (Option.defaultValue "null") |> thenSome
-        | GotoDefinition p -> 
-            server.GotoDefinition p |> thenMap serializeLocationList |> thenSome
-        | FindReferences p -> 
-            server.FindReferences p |> thenMap serializeLocationList |> thenSome
-        | DocumentHighlight p -> 
-            server.DocumentHighlight p |> thenMap serializeDocumentHighlightList |> thenSome
-        | DocumentSymbols p -> 
-            server.DocumentSymbols p |> thenMap serializeSymbolInformationList |> thenSome
-        | WorkspaceSymbols p -> 
-            server.WorkspaceSymbols p |> thenMap serializeSymbolInformationList |> thenSome
-        | CodeActions p -> 
-            server.CodeActions p |> thenMap serializeCommandList |> thenSome
-        | CodeLens p -> 
-            server.CodeLens p |> thenMap serializeCodeLensList |> thenSome
-        | ResolveCodeLens p -> 
-            server.ResolveCodeLens p |> thenMap serializeCodeLens |> thenSome
-        | DocumentLink p -> 
-            server.DocumentLink p |> thenMap serializeDocumentLinkList |> thenSome
-        | ResolveDocumentLink p -> 
-            server.ResolveDocumentLink p |> thenMap serializeDocumentLink |> thenSome
-        | DocumentFormatting p -> 
-            server.DocumentFormatting p |> thenMap serializeTextEditList |> thenSome
-        | DocumentRangeFormatting p -> 
-            server.DocumentRangeFormatting p |> thenMap serializeTextEditList |> thenSome
-        | DocumentOnTypeFormatting p -> 
-            server.DocumentOnTypeFormatting p |> thenMap serializeTextEditList |> thenSome
-        | Rename p -> 
-            server.Rename p |> thenMap serializeWorkspaceEdit |> thenSome
-        | ExecuteCommand p -> 
-            server.ExecuteCommand p |> thenNone
-        | DidChangeWorkspaceFolders p ->
-            server.DidChangeWorkspaceFolders p 
-            async { return None }
-    let processNotification (n: Notification) = 
+        | Initialize(p) -> 
+            server.Initialize(p) |> thenMap serializeInitializeResult |> thenSome
+        | WillSaveWaitUntilTextDocument(p) -> 
+            server.WillSaveWaitUntilTextDocument(p) |> thenMap serializeTextEditList |> thenSome
+        | Completion(p) -> 
+            server.Completion(p) |> thenMap serializeCompletionListOption
+        | Hover(p) -> 
+            server.Hover(p) |> thenMap serializeHoverOption |> thenMap (Option.defaultValue "null") |> thenSome
+        | ResolveCompletionItem(p) -> 
+            server.ResolveCompletionItem(p) |> thenMap serializeCompletionItem |> thenSome 
+        | SignatureHelp(p) -> 
+            server.SignatureHelp(p) |> thenMap serializeSignatureHelpOption |> thenMap (Option.defaultValue "null") |> thenSome
+        | GotoDefinition(p) -> 
+            server.GotoDefinition(p) |> thenMap serializeLocationList |> thenSome
+        | FindReferences(p) -> 
+            server.FindReferences(p) |> thenMap serializeLocationList |> thenSome
+        | DocumentHighlight(p) -> 
+            server.DocumentHighlight(p) |> thenMap serializeDocumentHighlightList |> thenSome
+        | DocumentSymbols(p) -> 
+            server.DocumentSymbols(p) |> thenMap serializeSymbolInformationList |> thenSome
+        | WorkspaceSymbols(p) -> 
+            server.WorkspaceSymbols(p) |> thenMap serializeSymbolInformationList |> thenSome
+        | CodeActions(p) -> 
+            server.CodeActions(p) |> thenMap serializeCommandList |> thenSome
+        | CodeLens(p) -> 
+            server.CodeLens(p) |> thenMap serializeCodeLensList |> thenSome
+        | ResolveCodeLens(p) -> 
+            server.ResolveCodeLens(p) |> thenMap serializeCodeLens |> thenSome
+        | DocumentLink(p) -> 
+            server.DocumentLink(p) |> thenMap serializeDocumentLinkList |> thenSome
+        | ResolveDocumentLink(p) -> 
+            server.ResolveDocumentLink(p) |> thenMap serializeDocumentLink |> thenSome
+        | DocumentFormatting(p) -> 
+            server.DocumentFormatting(p) |> thenMap serializeTextEditList |> thenSome
+        | DocumentRangeFormatting(p) -> 
+            server.DocumentRangeFormatting(p) |> thenMap serializeTextEditList |> thenSome
+        | DocumentOnTypeFormatting(p) -> 
+            server.DocumentOnTypeFormatting(p) |> thenMap serializeTextEditList |> thenSome
+        | Rename(p) -> 
+            server.Rename(p) |> thenMap serializeWorkspaceEdit |> thenSome
+        | ExecuteCommand(p) -> 
+            server.ExecuteCommand(p) |> thenNone
+        | DidChangeWorkspaceFolders(p) ->
+            server.DidChangeWorkspaceFolders(p) |> thenNone
+    let processNotification(n: Notification) = 
         match n with 
         | Initialized ->
             server.Initialized()
         | Shutdown ->
             server.Shutdown()
-        | DidChangeConfiguration p -> 
-            server.DidChangeConfiguration p
-        | DidOpenTextDocument p -> 
-            server.DidOpenTextDocument p
-        | DidChangeTextDocument p -> 
-            server.DidChangeTextDocument p
-        | WillSaveTextDocument p -> 
-            server.WillSaveTextDocument p 
-        | DidSaveTextDocument p -> 
-            server.DidSaveTextDocument p
-        | DidCloseTextDocument p -> 
-            server.DidCloseTextDocument p
-        | DidChangeWatchedFiles p -> 
-            server.DidChangeWatchedFiles p
-        | OtherNotification _ ->
+        | DidChangeConfiguration(p) -> 
+            server.DidChangeConfiguration(p)
+        | DidOpenTextDocument(p) -> 
+            server.DidOpenTextDocument(p)
+        | DidChangeTextDocument(p) -> 
+            server.DidChangeTextDocument(p)
+        | WillSaveTextDocument(p) -> 
+            server.WillSaveTextDocument(p)
+        | DidSaveTextDocument(p) -> 
+            server.DidSaveTextDocument(p)
+        | DidCloseTextDocument(p) -> 
+            server.DidCloseTextDocument(p)
+        | DidChangeWatchedFiles(p) -> 
+            server.DidChangeWatchedFiles(p)
+        | OtherNotification(_) ->
             async { () }
     // Process messages on a separate thread
     let pendingRequests = new System.Collections.Concurrent.ConcurrentDictionary<int, CancellationTokenSource>()
@@ -178,17 +181,17 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
                 else
                     try 
                         match Async.RunSynchronously(task, 0, cancel.Token) with 
-                        | Some result -> respond send id result
+                        | Some(result) -> respond(send, id, result)
                         | None -> ()
                     with :? OperationCanceledException -> 
                         dprintfn "Request %d was cancelled" id
-                pendingRequests.TryRemove id |> ignore
+                pendingRequests.TryRemove(id) |> ignore
     ).Start()
     // Read all messages on the main thread
-    for m in readMessages receive do 
+    for m in readMessages(receive) do 
         // Process cancellations immediately
         match m with 
-        | Parser.NotificationMessage ("$/cancelRequest", Some json) -> 
+        | Parser.NotificationMessage("$/cancelRequest", Some json) -> 
             let id = json?id.AsInteger()
             let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
             if stillRunning then
@@ -197,15 +200,15 @@ let connect (serverFactory: ILanguageClient -> ILanguageServer) (receive: Binary
             else 
                 dprintfn "Request %d has already finished" id
         // Process other requests on worker thread
-        | Parser.NotificationMessage (method, json) -> 
-            let n = Parser.parseNotification method json
-            let task = processNotification n
+        | Parser.NotificationMessage(method, json) -> 
+            let n = Parser.parseNotification(method, json)
+            let task = processNotification(n)
             processQueue.Add(ProcessNotification(method, task))
-        | Parser.RequestMessage (id, method, json) -> 
-            let task = processRequest (Parser.parseRequest method json) 
+        | Parser.RequestMessage(id, method, json) -> 
+            let task = processRequest(Parser.parseRequest method json) 
             let cancel = new CancellationTokenSource()
             processQueue.Add(ProcessRequest(id, task, cancel))
             pendingRequests.[id] <- cancel
     while pendingRequests.Count > 0 do 
         dprintfn "Waiting for %d pending requests to be processed" pendingRequests.Count
-        Thread.Sleep 500
+        Thread.Sleep(500)

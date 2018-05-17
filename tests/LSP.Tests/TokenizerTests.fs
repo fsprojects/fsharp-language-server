@@ -5,7 +5,7 @@ open System.Text
 open NUnit.Framework
 
 [<SetUp>]
-let setup () = 
+let setup() = 
     LSP.Log.diagnosticsLog := stdout
 
 [<Test>]
@@ -25,7 +25,7 @@ let ``parse empty line indicating start of message`` () =
     let found = Tokenizer.parseHeader ""
     Assert.AreEqual(Tokenizer.EmptyHeader, found)
 
-let binaryReader (sample: string): BinaryReader = 
+let binaryReader(sample: string): BinaryReader = 
     let bytes = Encoding.UTF8.GetBytes(sample)
     let stream = new MemoryStream(bytes)
     new BinaryReader(stream, Encoding.UTF8)
@@ -48,7 +48,7 @@ let ``allow newline without carriage-return`` () =
 let ``take message token`` () = 
     let sample = "{}\r\n\
                     next line..."
-    let found = Tokenizer.readLength 2 (binaryReader sample)
+    let found = Tokenizer.readLength(2, binaryReader(sample))
     Assert.AreEqual("{}", found)
 
 [<Test>]

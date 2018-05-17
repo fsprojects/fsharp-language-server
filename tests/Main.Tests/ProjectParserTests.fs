@@ -8,7 +8,7 @@ open Microsoft.FSharp.Compiler.SourceCodeServices
 open NUnit.Framework
 
 [<SetUp>]
-let setup () = 
+let setup() = 
     LSP.Log.diagnosticsLog := stdout
 
 [<Test>]
@@ -67,7 +67,7 @@ let ``parsing a JSON project file`` () =
 let ``parsing a project file`` () = 
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
     let parsed = match ProjectParser.parseFsProj file with Ok p -> p
-    let hasName (name: string) (f: FileInfo) = f.Name = name
+    let hasName(name: string) (f: FileInfo) = f.Name = name
     if not (Seq.exists (hasName "ProjectManager.fs") parsed.compileInclude) then 
         Assert.Fail(sprintf "No ProjectManager.fs in %A" parsed.compileInclude)
     if not (Seq.exists (hasName "LSP.fsproj") parsed.projectReferenceInclude) then 

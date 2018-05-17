@@ -7,22 +7,22 @@ open LSP.Json.Ser
 open NUnit.Framework
 
 [<SetUp>]
-let setup () = 
+let setup() = 
     LSP.Log.diagnosticsLog := stdout
 
-let removeSpace (expected: string) = 
+let removeSpace(expected: string) = 
     Regex.Replace(expected, @"\s", "")
 
 [<Test>]
 let ``remove space from string`` () = 
-    let found = removeSpace "foo bar"
+    let found = removeSpace("foo bar")
     Assert.AreEqual("foobar", found)
 
 [<Test>]
 let ``remove newline from string`` () = 
     let actual = """foo 
     bar"""
-    let found = removeSpace actual
+    let found = removeSpace(actual)
     Assert.AreEqual("foobar", found)
 
 [<Test>]
@@ -78,7 +78,7 @@ let ``serialize list of strings to JSON`` () =
 [<Test>]
 let ``serialize a record with a custom writer`` () = 
     let record = {simpleMember = 1}
-    let customWriter (r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
+    let customWriter(r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     let found = serializerFactory<SimpleRecord> options record
     Assert.AreEqual("\"simpleMember=1\"", found)
@@ -118,7 +118,7 @@ type MyFoo() =
 
 [<Test>]
 let ``serialize an interface with a custom writer`` () = 
-    let customWriter (foo: IFoo): string = 
+    let customWriter(foo: IFoo): string = 
         foo.Foo()
     let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
     let example = MyFoo()
@@ -184,7 +184,7 @@ let ``deserialize map`` () =
 
 type TestEnum = One | Two
 
-let deserializeTestEnum (i: int) = 
+let deserializeTestEnum(i: int) = 
     match i with 
     | 1 -> One  
     | 2 -> Two

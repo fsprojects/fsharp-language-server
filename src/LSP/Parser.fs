@@ -13,28 +13,28 @@ type RawMessage = {
     ``params``: JsonValue option
 }
 
-let parseTextDocumentSaveReason (i: int): TextDocumentSaveReason = 
+let parseTextDocumentSaveReason(i: int): TextDocumentSaveReason = 
     match i with 
     | 1 -> TextDocumentSaveReason.Manual 
     | 2 -> TextDocumentSaveReason.AfterDelay 
     | 3 -> TextDocumentSaveReason.FocusOut
     | _ -> raise (Exception (sprintf "%d is not a known TextDocumentSaveReason" i))
 
-let parseFileChangeType (i: int): FileChangeType = 
+let parseFileChangeType(i: int): FileChangeType = 
     match i with 
     | 1 -> FileChangeType.Created 
     | 2 -> FileChangeType.Changed 
     | 3 -> FileChangeType.Deleted
     | _ -> raise (Exception (sprintf "%d is not a known FileChangeType" i))
 
-let parseTrace (text: string): Trace = 
+let parseTrace(text: string): Trace = 
     match text with 
     | "off" -> Trace.Off 
     | "messages" -> Trace.Messages 
     | "verbose" -> Trace.Verbose
     | _ -> raise (Exception (sprintf "Unexpected trace %s" text))
 
-let parseCompletionItemKind (i: int): CompletionItemKind = 
+let parseCompletionItemKind(i: int): CompletionItemKind = 
     match i with 
     | 1 -> CompletionItemKind.Text
     | 2 -> CompletionItemKind.Method
@@ -56,13 +56,13 @@ let parseCompletionItemKind (i: int): CompletionItemKind =
     | 18 -> CompletionItemKind.Reference
     | _ -> raise (Exception (sprintf "%d is not a known CompletionItemKind" i))
 
-let parseInsertTextFormat (i: int): InsertTextFormat = 
+let parseInsertTextFormat(i: int): InsertTextFormat = 
     match i with 
     | 1 -> InsertTextFormat.PlainText
     | 2 -> InsertTextFormat.Snippet
     | _ -> raise (Exception (sprintf "%d is not a known InsertTextFormat" i))
 
-let parseDiagnosticSeverity (i: int): DiagnosticSeverity = 
+let parseDiagnosticSeverity(i: int): DiagnosticSeverity = 
     match i with 
     | 1 -> DiagnosticSeverity.Error 
     | 2 -> DiagnosticSeverity.Warning 
@@ -85,7 +85,7 @@ type Message =
 | RequestMessage of id: int * method: string * json: JsonValue
 | NotificationMessage of method: string * json: JsonValue option
 
-let parseMessage (jsonText: string): Message = 
+let parseMessage(jsonText: string): Message = 
     let raw = deserializeRawMessage jsonText
     match raw.id, raw.``params`` with
     | Some id, Some p -> RequestMessage (id, raw.method, p)
@@ -106,7 +106,7 @@ let parseDidCloseTextDocumentParams = deserializerFactory<DidCloseTextDocumentPa
 
 let parseDidChangeWatchedFilesParams = deserializerFactory<DidChangeWatchedFilesParams> readOptions
 
-let parseNotification (method: string) (maybeBody: JsonValue option): Notification = 
+let parseNotification(method: string, maybeBody: JsonValue option): Notification = 
     match method, maybeBody with 
     | "initialized", _ -> Initialized
     | "shutdown", _ -> Shutdown 
@@ -247,7 +247,7 @@ let parseExecuteCommandParams = deserializerFactory<ExecuteCommandParams> readOp
 
 let parseDidChangeWorkspaceFoldersParams = deserializerFactory<DidChangeWorkspaceFoldersParams> readOptions
 
-let parseRequest (method: string) (json: JsonValue): Request = 
+let parseRequest(method: string) (json: JsonValue): Request = 
     match method with 
     | "initialize" -> Initialize (parseInitialize json)
     | "textDocument/willSaveWaitUntil" -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams json)

@@ -8,13 +8,13 @@ open LSP.Types
 open NUnit.Framework
 
 [<SetUp>]
-let setup () = 
+let setup() = 
     LSP.Log.diagnosticsLog := stdout
 
-let binaryWriter () = 
+let binaryWriter() = 
     let stream = new MemoryStream()
     let writer = new BinaryWriter(stream)
-    let toString () = 
+    let toString() = 
         let bytes = stream.ToArray() 
         Encoding.UTF8.GetString bytes
     (writer, toString)
@@ -29,7 +29,7 @@ let ``write text`` () =
 [<Test>]
 let ``write response`` () = 
     let (writer, toString) = binaryWriter() 
-    LanguageServer.respond writer 1 "2"
+    LanguageServer.respond(writer, 1, "2")
     let expected = "Content-Length: 19\r\n\r\n\
                     {\"id\":1,\"result\":2}"
     let found = toString()
@@ -38,7 +38,7 @@ let ``write response`` () =
 [<Test>]
 let ``write multibyte characters`` () = 
     let (writer, toString) = binaryWriter() 
-    LanguageServer.respond writer 1 "🔥"
+    LanguageServer.respond(writer, 1, "🔥")
     let expected = "Content-Length: 22\r\n\r\n\
                     {\"id\":1,\"result\":🔥}"
     let found = toString()
@@ -83,7 +83,7 @@ type MockServer() =
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = TODO()
 
-let messageStream (messages: string list): BinaryReader = 
+let messageStream(messages: string list): BinaryReader = 
     let stdin = new MemoryStream()
     for m in messages do 
         let length = Encoding.UTF8.GetByteCount m 
@@ -130,11 +130,12 @@ let ``end of bytes terminates stream`` () =
     let found = Seq.toList messages
     Assert.AreEqual([Parser.RequestMessage (1, "initialize", JsonValue.Parse "{}")], found)
 
-let mock (server: ILanguageServer) (messages: string list): string = 
+let mock(server: ILanguageServer) (messages: string list): string = 
     let stdout = new MemoryStream()
     let writeOut = new BinaryWriter(stdout)
     let readIn = messageStream messages
-    LanguageServer.connect (fun _ -> server) readIn writeOut
+    let serverFactory = fun _ -> server
+    LanguageServer.connect(serverFactory, readIn, writeOut)
     Encoding.UTF8.GetString(stdout.ToArray())
 
 [<Test>]

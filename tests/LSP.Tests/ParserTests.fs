@@ -7,7 +7,7 @@ open LSP.Json
 open NUnit.Framework
 
 [<SetUp>]
-let setup () = 
+let setup() = 
     LSP.Log.diagnosticsLog := stdout
 
 [<Test>]
@@ -57,7 +57,7 @@ let ``parse a NotificationMessage with params`` () =
 
 [<Test>]
 let ``parse an Initialized notification`` () = 
-    let found = parseNotification "initialized" None
+    let found = parseNotification("initialized", None)
     Assert.AreEqual(Initialized, found)
 
 [<Test>]
@@ -65,7 +65,7 @@ let ``parse a DidChangeConfiguration notification`` () =
     let json = JsonValue.Parse """{
         "settings": {"hello": "world"}
     }"""
-    let found = parseNotification "workspace/didChangeConfiguration" (Some json)
+    let found = parseNotification("workspace/didChangeConfiguration", Some(json))
     let expected = (DidChangeConfiguration {
             settings = JsonValue.Parse """{"hello":"world"}"""
         })
@@ -81,7 +81,7 @@ let ``parse a DidOpenTextDocument notification`` () =
             "text": "let x = 1"
         }
     }"""
-    let found = parseNotification "textDocument/didOpen" (Some json)
+    let found = parseNotification("textDocument/didOpen", Some(json))
     let expected = (DidOpenTextDocument {
             textDocument = 
                 {
@@ -104,7 +104,7 @@ let ``parse a DidChangeTextDocument notification`` () =
             "text": "let x = 1"
         }]
     }"""
-    let found = parseNotification "textDocument/didChange" (Some json)
+    let found = parseNotification("textDocument/didChange", Some(json))
     let expected = (DidChangeTextDocument {
             textDocument = 
                 {
@@ -138,7 +138,7 @@ let ``parse a DidChangeTextDocument notification with range`` () =
             "text": "let x = 1"
         }]
     }"""
-    let found = parseNotification "textDocument/didChange" (Some json)
+    let found = parseNotification("textDocument/didChange", Some(json))
     let expected = (DidChangeTextDocument {
             textDocument = 
                 {
@@ -165,7 +165,7 @@ let ``parse a WillSaveTextDocument notification`` () =
         },
         "reason": 2
     }"""
-    let found = parseNotification "textDocument/willSave" (Some json)
+    let found = parseNotification("textDocument/willSave", Some(json))
     let expected = (WillSaveTextDocument {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             reason = TextDocumentSaveReason.AfterDelay
@@ -194,7 +194,7 @@ let ``parse a DidSaveTextDocument notification`` () =
             "uri": "file://workspace/Main.fs"
         }
     }"""
-    let found = parseNotification "textDocument/didSave" (Some json)
+    let found = parseNotification("textDocument/didSave", Some(json))
     let expected = (DidSaveTextDocument {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             text = None
@@ -209,7 +209,7 @@ let ``parse a DidSaveTextDocument notification with text`` () =
         },
         "text": "let x = 1"
     }"""
-    let found = parseNotification "textDocument/didSave" (Some json)
+    let found = parseNotification("textDocument/didSave", Some(json))
     let expected = (DidSaveTextDocument {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             text = Some "let x = 1"
@@ -223,7 +223,7 @@ let ``parse a DidCloseTextDocument notification`` () =
             "uri": "file://workspace/Main.fs"
         }
     }"""
-    let found = parseNotification "textDocument/didClose" (Some json)
+    let found = parseNotification("textDocument/didClose", Some(json))
     let expected = (DidCloseTextDocument {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
@@ -237,7 +237,7 @@ let ``parse a DidChangeWatchedFiles notification`` () =
             "type": 2
         }]
     }"""
-    let found = parseNotification "workspace/didChangeWatchedFiles" (Some json)
+    let found = parseNotification("workspace/didChangeWatchedFiles", Some(json))
     let expected = (DidChangeWatchedFiles {
             changes = 
                 [{

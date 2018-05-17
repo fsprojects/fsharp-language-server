@@ -53,21 +53,25 @@ module ProjectParser =
 
     let private fixPath (path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
+        
+    let private doParseAssetsJson = deserializerFactory<ProjectAssets> defaultJsonReadOptions
     // Exposed for testing
-    let parseAssetsJson = JsonValue.Parse >> deserializerFactory<ProjectAssets> defaultJsonReadOptions
+    let parseAssetsJson(jsonText: string) = 
+        let jsonValue = JsonValue.Parse(jsonText)
+        doParseAssetsJson jsonValue
 
     // Log messages once and then silence them
     let private alreadyLogged = System.Collections.Generic.HashSet<string>()
-    let private logOnce (message: string): unit = 
-        if not (alreadyLogged.Contains message) then 
+    let private logOnce(message: string): unit = 
+        if not(alreadyLogged.Contains(message)) then 
             dprintfn "%s" message 
             alreadyLogged.Add(message) |> ignore
     let private template = Regex(@"\$\((\w+)\)")
-    let private substituteVariables (directory: DirectoryInfo) (fsproj: string): string = 
+    let private substituteVariables(directory: DirectoryInfo, fsproj: string): string = 
         let doc = XmlDocument()
-        doc.LoadXml fsproj 
+        doc.LoadXml(fsproj) 
         let variables = Dictionary<string, string>()
-        let substituteMatch (m: Match) = 
+        let substituteMatch(m: Match) = 
             let name = m.Groups.[1].Value
             if variables.ContainsKey(name) then 
                 logOnce(sprintf "Replace %s with %s" name variables.[name])
@@ -75,7 +79,7 @@ module ProjectParser =
             else 
                 logOnce(sprintf "Leave %s because %s is not in %A" m.Value name variables)
                 m.Value
-        let substitute (text: string): string = 
+        let substitute(text: string): string = 
             template.Replace(text, substituteMatch)
         variables.["MSBuildProjectDirectory"] <- directory.FullName
         for propGroup in doc.DocumentElement.SelectNodes "//PropertyGroup" do 
@@ -84,16 +88,16 @@ module ProjectParser =
                 dprintfn "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
                 variables.[prop.Name] <- substitute(prop.InnerText)
         substitute fsproj
-    let parseFsProj (fsproj: FileInfo): Result<FsProj, string> = 
+    let parseFsProj(fsproj: FileInfo): Result<FsProj, string> = 
         try 
             let directory = fsproj.Directory
-            let text = substituteVariables directory (File.ReadAllText fsproj.FullName)
+            let text = substituteVariables(directory, File.ReadAllText(fsproj.FullName))
             let doc = XmlDocument()
             doc.LoadXml text 
             // Find all <Compile Include=?> elements in fsproj
             let compileInclude = List.ofSeq(seq {
-                for n in doc.DocumentElement.SelectNodes "//Compile[@Include]" do 
-                    let relativePath = n.Attributes.["Include"].Value |> fixPath
+                for n in doc.DocumentElement.SelectNodes("//Compile[@Include]") do 
+                    let relativePath = fixPath(n.Attributes.["Include"].Value)
                     let absolutePath = Path.Combine(directory.FullName, relativePath)
                     let normalizePath = Path.GetFullPath(absolutePath)
                     yield FileInfo(normalizePath)
@@ -101,45 +105,45 @@ module ProjectParser =
             // Find all <ProjectReference Include=?> elements in fsproj
             let projectReferenceInclude = List.ofSeq(seq {
                 for n in doc.DocumentElement.SelectNodes "//ProjectReference[@Include]" do 
-                    let relativePath = n.Attributes.["Include"].Value |> fixPath
+                    let relativePath = fixPath(n.Attributes.["Include"].Value)
                     let absolutePath = Path.Combine(directory.FullName, relativePath)
                     let normalizePath = Path.GetFullPath(absolutePath)
                     yield FileInfo(normalizePath)
             })
             {file=fsproj; compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude} |> Ok
         with e -> 
-            Error e.Message
-    let parseAssets (path: FileInfo): Result<ProjectAssets, string> = 
+            Error(e.Message)
+    let parseAssets(path: FileInfo): Result<ProjectAssets, string> = 
         if path.Exists then 
-            let text = File.ReadAllText path.FullName
-            let parsed = parseAssetsJson text
-            Ok parsed
+            let text = File.ReadAllText(path.FullName)
+            let parsed = parseAssetsJson(text)
+            Ok(parsed)
         else 
             let msg = sprintf "%s does not exist; maybe you need to build your project?" path.FullName
-            Error msg
+            Error(msg)
     // Find all dlls in project.assets.json
-    let findLibraryDlls (assets: ProjectAssets): FileInfo list = 
+    let findLibraryDlls(assets: ProjectAssets): FileInfo list = 
         // Given a dependency name, for example FSharp.Core, lookup the version in $.libraries, for example FSharp.Core/4.3.4
-        let lookupVersion (dependencyName: string) = 
+        let lookupVersion(dependencyName: string) = 
             let mutable found: string option = None
             for KeyValue(dependencyVersion, library) in assets.libraries do 
                 if dependencyVersion.StartsWith(dependencyName + "/") && found = None then 
-                    found <- Some dependencyVersion
+                    found <- Some(dependencyVersion)
             found
         // Find all dependencies in $.project.frameworks with autoReferenced=true,
         // We will import the whole contents of these dependencies
         let autoReferenced = seq {
             for KeyValue(frameworkName, framework) in assets.project.frameworks do 
                 for KeyValue(dependencyName, dependency) in framework.dependencies do 
-                    if dependency.autoReferenced |> Option.defaultValue false then 
-                        yield! lookupVersion dependencyName |> Option.toList
+                    if dependency.autoReferenced = Some true then 
+                        yield! Option.toList(lookupVersion(dependencyName))
         }
         // Identify which files are called out in the keys of in $.targets[*][dep/version].compile
         let compileFiles = seq {
             for KeyValue(targetName, libraryMap) in assets.targets do 
                 for KeyValue(dependencyName, dependency) in libraryMap do 
                     for KeyValue(dll, _) in dependency.compile  do 
-                        if dll.EndsWith ".dll" then 
+                        if dll.EndsWith(".dll") then 
                             yield (dependencyName, dll)
         }
         // Look up every autoReferenced dependency in $.libraries and include all DLLs 
@@ -147,18 +151,18 @@ module ProjectParser =
             for dependency in autoReferenced do 
                 if assets.libraries.ContainsKey(dependency) then 
                     for dll in assets.libraries.[dependency].files do 
-                        if dll.EndsWith ".dll" then 
+                        if dll.EndsWith(".dll") then 
                             yield (dependency, dll)
                 else logOnce(sprintf "Couldn't find auto-referenced dependency %s in libraries" dependency)
         }
-        let allFiles = Seq.concat [ compileFiles; autoReferencedFiles ] |> Set.ofSeq
+        let allFiles = Set.ofSeq(Seq.concat [compileFiles; autoReferencedFiles])
         // Look up each dependency in $.libraries[dep/version].files
-        let libraryFile (dependency: string, dll: string) = seq {
-            if assets.libraries.ContainsKey dependency then 
+        let libraryFile(dependency: string, dll: string) = seq {
+            if assets.libraries.ContainsKey(dependency) then 
                 let library = assets.libraries.[dependency]
                 match library.path with 
                 | None -> dprintfn "Skipping %s because no path in %A" dependency library
-                | Some parentPath -> 
+                | Some(parentPath) -> 
                     if List.contains dll library.files then 
                         yield Path.Combine(parentPath, dll)
                     else 
@@ -167,12 +171,15 @@ module ProjectParser =
         }
         let files = Seq.collect libraryFile allFiles
         // Find .dlls by checking each key of $.packageFolders
-        let findAbsolutePath (relativePath: string): FileInfo option = 
+        let findAbsolutePath(relativePath: string): FileInfo option = 
             let mutable found: FileInfo option = None
             for KeyValue(packageFolder, _) in assets.packageFolders do 
                 let absolutePath = Path.Combine(packageFolder, relativePath)
                 let normalizePath = Path.GetFullPath(absolutePath)
-                if File.Exists normalizePath && found = None then
+                if File.Exists(normalizePath) && found = None then
                     found <- Some(FileInfo(normalizePath))
             found
-        Seq.map findAbsolutePath files |> Seq.collect Option.toList |> List.ofSeq
+        [ for f in files do 
+            match findAbsolutePath(f) with 
+            | None -> ()
+            | Some found -> yield found ]

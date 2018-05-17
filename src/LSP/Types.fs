@@ -214,7 +214,7 @@ type InsertTextFormat =
 | PlainText 
 | Snippet 
 
-let writeInsertTextFormat (i: InsertTextFormat) = 
+let writeInsertTextFormat(i: InsertTextFormat) = 
     match i with 
     | InsertTextFormat.PlainText -> 1
     | InsertTextFormat.Snippet -> 2
@@ -240,7 +240,7 @@ type CompletionItemKind =
 | File
 | Reference
 
-let writeCompletionItemKind (i: CompletionItemKind) = 
+let writeCompletionItemKind(i: CompletionItemKind) = 
     match i with 
     | CompletionItemKind.Text -> 1
     | CompletionItemKind.Method -> 2
@@ -407,7 +407,7 @@ type TextDocumentSyncKind =
 | Full
 | Incremental
 
-let writeTextDocumentSyncKind (i: TextDocumentSyncKind) = 
+let writeTextDocumentSyncKind(i: TextDocumentSyncKind) = 
     match i with 
     | TextDocumentSyncKind.None -> 0
     | TextDocumentSyncKind.Full -> 1
@@ -529,7 +529,7 @@ type MarkedString =
 | HighlightedString of value: string * language: string 
 | PlainString of string
 
-let writeMarkedString (s: MarkedString): JsonValue = 
+let writeMarkedString(s: MarkedString): JsonValue = 
     match s with 
     | HighlightedString (value, language) -> 
         JsonValue.Record 
@@ -566,7 +566,7 @@ type DocumentHighlightKind =
 | Read 
 | Write 
 
-let writeDocumentHighlightKind (i: DocumentHighlightKind) = 
+let writeDocumentHighlightKind(i: DocumentHighlightKind) = 
     match i with 
     | DocumentHighlightKind.Text -> 1
     | DocumentHighlightKind.Read -> 2
@@ -599,7 +599,7 @@ type SymbolKind =
 | Boolean
 | Array
 
-let writeSymbolKind (i: SymbolKind) = 
+let writeSymbolKind(i: SymbolKind) = 
     match i with
     | SymbolKind.File -> 1
     | SymbolKind.Module -> 2
@@ -686,7 +686,7 @@ type DidChangeWatchedFilesOptions = {
     watchers: FileSystemWatcher list
 }
 
-let writeRegisterCapability (r: RegisterCapability) = 
+let writeRegisterCapability(r: RegisterCapability) = 
     match r with 
     | RegisterCapability.DidChangeWatchedFiles watchers -> {watchers=watchers}
 

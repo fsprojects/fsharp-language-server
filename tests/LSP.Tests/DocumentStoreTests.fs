@@ -6,11 +6,11 @@ open Types
 open NUnit.Framework
 
 [<SetUp>]
-let setup () = 
+let setup() = 
     LSP.Log.diagnosticsLog := stdout
 
 [<Test>]
-let ``convert prefix Range to offsets`` () = 
+let ``convert prefix Range to offsets``() = 
     let text = "foo\r\n\
                 bar\r\n\
                 doh" 
@@ -18,11 +18,11 @@ let ``convert prefix Range to offsets`` () =
     let range = 
         { start = {line = 0; character = 0}
           ``end`` = {line = 0; character = 3} }
-    let found = DocumentStoreUtils.findRange textBuilder range
+    let found = DocumentStoreUtils.findRange(textBuilder, range)
     Assert.AreEqual((0, 3), found)
 
 [<Test>]
-let ``convert suffix Range to offsets`` () = 
+let ``convert suffix Range to offsets``() = 
     let text = "foo\r\n\
                 bar\r\n\
                 doh" 
@@ -30,11 +30,11 @@ let ``convert suffix Range to offsets`` () =
     let range = 
         { start = {line = 2; character = 1}
           ``end`` = {line = 2; character = 3} }
-    let found = DocumentStoreUtils.findRange textBuilder range
+    let found = DocumentStoreUtils.findRange(textBuilder, range)
     Assert.AreEqual((11, 13), found)
 
 [<Test>]
-let ``convert line-spanning Range to offsets`` () = 
+let ``convert line-spanning Range to offsets``() = 
     let text = "foo\r\n\
                 bar\r\n\
                 doh" 
@@ -42,11 +42,11 @@ let ``convert line-spanning Range to offsets`` () =
     let range = 
         { start = {line = 1; character = 2}
           ``end`` = {line = 2; character = 1} }
-    let found = DocumentStoreUtils.findRange textBuilder range
+    let found = DocumentStoreUtils.findRange(textBuilder, range)
     Assert.AreEqual((7, 11), found)
 
 [<Test>]
-let ``open document`` () = 
+let ``open document``() = 
     let store = DocumentStore() 
     let exampleUri = Uri("file://example.txt")
     let helloWorld = "Hello world!"
@@ -58,7 +58,7 @@ let ``open document`` () =
               text = helloWorld } }
     store.Open(openDoc)
     let found = store.GetText(exampleUri)
-    Assert.AreEqual((Some helloWorld), found)
+    Assert.AreEqual(Some(helloWorld), found)
 
 let exampleUri = Uri("file://example.txt")
 let helloStore() = 
@@ -74,7 +74,7 @@ let helloStore() =
     store
 
 [<Test>]
-let ``replace a document`` () = 
+let ``replace a document``() = 
     let store = helloStore()
     let newText = "Replaced everything"
     let replaceAll: DidChangeTextDocumentParams = 
@@ -87,10 +87,10 @@ let ``replace a document`` () =
                 text = newText } ] }
     store.Change(replaceAll)
     let found = store.GetText(exampleUri)
-    Assert.AreEqual((Some newText), found)
+    Assert.AreEqual(Some(newText), found)
 
 [<Test>]
-let ``patch a document`` () = 
+let ``patch a document``() = 
     let store = helloStore()
     let newText = "George"
     let replaceAll: DidChangeTextDocumentParams = 
@@ -104,4 +104,4 @@ let ``patch a document`` () =
                 text = newText } ] }
     store.Change(replaceAll)
     let found = store.GetText(exampleUri)
-    Assert.AreEqual((Some "Hello George!"), found)
+    Assert.AreEqual(Some("Hello George!"), found)
