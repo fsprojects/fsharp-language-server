@@ -35,33 +35,29 @@ module DocumentStoreUtils =
 open DocumentStoreUtils
 
 type DocumentStore() = 
-    let compareUris = 
-        { new IEqualityComparer<Uri> with 
-            member this.Equals(x, y) = 
-                StringComparer.CurrentCulture.Equals(x, y)
-            member this.GetHashCode(x) = 
-                StringComparer.CurrentCulture.GetHashCode(x) }
-    let activeDocuments = new Dictionary<Uri, Version>(compareUris)
-    
+    // All open documents, organized by Uri
+    let activeDocuments = new Dictionary<string, Version>()
+    // Replace a section of an open file
     let patch(doc: VersionedTextDocumentIdentifier, range: Range, text: string): unit = 
-        let existing = activeDocuments.[doc.uri]
+        let existing = activeDocuments.[doc.uri.AbsoluteUri]
         let startOffset, endOffset = findRange(existing.text, range)
         existing.text.Remove(startOffset, endOffset - startOffset) |> ignore
         existing.text.Insert(startOffset, text) |> ignore
         existing.version <- doc.version
+    // Replace the entire contents of an open file
     let replace(doc: VersionedTextDocumentIdentifier, text: string): unit = 
-        let existing = activeDocuments.[doc.uri]
+        let existing = activeDocuments.[doc.uri.AbsoluteUri]
         existing.text.Clear() |> ignore
         existing.text.Append(text) |> ignore
         existing.version <- doc.version
-
+    
     member this.Open(doc: DidOpenTextDocumentParams): unit = 
         let text = StringBuilder(doc.textDocument.text)
         let version = {text = text; version = doc.textDocument.version}
-        activeDocuments.[doc.textDocument.uri] <- version
-
+        activeDocuments.[doc.textDocument.uri.AbsoluteUri] <- version
+    
     member this.Change(doc: DidChangeTextDocumentParams): unit = 
-        let existing = activeDocuments.[doc.textDocument.uri]
+        let existing = activeDocuments.[doc.textDocument.uri.AbsoluteUri]
         if doc.textDocument.version <= existing.version then 
             let oldVersion = existing.version
             let newVersion = doc.textDocument.version 
@@ -74,19 +70,19 @@ type DocumentStore() =
                 | None -> replace(doc.textDocument, change.text) 
 
     member this.GetText(uri: Uri): string option = 
-        let found, value = activeDocuments.TryGetValue(uri)
+        let found, value = activeDocuments.TryGetValue(uri.AbsoluteUri)
         if found then Some(value.text.ToString()) else None 
 
     member this.GetVersion(uri: Uri): int option = 
-        let found, value = activeDocuments.TryGetValue(uri)
+        let found, value = activeDocuments.TryGetValue(uri.AbsoluteUri)
         if found then Some(value.version) else None 
 
     member this.Get(uri: Uri): option<string * int> = 
-        let found, value = activeDocuments.TryGetValue(uri)
+        let found, value = activeDocuments.TryGetValue(uri.AbsoluteUri)
         if found then Some(value.text.ToString(), value.version) else None 
 
     member this.Close(doc: DidCloseTextDocumentParams): unit = 
-        activeDocuments.Remove(doc.textDocument.uri) |> ignore
+        activeDocuments.Remove(doc.textDocument.uri.AbsoluteUri) |> ignore
 
     member this.OpenFiles(): Uri list = 
-        List.ofSeq(activeDocuments.Keys)
+        [for uri in activeDocuments.Keys do yield Uri(uri)]
