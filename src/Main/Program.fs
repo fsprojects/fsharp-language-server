@@ -288,7 +288,7 @@ let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGr
 
 // Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
 // `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
-let private asSymbolKind (k: FSharpNavigationDeclarationItemKind): SymbolKind = 
+let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind = 
     match k with 
     | NamespaceDecl -> SymbolKind.Namespace
     | ModuleFileDecl -> SymbolKind.Module
@@ -303,7 +303,7 @@ let private asSymbolKind (k: FSharpNavigationDeclarationItemKind): SymbolKind =
 // Convert an F# `FSharpNavigationDeclarationItem` to an LSP `SymbolInformation`
 // `FSharpNavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
 // `container` is present when `d` is part of a module or type
-let private asSymbolInformation (d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
+let private asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
     let declarationName(d: FSharpNavigationDeclarationItem) = d.Name
     {
         name=d.Name 
@@ -313,7 +313,7 @@ let private asSymbolInformation (d: FSharpNavigationDeclarationItem, container: 
     }
 
 // Find all symbols in a parsed AST
-let private flattenSymbols (parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
+let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
     [ for d in parse.GetNavigationItems().Declarations do 
         yield d.Declaration, None
         for n in d.Nested do 

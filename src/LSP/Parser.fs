@@ -133,7 +133,7 @@ type InitializeParamsRaw = {
     trace: Trace option
 }
 
-let private parseCapabilities (nested: JsonValue): Map<string, bool> =
+let private parseCapabilities(nested: JsonValue): Map<string, bool> =
     let rec flatten (path: string) (node: JsonValue) = 
         seq {
             for (key, value) in node.Properties do 
@@ -149,7 +149,7 @@ let private parseCapabilities (nested: JsonValue): Map<string, bool> =
     }
     Map.ofSeq kvs
 
-let private parseInitializeParams (raw: InitializeParamsRaw): InitializeParams = 
+let private parseInitializeParams(raw: InitializeParamsRaw): InitializeParams = 
     { 
          processId = raw.processId
          rootUri = raw.rootUri
@@ -200,25 +200,25 @@ type DocumentOnTypeFormattingParamsRaw = {
     ch: char 
 }
 
-let private parseDocumentFormattingOptions (options: JsonValue) = 
+let private parseDocumentFormattingOptions(options: JsonValue) = 
     {
         tabSize = options?tabSize.AsInteger()
         insertSpaces = options?insertSpaces.AsBoolean()
     }
 
-let private parseDocumentFormattingOptionsMap (options: JsonValue) = 
+let private parseDocumentFormattingOptionsMap(options: JsonValue) = 
     options.Properties 
         |> Seq.map (fun (key, value) -> (key, value.AsString()))
         |> Map.ofSeq
 
-let private parseDocumentFormattingParamsRaw (raw: DocumentFormattingParamsRaw): DocumentFormattingParams = 
+let private parseDocumentFormattingParamsRaw(raw: DocumentFormattingParamsRaw): DocumentFormattingParams = 
     {
         textDocument = raw.textDocument 
         options = parseDocumentFormattingOptions raw.options
         optionsMap = parseDocumentFormattingOptionsMap raw.options
     }
 
-let private parseDocumentRangeFormattingParamsRaw (raw: DocumentRangeFormattingParamsRaw): DocumentRangeFormattingParams = 
+let private parseDocumentRangeFormattingParamsRaw(raw: DocumentRangeFormattingParamsRaw): DocumentRangeFormattingParams = 
     {
         textDocument = raw.textDocument 
         options = parseDocumentFormattingOptions raw.options
@@ -226,7 +226,7 @@ let private parseDocumentRangeFormattingParamsRaw (raw: DocumentRangeFormattingP
         range = raw.range
     }
 
-let private parseDocumentOnTypeFormattingParamsRaw (raw: DocumentOnTypeFormattingParamsRaw): DocumentOnTypeFormattingParams = 
+let private parseDocumentOnTypeFormattingParamsRaw(raw: DocumentOnTypeFormattingParamsRaw): DocumentOnTypeFormattingParams = 
     {
         textDocument = raw.textDocument 
         options = parseDocumentFormattingOptions raw.options

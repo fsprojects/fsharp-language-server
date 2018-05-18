@@ -51,7 +51,7 @@ module ProjectParser =
         projectReferenceInclude: FileInfo list
     }
 
-    let private fixPath (path: string): string = 
+    let private fixPath(path: string): string = 
         path.Replace('\\', Path.DirectorySeparatorChar)
         
     let private doParseAssetsJson = deserializerFactory<ProjectAssets> defaultJsonReadOptions
