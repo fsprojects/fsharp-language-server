@@ -231,6 +231,7 @@ let private containsChars(find: string, candidate: string): bool =
     iFind = find.Length
 
 // Check if an F# symbol matches a query typed by the user
+// TODO chars are only allowed to be separated if they're the beginning of a word
 let private matchesQuery(query: string, candidate: string): bool = 
     containsChars(query.ToLower(), candidate.ToLower())
 
@@ -488,13 +489,16 @@ type Server(client: ILanguageClient) =
 
     // Quickly check if a file *might* contain a symbol matching query
     let symbolPattern = Regex(@"\w+")
-    let maybeMatchesQuery(query: string, uri: Uri) = 
+    let maybeMatchesQuery(query: string, uri: Uri): string option = 
         match getOrRead(uri) with 
-        | None -> false 
+        | None -> None 
         | Some text -> 
             let matches = symbolPattern.Matches(text)
             let test(m: Match) = matchesQuery(query, m.Value)
-            Seq.exists test matches
+            if Seq.exists test matches then 
+                Some text 
+            else 
+                None
 
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
@@ -681,17 +685,19 @@ type Server(client: ILanguageClient) =
                 let all = System.Collections.Generic.List<SymbolInformation>()
                 for projectOptions in projects.OpenProjects do 
                     for sourceFile in projectOptions.SourceFiles do 
-                        let uri = Uri("file://" + sourceFile)
-                        if all.Count < 50 && maybeMatchesQuery(p.query, uri) then 
-                            let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                            let! maybeParse = parseFile(uri)
-                            match maybeParse with 
-                            | Error e -> 
-                                dprintfn "%s" e 
-                            | Ok parse ->
-                                for declaration, container in flattenSymbols(parse) do 
-                                    if matchesQuery(p.query, declaration.Name) then 
-                                        all.Add(asSymbolInformation(declaration, container))
+                        if all.Count < 50 then 
+                            let uri = Uri("file://" + sourceFile)
+                            match maybeMatchesQuery(p.query, uri) with 
+                            | None -> () 
+                            | Some sourceText ->
+                                try
+                                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                                    let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
+                                    for declaration, container in flattenSymbols(parse) do 
+                                        if matchesQuery(p.query, declaration.Name) then 
+                                            all.Add(asSymbolInformation(declaration, container))
+                                with e -> 
+                                    dprintfn "Error parsing %s: %s" sourceFile e.Message
                 return List.ofSeq all
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
