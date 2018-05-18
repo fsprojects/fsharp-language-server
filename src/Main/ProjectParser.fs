@@ -66,6 +66,7 @@ module ProjectParser =
         if not(alreadyLogged.Contains(message)) then 
             dprintfn "%s" message 
             alreadyLogged.Add(message) |> ignore
+    // Substitute $(variables) in .fsproj files
     let private template = Regex(@"\$\((\w+)\)")
     let private substituteVariables(directory: DirectoryInfo, fsproj: string): string = 
         let doc = XmlDocument()
@@ -88,6 +89,7 @@ module ProjectParser =
                 dprintfn "  Child %O Name %s Value %s" prop prop.Name prop.InnerText
                 variables.[prop.Name] <- substitute(prop.InnerText)
         substitute fsproj
+    // Parse an .fsproj
     let parseFsProj(fsproj: FileInfo): Result<FsProj, string> = 
         try 
             let directory = fsproj.Directory
@@ -113,6 +115,7 @@ module ProjectParser =
             {file=fsproj; compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude} |> Ok
         with e -> 
             Error(e.Message)
+    // Parse a project.assets.json file
     let parseAssets(path: FileInfo): Result<ProjectAssets, string> = 
         if path.Exists then 
             let text = File.ReadAllText(path.FullName)
