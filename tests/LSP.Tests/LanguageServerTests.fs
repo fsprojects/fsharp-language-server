@@ -86,8 +86,9 @@ type MockServer() =
 let messageStream(messages: string list): BinaryReader = 
     let stdin = new MemoryStream()
     for m in messages do 
-        let length = Encoding.UTF8.GetByteCount m 
-        let wrapper = sprintf "Content-Length: %d\r\n\r\n%s" length m 
+        let trim = m.Trim()
+        let length = Encoding.UTF8.GetByteCount trim
+        let wrapper = sprintf "Content-Length: %d\r\n\r\n%s" length trim
         let bytes = Encoding.UTF8.GetBytes wrapper 
         stdin.Write(bytes, 0, bytes.Length)
     stdin.Seek(int64 0, SeekOrigin.Begin) |> ignore

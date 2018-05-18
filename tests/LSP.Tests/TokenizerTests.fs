@@ -64,11 +64,11 @@ let ``tokenize stream`` () =
 
 [<Test>]
 let ``tokenize stream with multibyte characters`` () = 
-    let sample = "Content-Length: 4\r\n\
+    let sample = "Content-Length: 5\r\n\
                     \r\n\
-                    🔥\
-                    Content-Length: 4\r\n\
+                    _🔥\
+                    Content-Length: 5\r\n\
                     \r\n\
-                    🐼"
+                    _🐼"
     let found = Tokenizer.tokenize (binaryReader sample) |> Seq.toList
-    Assert.AreEqual(["🔥"; "🐼"], found)
+    Assert.AreEqual(["_🔥"; "_🐼"], found)
