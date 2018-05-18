@@ -180,7 +180,7 @@ let ``parse a WillSaveWaitUntilTextDocument request`` () =
         },
         "reason": 2
     }"""
-    let found = parseRequest "textDocument/willSaveWaitUntil" json
+    let found = parseRequest("textDocument/willSaveWaitUntil", json)
     let expected = (WillSaveWaitUntilTextDocument {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             reason = TextDocumentSaveReason.AfterDelay
@@ -255,7 +255,7 @@ let ``parse a minimal Initialize request`` () =
         "capabilities": {
         }
     }"""
-    let (Initialize i) = parseRequest "initialize" json
+    let (Initialize i) = parseRequest("initialize", json)
     let expected = (
             {
                 processId = Some 1;
@@ -275,7 +275,7 @@ let ``processId can be null`` () =
         "capabilities": {
         }
     }"""
-    let (Initialize i) = parseRequest "initialize" json 
+    let (Initialize i) = parseRequest("initialize", json) 
     Assert.AreEqual(None, i.processId)
     
 [<Test>]
@@ -291,7 +291,7 @@ let ``parse capabilities as map`` () =
             }
         }
     }"""
-    let (Initialize i) = parseRequest "initialize" json 
+    let (Initialize i) = parseRequest("initialize", json) 
     let expected = Map.empty.Add("workspace.workspaceEdit.documentChanges", true)
     Assert.AreEqual(expected, i.capabilitiesMap)
 
@@ -306,7 +306,7 @@ let ``parse Completion request`` () =
             "character": 5
         }
     }"""
-    let found = parseRequest "textDocument/completion" json
+    let found = parseRequest("textDocument/completion", json)
     let expected = (Completion {
             textDocument = 
                 {
@@ -325,7 +325,7 @@ let ``parse minimal ResolveCompletionItem request`` () =
     let json = JsonValue.Parse """{
         "label": "foo"
     }"""
-    let found = parseRequest "completionItem/resolve" json
+    let found = parseRequest("completionItem/resolve", json)
     let expected = (ResolveCompletionItem {
             label = "foo"
             kind = None 
@@ -376,7 +376,7 @@ let ``parse maximal ResolveCompletionItem request`` () =
         },
         "data": {"hello":"world"}
     }"""
-    let found = parseRequest "completionItem/resolve" json
+    let found = parseRequest("completionItem/resolve", json)
     let expected = (ResolveCompletionItem {
             label = "foo"
             kind = Some CompletionItemKind.Text
@@ -424,7 +424,7 @@ let ``parse SignatureHelp request`` () =
             "character": 5
         }
     }"""
-    let found = parseRequest "textDocument/signatureHelp" json
+    let found = parseRequest("textDocument/signatureHelp", json)
     let expected = (SignatureHelp {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             position = 
@@ -446,7 +446,7 @@ let ``parse GotoDefinition request`` () =
             "character": 5
         }
     }"""
-    let found = parseRequest "textDocument/definition" json
+    let found = parseRequest("textDocument/definition", json)
     let expected = (GotoDefinition {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             position = 
@@ -471,7 +471,7 @@ let ``parse FindReferences request`` () =
             "includeDeclaration": true
         }
     }"""
-    let found = parseRequest "textDocument/references" json
+    let found = parseRequest("textDocument/references", json)
     let expected = (FindReferences {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             position = { line = 0; character = 5 }
@@ -490,7 +490,7 @@ let ``parse DocumentHighlight request`` () =
             "character": 5
         }
     }"""
-    let found = parseRequest "textDocument/documentHighlight" json
+    let found = parseRequest("textDocument/documentHighlight", json)
     let expected = (DocumentHighlight {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             position = { line = 0; character = 5 }
@@ -504,7 +504,7 @@ let ``parse DocumentSymbols request`` () =
             "uri": "file://workspace/Main.fs"
         }
     }"""
-    let found = parseRequest "textDocument/documentSymbol" json
+    let found = parseRequest("textDocument/documentSymbol", json)
     let expected = (DocumentSymbols {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
@@ -515,7 +515,7 @@ let ``parse WorkspaceSymbols request`` () =
     let json = JsonValue.Parse """{
         "query": "foo"
     }"""
-    let found = parseRequest "workspace/symbol" json
+    let found = parseRequest("workspace/symbol", json)
     let expected = (WorkspaceSymbols {
             query = "foo"
         })
@@ -541,7 +541,7 @@ let ``parse minimal CodeActions request`` () =
             }]
         }
     }"""
-    let found = parseRequest "textDocument/codeAction" json
+    let found = parseRequest("textDocument/codeAction", json)
     let expected = (CodeActions {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             range = 
@@ -590,7 +590,7 @@ let ``parse maximal CodeActions request`` () =
             }]
         }
     }"""
-    let found = parseRequest "textDocument/codeAction" json
+    let found = parseRequest("textDocument/codeAction", json)
     let expected = (CodeActions {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             range = 
@@ -637,7 +637,7 @@ let ``parse CodeActions request with an integer code`` () =
             }]
         }
     }"""
-    let found = parseRequest "textDocument/codeAction" json
+    let found = parseRequest("textDocument/codeAction", json)
     let expected = (CodeActions {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             range = 
@@ -670,7 +670,7 @@ let ``parse CodeLens request`` () =
             "uri": "file://workspace/Main.fs"
         }
     }"""
-    let found = parseRequest "textDocument/codeLens" json
+    let found = parseRequest("textDocument/codeLens", json)
     let expected = (Request.CodeLens {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
@@ -684,7 +684,7 @@ let ``parse minimal ResolveCodeLens request`` () =
             "end": {"line": 1, "character": 0}
         }
     }"""
-    let found = parseRequest "codeLens/resolve" json
+    let found = parseRequest("codeLens/resolve", json)
     let expected = (ResolveCodeLens {
             range = 
                 {
@@ -710,7 +710,7 @@ let ``parse maximal ResolveCodeLens request`` () =
         },
         "data": "hi"
     }"""
-    let found = parseRequest "codeLens/resolve" json
+    let found = parseRequest("codeLens/resolve", json)
     let expected = (ResolveCodeLens {
             range = 
                 {
@@ -733,7 +733,7 @@ let ``parse DocumentLink request`` () =
             "uri": "file://workspace/Main.fs"
         }
     }"""
-    let found = parseRequest "textDocument/documentLink" json
+    let found = parseRequest("textDocument/documentLink", json)
     let expected = (DocumentLink {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
         })
@@ -747,7 +747,7 @@ let ``parse ResolveDocumentLink request`` () =
             "end": {"line": 1, "character": 0}
         }
     }"""
-    let found = parseRequest "documentLink/resolve" json
+    let found = parseRequest("documentLink/resolve", json)
     let expected = (ResolveDocumentLink {
             range = 
                 {
@@ -772,7 +772,7 @@ let ``parse DocumentFormatting request`` () =
             "stringOption": "foo"
         }
     }"""
-    let found = parseRequest "textDocument/formatting" json
+    let found = parseRequest("textDocument/formatting", json)
     let expected = (DocumentFormatting {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             options = 
@@ -809,7 +809,7 @@ let ``parse DocumentRangeFormatting request`` () =
             "end": {"line": 1, "character": 0}
         }
     }"""
-    let found = parseRequest "textDocument/rangeFormatting" json
+    let found = parseRequest("textDocument/rangeFormatting", json)
     let expected = (DocumentRangeFormatting {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             options = 
@@ -852,7 +852,7 @@ let ``parse DocumentOnTypeFormatting request`` () =
         },
         "ch": "a"
     }"""
-    let found = parseRequest "textDocument/onTypeFormatting" json
+    let found = parseRequest("textDocument/onTypeFormatting", json)
     let expected = (DocumentOnTypeFormatting {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             options = 
@@ -889,7 +889,7 @@ let ``parse Rename request`` () =
         },
         "newName": "foo"
     }"""
-    let found = parseRequest "textDocument/rename" json
+    let found = parseRequest("textDocument/rename", json)
     let expected = (Rename {
             textDocument = { uri = Uri("file://workspace/Main.fs") }
             position = 
@@ -906,7 +906,7 @@ let ``parse ExecuteCommand request with no arguments`` () =
     let json = JsonValue.Parse """{
         "command": "foo"
     }"""
-    let found = parseRequest "workspace/executeCommand" json
+    let found = parseRequest("workspace/executeCommand", json)
     let expected = (ExecuteCommand {
             command = "foo"
             arguments = []
@@ -919,7 +919,7 @@ let ``parse ExecuteCommand request with arguments`` () =
         "command": "foo",
         "arguments": ["bar"]
     }"""
-    let found = parseRequest "workspace/executeCommand" json
+    let found = parseRequest("workspace/executeCommand", json)
     let expected = (ExecuteCommand {
             command = "foo"
             arguments = [JsonValue.String "bar"]

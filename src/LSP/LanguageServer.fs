@@ -191,7 +191,7 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                 let task = processNotification(n)
                 processQueue.Add(ProcessNotification(method, task))
             | Parser.RequestMessage(id, method, json) -> 
-                let task = processRequest(Parser.parseRequest method json) 
+                let task = processRequest(Parser.parseRequest(method, json)) 
                 let cancel = new CancellationTokenSource()
                 processQueue.Add(ProcessRequest(id, task, cancel))
                 pendingRequests.[id] <- cancel

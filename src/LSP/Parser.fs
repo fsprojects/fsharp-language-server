@@ -18,21 +18,21 @@ let parseTextDocumentSaveReason(i: int): TextDocumentSaveReason =
     | 1 -> TextDocumentSaveReason.Manual 
     | 2 -> TextDocumentSaveReason.AfterDelay 
     | 3 -> TextDocumentSaveReason.FocusOut
-    | _ -> raise (Exception (sprintf "%d is not a known TextDocumentSaveReason" i))
+    | _ -> raise(Exception(sprintf "%d is not a known TextDocumentSaveReason" i))
 
 let parseFileChangeType(i: int): FileChangeType = 
     match i with 
     | 1 -> FileChangeType.Created 
     | 2 -> FileChangeType.Changed 
     | 3 -> FileChangeType.Deleted
-    | _ -> raise (Exception (sprintf "%d is not a known FileChangeType" i))
+    | _ -> raise(Exception(sprintf "%d is not a known FileChangeType" i))
 
 let parseTrace(text: string): Trace = 
     match text with 
     | "off" -> Trace.Off 
     | "messages" -> Trace.Messages 
     | "verbose" -> Trace.Verbose
-    | _ -> raise (Exception (sprintf "Unexpected trace %s" text))
+    | _ -> raise(Exception(sprintf "Unexpected trace %s" text))
 
 let parseCompletionItemKind(i: int): CompletionItemKind = 
     match i with 
@@ -54,13 +54,13 @@ let parseCompletionItemKind(i: int): CompletionItemKind =
     | 16 -> CompletionItemKind.Color
     | 17 -> CompletionItemKind.File
     | 18 -> CompletionItemKind.Reference
-    | _ -> raise (Exception (sprintf "%d is not a known CompletionItemKind" i))
+    | _ -> raise(Exception(sprintf "%d is not a known CompletionItemKind" i))
 
 let parseInsertTextFormat(i: int): InsertTextFormat = 
     match i with 
     | 1 -> InsertTextFormat.PlainText
     | 2 -> InsertTextFormat.Snippet
-    | _ -> raise (Exception (sprintf "%d is not a known InsertTextFormat" i))
+    | _ -> raise(Exception(sprintf "%d is not a known InsertTextFormat" i))
 
 let parseDiagnosticSeverity(i: int): DiagnosticSeverity = 
     match i with 
@@ -68,7 +68,7 @@ let parseDiagnosticSeverity(i: int): DiagnosticSeverity =
     | 2 -> DiagnosticSeverity.Warning 
     | 3 -> DiagnosticSeverity.Information 
     | 4 -> DiagnosticSeverity.Hint
-    | _ -> raise (Exception (sprintf "%d is not a known DiagnosticSeverity" i))
+    | _ -> raise(Exception(sprintf "%d is not a known DiagnosticSeverity" i))
 
 let private readOptions = 
     { defaultJsonReadOptions 
@@ -89,7 +89,7 @@ let parseMessage(jsonText: string): Message =
     let raw = deserializeRawMessage jsonText
     match raw.id, raw.``params`` with
     | Some id, Some p -> RequestMessage (id, raw.method, p)
-    | Some id, None -> raise (Exception (sprintf "Request message with id %d missing params" id))
+    | Some id, None -> raise(Exception(sprintf "Request message with id %d missing params" id))
     | None, _ -> NotificationMessage (raw.method, raw.``params``)
 
 let parseDidChangeConfigurationParams = deserializerFactory<DidChangeConfigurationParams> readOptions
@@ -110,7 +110,7 @@ let parseNotification(method: string, maybeBody: JsonValue option): Notification
     match method, maybeBody with 
     | "initialized", _ -> Initialized
     | "shutdown", _ -> Shutdown 
-    | "exit", _ -> raise (Exception "exit message should terminated stream before reaching this point") 
+    | "exit", _ -> raise(Exception"exit message should terminated stream before reaching this point") 
     | "workspace/didChangeConfiguration", Some json -> DidChangeConfiguration (parseDidChangeConfigurationParams json)
     | "textDocument/didOpen", Some json -> DidOpenTextDocument (parseDidOpenTextDocumentParams json)
     | "textDocument/didChange", Some json -> DidChangeTextDocument (parseDidChangeTextDocumentParams json)
@@ -134,18 +134,18 @@ type InitializeParamsRaw = {
 }
 
 let private parseCapabilities(nested: JsonValue): Map<string, bool> =
-    let rec flatten (path: string) (node: JsonValue) = 
+    let rec flatten(path: string, node: JsonValue) = 
         seq {
             for (key, value) in node.Properties do 
                 let newPath = path + "." + key
                 match value with 
                 | JsonValue.Boolean setting -> yield (newPath, setting)
-                | _ -> yield! flatten newPath value
+                | _ -> yield! flatten(newPath, value)
         } 
     let kvs = seq {
         for (key, value) in nested.Properties do 
             if key <> "experimental" then 
-                yield! flatten key value
+                yield! flatten(key, value)
     }
     Map.ofSeq kvs
 
@@ -247,28 +247,28 @@ let parseExecuteCommandParams = deserializerFactory<ExecuteCommandParams> readOp
 
 let parseDidChangeWorkspaceFoldersParams = deserializerFactory<DidChangeWorkspaceFoldersParams> readOptions
 
-let parseRequest(method: string) (json: JsonValue): Request = 
+let parseRequest(method: string, json: JsonValue): Request = 
     match method with 
-    | "initialize" -> Initialize (parseInitialize json)
-    | "textDocument/willSaveWaitUntil" -> WillSaveWaitUntilTextDocument (parseWillSaveTextDocumentParams json)
-    | "textDocument/completion" -> Completion (parseTextDocumentPositionParams json)
-    | "textDocument/hover" -> Hover (parseTextDocumentPositionParams json)
-    | "completionItem/resolve" -> ResolveCompletionItem (parseCompletionItem json)
-    | "textDocument/signatureHelp" -> SignatureHelp (parseTextDocumentPositionParams json)
-    | "textDocument/definition" -> GotoDefinition (parseTextDocumentPositionParams json)
-    | "textDocument/references" -> FindReferences (parseReferenceParams json)
-    | "textDocument/documentHighlight" -> DocumentHighlight (parseTextDocumentPositionParams json)
-    | "textDocument/documentSymbol" -> DocumentSymbols (parseDocumentSymbolParams json)
-    | "workspace/symbol" -> WorkspaceSymbols (parseWorkspaceSymbolParams json)
-    | "textDocument/codeAction" -> CodeActions (parseCodeActionParams json)
-    | "textDocument/codeLens" -> CodeLens (parseCodeLensParams json)
-    | "codeLens/resolve" -> ResolveCodeLens (parseCodeLens json)
-    | "textDocument/documentLink" -> DocumentLink (parseDocumentLinkParams json)
-    | "documentLink/resolve" -> ResolveDocumentLink (parseDocumentLink json)
-    | "textDocument/formatting" -> DocumentFormatting (parseDocumentFormattingParams json)
-    | "textDocument/rangeFormatting" -> DocumentRangeFormatting (parseDocumentRangeFormattingParams json)
-    | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting (parseDocumentOnTypeFormattingParams json)
-    | "textDocument/rename" -> Rename (parseRenameParams json)
-    | "workspace/executeCommand" -> ExecuteCommand (parseExecuteCommandParams json)
-    | "workspace/didChangeWorkspaceFolders" -> DidChangeWorkspaceFolders (parseDidChangeWorkspaceFoldersParams json)
-    | _ -> raise (Exception (sprintf "Unexpected request method %s" method))
+    | "initialize" -> Initialize(parseInitialize json)
+    | "textDocument/willSaveWaitUntil" -> WillSaveWaitUntilTextDocument(parseWillSaveTextDocumentParams json)
+    | "textDocument/completion" -> Completion(parseTextDocumentPositionParams json)
+    | "textDocument/hover" -> Hover(parseTextDocumentPositionParams json)
+    | "completionItem/resolve" -> ResolveCompletionItem(parseCompletionItem json)
+    | "textDocument/signatureHelp" -> SignatureHelp(parseTextDocumentPositionParams json)
+    | "textDocument/definition" -> GotoDefinition(parseTextDocumentPositionParams json)
+    | "textDocument/references" -> FindReferences(parseReferenceParams json)
+    | "textDocument/documentHighlight" -> DocumentHighlight(parseTextDocumentPositionParams json)
+    | "textDocument/documentSymbol" -> DocumentSymbols(parseDocumentSymbolParams json)
+    | "workspace/symbol" -> WorkspaceSymbols(parseWorkspaceSymbolParams json)
+    | "textDocument/codeAction" -> CodeActions(parseCodeActionParams json)
+    | "textDocument/codeLens" -> CodeLens(parseCodeLensParams json)
+    | "codeLens/resolve" -> ResolveCodeLens(parseCodeLens json)
+    | "textDocument/documentLink" -> DocumentLink(parseDocumentLinkParams json)
+    | "documentLink/resolve" -> ResolveDocumentLink(parseDocumentLink json)
+    | "textDocument/formatting" -> DocumentFormatting(parseDocumentFormattingParams json)
+    | "textDocument/rangeFormatting" -> DocumentRangeFormatting(parseDocumentRangeFormattingParams json)
+    | "textDocument/onTypeFormatting" -> DocumentOnTypeFormatting(parseDocumentOnTypeFormattingParams json)
+    | "textDocument/rename" -> Rename(parseRenameParams json)
+    | "workspace/executeCommand" -> ExecuteCommand(parseExecuteCommandParams json)
+    | "workspace/didChangeWorkspaceFolders" -> DidChangeWorkspaceFolders(parseDidChangeWorkspaceFoldersParams json)
+    | _ -> raise(Exception(sprintf "Unexpected request method %s" method))

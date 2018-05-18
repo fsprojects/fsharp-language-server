@@ -42,7 +42,7 @@ type DocumentStore() =
             member this.GetHashCode(x) = 
                 StringComparer.CurrentCulture.GetHashCode(x) }
     let activeDocuments = new Dictionary<Uri, Version>(compareUris)
-        
+    
     let patch(doc: VersionedTextDocumentIdentifier, range: Range, text: string): unit = 
         let existing = activeDocuments.[doc.uri]
         let startOffset, endOffset = findRange(existing.text, range)
