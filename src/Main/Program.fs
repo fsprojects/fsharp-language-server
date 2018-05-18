@@ -231,8 +231,8 @@ let private containsChars(find: string, candidate: string): bool =
     iFind = find.Length
 
 // Check if an F# symbol matches a query typed by the user
-let private matchesQuery(query: string, candidate: FSharpNavigationDeclarationItem): bool = 
-    containsChars(query.ToLower(), candidate.Name.ToLower())
+let private matchesQuery(query: string, candidate: string): bool = 
+    containsChars(query.ToLower(), candidate.ToLower())
 
 // Find the name of the namespace, type or module that contains `s`
 let private containerName(s: FSharpSymbol): string option = 
@@ -486,6 +486,16 @@ type Server(client: ILanguageClient) =
         let names = List.map projectName openProjects
         String.concat ", " names
 
+    // Quickly check if a file *might* contain a symbol matching query
+    let symbolPattern = Regex(@"\w+")
+    let maybeMatchesQuery(query: string, uri: Uri) = 
+        match getOrRead(uri) with 
+        | None -> false 
+        | Some text -> 
+            let matches = symbolPattern.Matches(text)
+            let test(m: Match) = matchesQuery(query, m.Value)
+            Seq.exists test matches
+
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
 
@@ -671,16 +681,16 @@ type Server(client: ILanguageClient) =
                 let all = System.Collections.Generic.List<SymbolInformation>()
                 for projectOptions in projects.OpenProjects do 
                     for sourceFile in projectOptions.SourceFiles do 
-                        if all.Count < 50 then 
+                        let uri = Uri("file://" + sourceFile)
+                        if all.Count < 50 && maybeMatchesQuery(p.query, uri) then 
                             let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                            let uri = Uri("file://" + sourceFile)
                             let! maybeParse = parseFile(uri)
                             match maybeParse with 
                             | Error e -> 
                                 dprintfn "%s" e 
                             | Ok parse ->
-                                for declaration, container in flattenSymbols parse do 
-                                    if matchesQuery(p.query, declaration) then 
+                                for declaration, container in flattenSymbols(parse) do 
+                                    if matchesQuery(p.query, declaration.Name) then 
                                         all.Add(asSymbolInformation(declaration, container))
                 return List.ofSeq all
             }
