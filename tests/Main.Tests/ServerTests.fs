@@ -32,7 +32,8 @@ type MockClient() =
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
         member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
-            dprintfn "Received %d diagnostics for %s" p.diagnostics.Length (FileInfo(p.uri.AbsolutePath).Name)
+            let file = FileInfo(p.uri.LocalPath)
+            dprintfn "Received %d diagnostics for %s" p.diagnostics.Length file.Name
             this.Diagnostics.Add(p)
         member this.RegisterCapability (p: RegisterCapability): unit = 
             ()
@@ -147,7 +148,7 @@ let ``report a type error when a referenced file is changed``() =
     server.DidChangeTextDocument(edit "BreakParentTarget.fs" 3 17 "1" "\"1\"") |> Async.RunSynchronously
     server.DidSaveTextDocument(save "BreakParentTarget.fs") |> Async.RunSynchronously
     let files = [for group in client.Diagnostics do yield group.uri]
-    let isBreakParent(uri: Uri) = uri.AbsolutePath.EndsWith "BreakParentReference.fs"
+    let isBreakParent(uri: Uri) = uri.LocalPath.EndsWith "BreakParentReference.fs"
     if not (List.exists isBreakParent files) then Assert.Fail(sprintf "Didn't lint BreakParentReference.fs in %A" files)
 
 [<Test>]
@@ -294,7 +295,7 @@ let ``find references``() =
             context = { includeDeclaration=true }
         }
     let list = server.FindReferences(p) |> Async.RunSynchronously
-    let isReferenceFs(r: Location) = r.uri.AbsolutePath.EndsWith("UseSymbol.fs")
+    let isReferenceFs(r: Location) = r.uri.LocalPath.EndsWith("UseSymbol.fs")
     let found = List.exists isReferenceFs list
     if not found then Assert.Fail(sprintf "Didn't find reference from UseSymbol.fs in %A" list)
 
@@ -310,7 +311,7 @@ let ``rename across files``() =
     let ranges = [
         for doc in edit.documentChanges do 
             for e in doc.edits do 
-                let file = FileInfo(doc.textDocument.uri.AbsolutePath).Name
+                let file = FileInfo(doc.textDocument.uri.LocalPath).Name
                 yield file, e.range.start.line + 1, e.range.start.character + 1, e.range.``end``.character + 1 ]
     if not (List.contains ("RenameReference.fs", 3, 45, 59) ranges) then Assert.Fail(sprintf "%A" ranges)
 

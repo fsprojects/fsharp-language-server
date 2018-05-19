@@ -140,6 +140,8 @@ let ``deserialize simple types`` () =
     Assert.AreEqual("foo", found)
     let found = deserializerFactory<Uri> options (JsonValue.Parse "\"https://github.com\"")
     Assert.AreEqual(Uri("https://github.com"), found)
+    let found = deserializerFactory<Uri> options (JsonValue.Parse "\"file:///d%3A/foo.txt\"")
+    Assert.AreEqual(Uri("file:///d:/foo.txt"), found)
 
 type TestSimpleRead = {
     oneField: int

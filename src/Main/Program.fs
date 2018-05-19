@@ -345,7 +345,7 @@ type Server(client: ILanguageClient) =
     let getOrRead(uri: Uri): string option = 
         match docs.GetText(uri) with 
         | Some text -> Some(text)
-        | None when File.Exists(uri.AbsolutePath) -> Some(File.ReadAllText(uri.AbsolutePath))
+        | None when File.Exists(uri.LocalPath) -> Some(File.ReadAllText(uri.LocalPath))
         | None -> None
 
     // Read a specific line from a file
@@ -365,20 +365,20 @@ type Server(client: ILanguageClient) =
     // Parse a file 
     let parseFile(uri: Uri): Async<Result<FSharpParseFileResults, string>> = 
         async {
-            let file = FileInfo(uri.AbsolutePath)
+            let file = FileInfo(uri.LocalPath)
             match projects.FindProjectOptions(file), getOrRead(uri) with 
             | Error e, _ ->
                 return Error(sprintf "Can't find symbols in %s because of error in project options: %s" file.Name e)
             | _, None -> 
                 return Error(sprintf "Can't find symbols in non-existant file %s" file.FullName)
             | Ok(projectOptions), Some(sourceText) -> 
-                match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
+                match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
                 | Some(parse, _, _) -> 
                     return Ok parse
                 | None ->
                     try
                         let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                        let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
+                        let! parse = checker.ParseFile(uri.LocalPath, sourceText, parsingOptions)
                         return Ok(parse)
                     with e -> 
                         return Error(e.Message)
@@ -386,12 +386,12 @@ type Server(client: ILanguageClient) =
     // Typecheck a file, ignoring caches
     let forceCheckOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.AbsolutePath)
+            let file = FileInfo(uri.LocalPath)
             match projects.FindProjectOptions(file), docs.Get(uri) with 
             | Error(e), _ -> return Error [errorAtTop(e)]
             | _, None -> return Error [errorAtTop(sprintf "No source file %A" uri)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
-                let! force = checker.ParseAndCheckFileInProject(uri.AbsolutePath, sourceVersion, sourceText, projectOptions)
+                let! force = checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions)
                 match force with 
                 | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
                 | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
@@ -399,12 +399,12 @@ type Server(client: ILanguageClient) =
     // Typecheck a file
     let checkOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.AbsolutePath)
+            let file = FileInfo(uri.LocalPath)
             match projects.FindProjectOptions(file), docs.GetVersion(uri) with 
             | Error(e), _ -> return Error [errorAtTop e]
             | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
             | Ok(projectOptions), Some(sourceVersion) -> 
-                match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
+                match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
                 | Some(parseResult, checkResult, version) when version = sourceVersion -> 
                     return Ok(parseResult, checkResult)
                 | _ -> 
@@ -484,8 +484,8 @@ type Server(client: ILanguageClient) =
             stop || Array.exists traverseNext p.ReferencedProjects
         parentProject.ProjectFileName <> childProject.ProjectFileName && traverse childProject
     let isAncestor(parent: Uri, child: Uri): bool = 
-        let parentFile = FileInfo(parent.AbsolutePath)
-        let childFile = FileInfo(child.AbsolutePath)
+        let parentFile = FileInfo(parent.LocalPath)
+        let childFile = FileInfo(child.LocalPath)
         match projects.FindProjectOptions(parentFile), projects.FindProjectOptions(childFile) with 
         | Ok(parentProject), Ok(childProject) -> 
             isAncestorInProject(parentProject, parentFile, childFile) || isAncestorProject(parentProject, childProject)
@@ -523,7 +523,9 @@ type Server(client: ILanguageClient) =
         member this.Initialize(p: InitializeParams) =
             async {
                 match p.rootUri with 
-                | Some root -> projects.AddWorkspaceRoot (DirectoryInfo(root.AbsolutePath)) 
+                | Some root -> 
+                    dprintfn "Adding workspace root %s ~ %s" root.AbsoluteUri root.LocalPath
+                    projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath)) 
                 | _ -> ()
                 return { 
                     capabilities = 
@@ -567,7 +569,7 @@ type Server(client: ILanguageClient) =
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
                 let files = p.textDocument.uri::openDescendentFiles(p.textDocument.uri)
-                let uriFileName(uri:Uri) = FileInfo(uri.AbsolutePath).Name
+                let uriFileName(uri:Uri) = FileInfo(uri.LocalPath).Name
                 let names = List.map uriFileName files
                 dprintfn "Lint %s" (String.Join(", ", names))
                 for f in files do 
@@ -580,7 +582,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {
                 for change in p.changes do 
-                    let file = FileInfo(change.uri.AbsolutePath)
+                    let file = FileInfo(change.uri.LocalPath)
                     dprintfn "Watched file %s %O" file.FullName change.``type``
                     if file.Name.EndsWith(".fsproj") then 
                         match change.``type`` with 
@@ -595,7 +597,7 @@ type Server(client: ILanguageClient) =
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
-                dprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.AbsolutePath p.position.line p.position.character
+                dprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.LocalPath p.position.line p.position.character
                 let! c = checkOpenFile(p.textDocument.uri)
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
@@ -708,7 +710,7 @@ type Server(client: ILanguageClient) =
                             | Some sourceText ->
                                 try
                                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                                    let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
+                                    let! parse = checker.ParseFile(uri.LocalPath, sourceText, parsingOptions)
                                     for declaration, container in flattenSymbols(parse) do 
                                         if matchesQuery(p.query, declaration.Name) then 
                                             all.Add(asSymbolInformation(declaration, container))
@@ -745,7 +747,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
             async {
                 for root in p.event.added do 
-                    projects.AddWorkspaceRoot(DirectoryInfo(root.uri.AbsolutePath))
+                    projects.AddWorkspaceRoot(DirectoryInfo(root.uri.LocalPath))
                 // TODO removed
             }
 
