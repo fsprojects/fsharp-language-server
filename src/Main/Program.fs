@@ -37,29 +37,12 @@ let private asDiagnostic(err: FSharpErrorInfo): Diagnostic =
         message = err.Message
     }
     
-// Some compiler errors have no location in the file and should be logged separately
+// Some compiler errors have no location in the file and should be displayed at the top of the file
 let private hasNoLocation(err: FSharpErrorInfo): bool = 
     err.StartLineAlternate-1 = 0 && 
     err.StartColumn = 0 &&
     err.EndLineAlternate-1 = 0 &&
     err.EndColumn = 0
-    
-// Log no-location messages once and then silence them
-let private alreadyLogged = System.Collections.Generic.HashSet<string>()
-let private logOnce(message: string): unit = 
-    if not (alreadyLogged.Contains message) then 
-        dprintfn "%s" message 
-        alreadyLogged.Add(message) |> ignore
-
-// Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
-let private asDiagnostics(errors: FSharpErrorInfo[]): Diagnostic list =
-    [ 
-        for err in errors do 
-            if hasNoLocation err then 
-                logOnce(sprintf "NOPOS %s %d %s '%s'" err.FileName err.ErrorNumber err.Subcategory err.Message)
-            else
-                yield asDiagnostic(err) 
-    ]
 
 // A special error message that shows at the top of the file
 let private errorAtTop(message: string): Diagnostic =
@@ -71,8 +54,18 @@ let private errorAtTop(message: string): Diagnostic =
         message = message
     }
 
+// Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
+let private asDiagnostics(errors: FSharpErrorInfo[]): Diagnostic list =
+    [ 
+        for err in errors do 
+            if hasNoLocation(err) then 
+                yield errorAtTop(sprintf "%s: %s" err.Subcategory err.Message)
+            else
+                yield asDiagnostic(err) 
+    ]
+
 // Look for a fully qualified name leading up to the cursor
-// Exposed for testing
+// (exposed for testing)
 let findNamesUnderCursor(lineContent: string, character: int): string list = 
     let r = Regex(@"(\w+|``[^`]+``)([\.?](\w+|``[^`]+``))*")
     let ms = r.Matches(lineContent)
@@ -97,7 +90,7 @@ let findNamesUnderCursor(lineContent: string, character: int): string list =
         []
 
 // Look for a method call like foo.MyMethod() before the cursor
-// Exposed for testing
+// (exposed for testing)
 let findMethodCallBeforeCursor(lineContent: string, cursor: int): int option = 
     let mutable found = -1
     let mutable parenDepth = 0
@@ -150,7 +143,7 @@ let private asHover(FSharpToolTipText tips): Hover =
                 for e in elements do 
                     yield HighlightedString(e.MainDescription, "fsharp")
             | FSharpToolTipElement.CompositionError err -> 
-                dprintfn "Tooltip error %s" err]
+                yield PlainString(err)]
     {contents=convert; range=None}
 
 // Convert an F# `FSharpToolTipText` to text
@@ -175,13 +168,14 @@ let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem =
         label = i.Name 
         kind = asCompletionItemKind i.Kind
         detail = Some i.FullName
+        // Stash FullName in data so we can use it later in ResolveCompletionItem
         data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
     }
 
 // Convert an F# `FSharpDeclarationListInfo` to an LSP `CompletionList`
 // Used in rendering autocomplete lists
 let private asCompletionList(ds: FSharpDeclarationListInfo): CompletionList = 
-    let items = List.map asCompletionItem (List.ofArray ds.Items)
+    let items = [for i in ds.Items do yield asCompletionItem(i)]
     {isIncomplete=false; items=items}
 
 // Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
