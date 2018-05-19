@@ -12,14 +12,26 @@ open LSP.Json
 open LSP.Json.JsonExtensions
 
 let private TODO() = raise (Exception "TODO")
+    
+// Some compiler errors have no location in the file
+let private hasNoLocation(err: FSharpErrorInfo): bool = 
+    err.StartLineAlternate-1 = 0 && 
+    err.StartColumn = 0 &&
+    err.EndLineAlternate-1 = 0 &&
+    err.EndColumn = 0
 
 // Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpErrorInfo): Range = 
-    {
-        // Got error "The field, constructor or member 'StartLine' is not defined"
-        start = {line=err.StartLineAlternate-1; character=err.StartColumn}
-        ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
-    }
+    if hasNoLocation(err) then 
+        { 
+            start = {line=0; character=0}
+            ``end`` = {line=0; character=1} }
+    else
+        {
+            // Got error "The field, constructor or member 'StartLine' is not defined"
+            start = {line=err.StartLineAlternate-1; character=err.StartColumn}
+            ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
+        }
 
 // Convert an F# Compiler Services 'FSharpErrorSeverity' to an LSP 'DiagnosticSeverity'
 let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
@@ -37,13 +49,6 @@ let private asDiagnostic(err: FSharpErrorInfo): Diagnostic =
         message = err.Message
     }
     
-// Some compiler errors have no location in the file and should be logged separately
-let private hasNoLocation(err: FSharpErrorInfo): bool = 
-    err.StartLineAlternate-1 = 0 && 
-    err.StartColumn = 0 &&
-    err.EndLineAlternate-1 = 0 &&
-    err.EndColumn = 0
-    
 // Log no-location messages once and then silence them
 let private alreadyLogged = System.Collections.Generic.HashSet<string>()
 let private logOnce(message: string): unit = 
@@ -53,13 +58,7 @@ let private logOnce(message: string): unit =
 
 // Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
 let private asDiagnostics(errors: FSharpErrorInfo[]): Diagnostic list =
-    [ 
-        for err in errors do 
-            if hasNoLocation err then 
-                logOnce(sprintf "NOPOS %s %d %s '%s'" err.FileName err.ErrorNumber err.Subcategory err.Message)
-            else
-                yield asDiagnostic(err) 
-    ]
+    [ for err in errors do yield asDiagnostic(err) ]
 
 // A special error message that shows at the top of the file
 let private errorAtTop(message: string): Diagnostic =
@@ -340,6 +339,7 @@ type Server(client: ILanguageClient) =
     let docs = DocumentStore()
     let projects = ProjectManager()
     let checker = FSharpChecker.Create()
+    let openScriptProjects = new System.Collections.Generic.Dictionary<string, Result<FSharpProjectOptions, Diagnostic list>>()
 
     // Get a file from docs, or read it from disk
     let getOrRead(uri: Uri): string option = 
@@ -361,16 +361,37 @@ type Server(client: ILanguageClient) =
             "" 
         else 
             reader.ReadLine()
-
-    // Parse a file 
-    let parseFile(uri: Uri): Async<Result<FSharpParseFileResults, string>> = 
+    // Find project options
+    // For .fs files, this uses ?.fsproj and project.assets.json, parsed and cached by ProjectManager
+    // For .fsx files, this uses `GetProjectOptionsFromScript`, cached by `openScriptProjects`
+    let findProjectOptions(uri: Uri): Result<FSharpProjectOptions, Diagnostic list> = 
+        if uri.AbsoluteUri.EndsWith(".fsx") then 
+            match openScriptProjects.TryGetValue(uri.AbsoluteUri) with 
+            | false, _ -> Error [errorAtTop(sprintf "No project options have been generated for %s" uri.AbsoluteUri)]
+            | _, found -> found
+        else 
+            match projects.FindProjectOptions(FileInfo(uri.AbsolutePath)) with 
+            | Error msg -> Error [errorAtTop(msg)]
+            | Ok(options) -> Ok(options)
+    let createScriptOptions(uri: Uri): Async<Result<FSharpProjectOptions, Diagnostic list>> =
         async {
-            let file = FileInfo(uri.AbsolutePath)
-            match projects.FindProjectOptions(file), getOrRead(uri) with 
-            | Error e, _ ->
-                return Error(sprintf "Can't find symbols in %s because of error in project options: %s" file.Name e)
+            dprintfn "Creating script options for %s" uri.AbsolutePath
+            match getOrRead(uri) with 
+            | None -> return Error [errorAtTop(sprintf "No source file %s" uri.AbsoluteUri)]
+            | Some(source) -> 
+                let! maybeOptions = checker.GetProjectOptionsFromScript(uri.AbsoluteUri, source)
+                match maybeOptions with 
+                | options, [] -> return Ok(options)
+                | _, errs -> return Error(List.map asDiagnostic errs)
+        }
+    // Parse a file 
+    let parseFile(uri: Uri): Async<Result<FSharpParseFileResults, Diagnostic list>> = 
+        async {
+            match findProjectOptions(uri), getOrRead(uri) with 
+            | Error(es), _ ->
+                return Error(es)
             | _, None -> 
-                return Error(sprintf "Can't find symbols in non-existant file %s" file.FullName)
+                return Error [errorAtTop(sprintf "No file %s" uri.AbsoluteUri)]
             | Ok(projectOptions), Some(sourceText) -> 
                 match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
                 | Some(parse, _, _) -> 
@@ -381,14 +402,13 @@ type Server(client: ILanguageClient) =
                         let! parse = checker.ParseFile(uri.AbsolutePath, sourceText, parsingOptions)
                         return Ok(parse)
                     with e -> 
-                        return Error(e.Message)
+                        return Error [errorAtTop(e.Message)]
         }
     // Typecheck a file, ignoring caches
     let forceCheckOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.AbsolutePath)
-            match projects.FindProjectOptions(file), docs.Get(uri) with 
-            | Error(e), _ -> return Error [errorAtTop(e)]
+            match findProjectOptions(uri), docs.Get(uri) with 
+            | Error(es), _ -> return Error(es)
             | _, None -> return Error [errorAtTop(sprintf "No source file %A" uri)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 let! force = checker.ParseAndCheckFileInProject(uri.AbsolutePath, sourceVersion, sourceText, projectOptions)
@@ -399,9 +419,8 @@ type Server(client: ILanguageClient) =
     // Typecheck a file
     let checkOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.AbsolutePath)
-            match projects.FindProjectOptions(file), docs.GetVersion(uri) with 
-            | Error(e), _ -> return Error [errorAtTop e]
+            match findProjectOptions(uri), docs.GetVersion(uri) with 
+            | Error(es), _ -> return Error(es)
             | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
             | Ok(projectOptions), Some(sourceVersion) -> 
                 match checker.TryGetRecentCheckResultsForFile(uri.AbsolutePath, projectOptions) with 
@@ -484,10 +503,10 @@ type Server(client: ILanguageClient) =
             stop || Array.exists traverseNext p.ReferencedProjects
         parentProject.ProjectFileName <> childProject.ProjectFileName && traverse childProject
     let isAncestor(parent: Uri, child: Uri): bool = 
-        let parentFile = FileInfo(parent.AbsolutePath)
-        let childFile = FileInfo(child.AbsolutePath)
-        match projects.FindProjectOptions(parentFile), projects.FindProjectOptions(childFile) with 
+        match findProjectOptions(parent), findProjectOptions(child) with 
         | Ok(parentProject), Ok(childProject) -> 
+            let parentFile = FileInfo(parent.AbsolutePath)
+            let childFile = FileInfo(child.AbsolutePath)
             isAncestorInProject(parentProject, parentFile, childFile) || isAncestorProject(parentProject, childProject)
         | _, _ -> false
     
@@ -555,8 +574,12 @@ type Server(client: ILanguageClient) =
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
-                docs.Open p
-                return! lint p.textDocument.uri
+                docs.Open(p)
+                // If this is an .fsx file, register its project options
+                if p.textDocument.uri.AbsoluteUri.EndsWith(".fsx") then 
+                    let! options = createScriptOptions(p.textDocument.uri)
+                    openScriptProjects.[p.textDocument.uri.AbsoluteUri] <- options
+                return! lint(p.textDocument.uri)
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
@@ -676,6 +699,7 @@ type Server(client: ILanguageClient) =
                 | Some s -> 
                     dprintfn "Looking for references to %s in %s" s.Symbol.FullName (printProjectNames(projects.OpenProjects))
                     let all = System.Collections.Generic.List<Location>()
+                    // TODO search .fsx files as well
                     for options in projects.OpenProjects do 
                         let! check = checker.ParseAndCheckProject(options)
                         let! uses = check.GetUsesOfSymbol(s.Symbol)
@@ -688,8 +712,10 @@ type Server(client: ILanguageClient) =
             async {
                 let! maybeParse = parseFile(p.textDocument.uri)
                 match maybeParse with 
-                | Error e -> 
-                    dprintfn "%s" e 
+                | Error es -> 
+                    let message(d: Diagnostic) = d.message
+                    let ms = List.map message es
+                    dprintfn "Can't find symbols in %s because of error in project options: %A" p.textDocument.uri.AbsoluteUri ms
                     return []
                 | Ok parse ->
                     return List.map asSymbolInformation (flattenSymbols(parse))
