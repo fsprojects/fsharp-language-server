@@ -313,3 +313,9 @@ let ``rename across files``() =
                 let file = FileInfo(doc.textDocument.uri.AbsolutePath).Name
                 yield file, e.range.start.line + 1, e.range.start.character + 1, e.range.``end``.character + 1 ]
     if not (List.contains ("RenameReference.fs", 3, 45, 59) ranges) then Assert.Fail(sprintf "%A" ranges)
+
+[<Test>]
+let ``match title case queries``() = 
+    Assert.True(matchesTitleCase("fb", "FooBar"))
+    Assert.True(matchesTitleCase("fob", "FooBar"))
+    Assert.False(matchesTitleCase("fb", "Foobar"))

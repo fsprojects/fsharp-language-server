@@ -222,18 +222,34 @@ let rec private findAllSymbols(es: FSharpEntity seq) =
             yield! findAllSymbols e.NestedEntities
     }
 
-// Check if candidate contains all the characters of find, in-order, case-insensitive
-// candidate is allowed to have other characters in between, as long as it contains all of find in-order
-let private containsChars(find: string, candidate: string): bool = 
-    let mutable iFind = 0
-    for c in candidate do 
-        if iFind < find.Length && c = find.[iFind] then iFind <- iFind + 1
-    iFind = find.Length
+// Check if `candidate` contains all the characters of `find`, in-order, case-insensitive
+// Matches can be discontinuous if the letters of `find` match the first letters of words in `candidate`
+// For example, fb matches FooBar, but it doesn't match Foobar
+// (exposed for testing)
+let matchesTitleCase(find: string, candidate: string): bool = 
+    let mutable i = 0
+    let lowerEquals(x, y) = 
+        Char.ToLower(x) = Char.ToLower(y)
+    let matchNextChar(f) = 
+        if i < candidate.Length && lowerEquals(candidate.[i], f) then 
+            i <- i + 1 
+            true 
+        else false 
+    let isStartOfWord(i) = 
+        0 < i && i < candidate.Length && Char.IsLower(candidate.[i - 1]) && Char.IsUpper(candidate.[i])
+    let matchStartOfNextWord(f) = 
+        let test(i) = isStartOfWord(i) && lowerEquals(candidate.[i], f)
+        while i < candidate.Length && not(test(i)) do
+            i <- i + 1 
+        test(i)
+    let mutable matched = true
+    for f in find do 
+        matched <- matched && (matchNextChar(f) || matchStartOfNextWord(f))
+    matched
 
 // Check if an F# symbol matches a query typed by the user
-// TODO chars are only allowed to be separated if they're the beginning of a word
 let private matchesQuery(query: string, candidate: string): bool = 
-    containsChars(query.ToLower(), candidate.ToLower())
+    matchesTitleCase(query, candidate)
 
 // Find the name of the namespace, type or module that contains `s`
 let private containerName(s: FSharpSymbol): string option = 
