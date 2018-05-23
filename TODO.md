@@ -19,3 +19,4 @@ Don't check entire project for rename if symbol is local
 
 # Features
 - Docstrings on autocomplete and hover
+- Progress bar showing background project check

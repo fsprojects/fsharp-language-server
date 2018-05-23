@@ -38,20 +38,36 @@ type ProjectManager() =
     // For example, sample/IndirectDep/IndirectDep.fsproj corresponds to sample/IndirectDep/bin/Debug/netcoreapp2.0/IndirectDep.dll
     // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
     let projectDll(fsproj: FileInfo): string = 
-        let bin = DirectoryInfo(Path.Combine(fsproj.Directory.FullName, "bin"))
-        let name = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
-        // TODO this is pretty hacky
-        // Does it actually matter if I find a real .dll? Can I just use bin/Debug/placeholder/___.dll?
-        let list = [ if bin.Exists then
-                        for target in bin.GetDirectories() do 
-                            for platform in target.GetDirectories() do 
-                                let file = Path.Combine(platform.FullName, name)
-                                if File.Exists(file) then 
-                                    yield file ]
+        // TODO Does it actually matter if I find a real .dll? Can I just use bin/Debug/placeholder/ProjectName.dll?
+        // TODO Alternatively, output each project to a temporary directory and reference those .dlls
+        // ProjectName.dll
+        let dll = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
+        let outputs = ["bin"; "obj"]
+        let configs = ["Debug"; "Release"]
+        let frameworkPrefixes = ["netcoreapp"; "netstandard"; "net"]
+        let list = [
+            // obj
+            for output in outputs do 
+                // Debug
+                for config in configs do 
+                    // If obj/Debug exists, search it
+                    let outputDir = DirectoryInfo(Path.Combine [|fsproj.Directory.FullName; output; config|])
+                    if outputDir.Exists then 
+                        // Look for a directory with a name starting with netcoreapp
+                        for frameworkPrefix in frameworkPrefixes do 
+                            // netcoreapp2.0
+                            for framework in outputDir.GetDirectories() do 
+                                // netcoreapp2.0 starts with netcoreapp
+                                if framework.Name.StartsWith(frameworkPrefix) then 
+                                    // obj/Debug/netcoreapp2.0/ProjectName.dll
+                                    let candidate = Path.Combine(framework.FullName, dll)
+                                    if File.Exists(candidate) then 
+                                        yield candidate
+        ]
         if list.Length > 0 then 
             list.[0] 
         else
-            Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; name|]
+            Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; dll|]
     let ancestorDlls(refs: (string * FSharpProjectOptions)[]): string list = 
         let result = HashSet<string>()
         let rec traverse(refs: (string * FSharpProjectOptions)[]) = 
