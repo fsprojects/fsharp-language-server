@@ -630,7 +630,7 @@ type Server(client: ILanguageClient) =
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
-                let! c = checkOpenFile p.textDocument.uri
+                let! c = checkOpenFile(p.textDocument.uri)
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
