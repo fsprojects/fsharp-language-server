@@ -404,6 +404,26 @@ type Server(client: ILanguageClient) =
                 | _ -> 
                     return! forceCheckOpenFile(uri)
         }
+    // Typecheck a file quickly and a little less accurately
+    // If the file has never been checked before, this is the same as `checkOpenFile`
+    // If the file has been checked before, the previous check is returned, and a new check is queued
+    let quickCheckOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+        async {
+            let file = FileInfo(uri.LocalPath)
+            match projects.FindProjectOptions(file), docs.Get(uri) with 
+            | Error(e), _ -> return Error [errorAtTop e]
+            | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
+            | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
+                match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
+                | Some(parseResult, checkResult, version) -> 
+                    // Queue a checking operation
+                    checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions) |> ignore
+                    // Return the cached check, even if it is out-of-date
+                    return Ok(parseResult, checkResult)
+                | _ -> 
+                    return! forceCheckOpenFile(uri)
+
+        }
     // Check a file and send all errors to the client
     let lint(uri: Uri): Async<unit> = 
         async {
@@ -592,7 +612,7 @@ type Server(client: ILanguageClient) =
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
                 dprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.LocalPath p.position.line p.position.character
-                let! c = checkOpenFile(p.textDocument.uri)
+                let! c = quickCheckOpenFile(p.textDocument.uri)
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
                 | Error errors -> 
