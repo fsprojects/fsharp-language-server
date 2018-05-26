@@ -629,6 +629,11 @@ type Server(client: ILanguageClient) =
                             projects.DeleteProjectFile(file)
                     elif file.Name = "project.assets.json" then 
                         projects.UpdateAssetsJson(file)
+                // Re-lint all open files
+                // In theory we could optimize this by only re-linting descendents of changed projects, 
+                // but in practice that will make little difference
+                for f in docs.OpenFiles() do 
+                    do! lint(f) 
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
