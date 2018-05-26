@@ -571,12 +571,12 @@ type Server(client: ILanguageClient) =
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
-                docs.Open p
+                docs.Open(p)
                 return! lint p.textDocument.uri
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
-                docs.Change p
+                docs.Change(p)
             }
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
