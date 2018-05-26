@@ -572,7 +572,7 @@ type Server(client: ILanguageClient) =
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
                 docs.Open(p)
-                return! lint p.textDocument.uri
+                do! lint(p.textDocument.uri)
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
@@ -626,14 +626,14 @@ type Server(client: ILanguageClient) =
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
                     lastCompletion <- Some declarations 
                     dprintfn "Found %d completions" declarations.Items.Length
-                    return Some(asCompletionList declarations)
+                    return Some(asCompletionList(declarations))
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
                 let! c = checkOpenFile(p.textDocument.uri)
                 match c with 
                 | Error errors -> 
-                    dprintfn "Check failed, ignored %d errors" (List.length errors)
+                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
                     let line = lineContent(p.textDocument.uri, p.position.line)
@@ -658,7 +658,7 @@ type Server(client: ILanguageClient) =
                 let! c = quickCheckOpenFile(p.textDocument.uri)
                 match c with 
                 | Error errors -> 
-                    dprintfn "Check failed, ignored %d errors" (List.length errors)
+                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
                     let line = lineContent(p.textDocument.uri, p.position.line)
@@ -690,6 +690,9 @@ type Server(client: ILanguageClient) =
                 match maybeSymbol with 
                 | None -> return [] 
                 | Some s -> 
+                    // TODO only check files that contain s.Symbol.FullName
+                    // maybeMatchesQuery is similar
+                    // GetUsesOfSymbolInFile can be used to refine the guess
                     dprintfn "Looking for references to %s in %s" s.Symbol.FullName (printProjectNames(projects.OpenProjects))
                     let all = System.Collections.Generic.List<Location>()
                     for options in projects.OpenProjects do 
@@ -746,10 +749,11 @@ type Server(client: ILanguageClient) =
                 match maybeSymbol with 
                 | None -> return {documentChanges=[]}
                 | Some s -> 
+                    // TODO only check files that contain s.Symbol.FullName
                     dprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName (printProjectNames(projects.OpenProjects))
                     let all = System.Collections.Generic.List<FSharpSymbolUse>()
                     for options in projects.OpenProjects do 
-                        let! check = checker.ParseAndCheckProject options
+                        let! check = checker.ParseAndCheckProject(options)
                         let! usages = check.GetUsesOfSymbol(s.Symbol)
                         for u in usages do 
                             all.Add u
