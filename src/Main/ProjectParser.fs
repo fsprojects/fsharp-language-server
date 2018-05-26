@@ -49,6 +49,7 @@ module ProjectParser =
         file: FileInfo
         compileInclude: FileInfo list 
         projectReferenceInclude: FileInfo list
+        referenceHintPath: FileInfo list
     }
 
     let private fixPath(path: string): string = 
@@ -112,7 +113,15 @@ module ProjectParser =
                     let normalizePath = Path.GetFullPath(absolutePath)
                     yield FileInfo(normalizePath)
             })
-            {file=fsproj; compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude} |> Ok
+            // Find all <Reference><HintPath>?</></>
+            let referenceHintPath = List.ofSeq(seq {
+                for n in doc.DocumentElement.SelectNodes "//Reference/HintPath" do 
+                    let relativePath = n.InnerText
+                    let absolutePath = Path.Combine(directory.FullName, relativePath)
+                    let normalizePath = Path.GetFullPath(absolutePath)
+                    yield FileInfo(normalizePath)
+            })
+            {file=fsproj; compileInclude=compileInclude; projectReferenceInclude=projectReferenceInclude; referenceHintPath=referenceHintPath} |> Ok
         with e -> 
             Error(e.Message)
     // Parse a project.assets.json file

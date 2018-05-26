@@ -27,6 +27,16 @@ let ``find project file`` () =
     | Ok f -> if not (f.ProjectFileName.EndsWith "MainProject.fsproj") then Assert.Fail(sprintf "%A" f)
 
 [<Test>]
+let ``find an local dll`` () = 
+    let projects = ProjectManager()
+    let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo
+    projects.AddWorkspaceRoot root 
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
+    match projects.FindProjectOptions(file) with 
+    | Error m -> Assert.Fail m
+    | Ok parsed -> if not (Seq.exists (endsWith "LocalDll.dll") parsed.OtherOptions) then Assert.Fail(sprintf "%A" parsed.OtherOptions)
+
+[<Test>]
 let ``project-file-not-found`` () = 
     let projects = ProjectManager()
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])

@@ -100,7 +100,7 @@ type ProjectManager() =
         // Recursively ensure that all ancestors are analyzed and cached
         for parent in proj.projectReferenceInclude do 
             ensureAnalyzed(parent)
-        let libraryDlls = findLibraryDlls(assets)
+        let libraryDlls = findLibraryDlls(assets)@proj.referenceHintPath
         let projectRefs = Seq.toArray(projectReferences(proj))
         let projectDlls = ancestorDlls(projectRefs)
         dprintfn "Project %s" proj.file.FullName
