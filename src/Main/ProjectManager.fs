@@ -42,7 +42,7 @@ type ProjectManager() =
         // TODO Alternatively, output each project to a temporary directory and reference those .dlls
         // ProjectName.dll
         let dll = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
-        let outputs = ["bin"; "obj"]
+        let outputs = ["obj"; "bin"]
         let configs = ["Debug"; "Release"]
         let frameworkPrefixes = ["netcoreapp"; "netstandard"; "net"]
         let list = [
@@ -67,7 +67,7 @@ type ProjectManager() =
         if list.Length > 0 then 
             list.[0] 
         else
-            Path.Combine [|fsproj.Directory.FullName; "bin"; "placeholder"; dll|]
+            Path.Combine [|fsproj.Directory.FullName; "obj"; "placeholder"; dll|]
     let ancestorDlls(refs: (string * FSharpProjectOptions)[]): string list = 
         let result = HashSet<string>()
         let rec traverse(refs: (string * FSharpProjectOptions)[]) = 
