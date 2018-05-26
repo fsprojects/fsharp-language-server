@@ -53,7 +53,7 @@ let ``bad project file`` () =
 
 [<Test>]
 let ``parse a project file with dependencies`` () = 
-    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Projects"; "Projects.fsproj"|])
     let parsed = match ProjectParser.parseFsProj file with Ok p -> p
     if not (Seq.exists (fileHasName "ProjectManager.fs") parsed.compileInclude) then Assert.Fail(sprintf "%A" parsed.compileInclude)
     if not (Seq.exists (fileHasName "LSP.fsproj") parsed.projectReferenceInclude) then Assert.Fail(sprintf "%A" parsed.projectReferenceInclude)
@@ -62,7 +62,7 @@ let ``parse a project file with dependencies`` () =
 let ``find an fsproj in a parent dir`` () = 
     let projects = ProjectManager()
     projects.AddWorkspaceRoot projectRoot
-    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Program.fs"|])
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Projects"; "ProjectManager.fs"|])
     let parsed = match projects.FindProjectOptions(file) with Ok p -> p
     if not (Seq.exists (endsWith "ProjectManager.fs") parsed.SourceFiles) then Assert.Fail("Failed")
     if not (Seq.exists (fst >> endsWith "LSP.dll") parsed.ReferencedProjects) then Assert.Fail(sprintf "%A" parsed.ReferencedProjects)

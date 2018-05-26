@@ -65,7 +65,7 @@ let ``parsing a JSON project file`` () =
 
 [<Test>]
 let ``parsing a project file`` () = 
-    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Main"; "Main.fsproj"|])
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Projects"; "Projects.fsproj"|])
     let parsed = match ProjectParser.parseFsProj file with Ok p -> p
     let hasName(name: string) (f: FileInfo) = f.Name = name
     if not (Seq.exists (hasName "ProjectManager.fs") parsed.compileInclude) then 

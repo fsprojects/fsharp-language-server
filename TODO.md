@@ -13,6 +13,7 @@
 
 # Bugs
 - Autocompleting in strings
+- Re-lint files when .fsproj or projects.assets.json changes
 
 # Optimizations
 Don't check entire project for rename if symbol is local
