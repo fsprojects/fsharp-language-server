@@ -655,7 +655,7 @@ type Server(client: ILanguageClient) =
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
-                let! c = checkOpenFile(p.textDocument.uri)
+                let! c = quickCheckOpenFile(p.textDocument.uri)
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length errors)
