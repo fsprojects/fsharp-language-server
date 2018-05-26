@@ -38,8 +38,9 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 - src/Projects: Figures out [F# compiler options](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/compiler-options) by reading .fsproj and project.assets.json files
 - src/Main: F# language server
 - tests/LSP.Tests
+- tests/Projects.Tests
 - tests/Main.Tests
-- sample: Example projects used by tests/Main.Tests
+- sample: Example projects used by tests
 
 ## How is this project different than [Ionide](https://github.com/ionide)?
 Ionide is a suite of F# plugins for VSCode that implements an IDE-type experience. This project is focused on implementing the core code intelligence features with maximum reliability and performance. 

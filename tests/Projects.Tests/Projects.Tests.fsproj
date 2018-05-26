@@ -1,26 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
-
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
   <ItemGroup>
-    <Compile Include="JsonTests.fs" />
-    <Compile Include="TokenizerTests.fs" />
-    <Compile Include="ParserTests.fs" />
-    <Compile Include="DocumentStoreTests.fs" />
-    <Compile Include="LanguageServerTests.fs" />
+    <Compile Include="Common.fs" />
+    <Compile Include="ProjectParserTests.fs" />
+    <Compile Include="ProjectManagerTests.fs" />
   </ItemGroup>
-
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.5.0" />
     <PackageReference Include="NUnit" Version="3.9.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.9.0" />
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\..\src\LSP\LSP.fsproj" />
+    <ProjectReference Include="..\..\src\Projects\Projects.fsproj" />
   </ItemGroup>
-
 </Project>
