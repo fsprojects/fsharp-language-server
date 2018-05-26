@@ -124,7 +124,6 @@ let private findEndOfIdentifierUnderCursor(lineContent: string, cursor: int): in
     | m::_ -> 
         Some(m.Index + m.Length)
 
-
 // Figure out the active parameter by counting ',' characters
 let private countCommas(lineContent: string, endOfMethodName: int, cursor: int): int = 
     let mutable count = 0
@@ -199,21 +198,6 @@ let private asSignatureInformation(methodName: string, s: FSharpMethodGroupItem)
         label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames) 
         documentation = doc 
         parameters = Array.map asParameterInformation s.Parameters |> List.ofArray
-    }
-
-// Lazily enumerate all symbols in a file or project
-// Used in DocumentSymbols and WorkspaceSymbols
-let rec private findAllSymbols(es: FSharpEntity seq) = 
-    seq {
-        for e in es do 
-            yield e :> FSharpSymbol
-            for x in e.MembersFunctionsAndValues do
-                yield x :> FSharpSymbol
-            for x in e.UnionCases do
-                yield x :> FSharpSymbol
-            for x in e.FSharpFields do
-                yield x :> FSharpSymbol
-            yield! findAllSymbols e.NestedEntities
     }
 
 // Check if `candidate` contains all the characters of `find`, in-order, case-insensitive
@@ -529,6 +513,43 @@ type Server(client: ILanguageClient) =
                 Some text 
             else 
                 None
+    let exactlyMatches(findSymbol: string, uri: Uri): string option =
+        match getOrRead(uri) with 
+        | None -> None 
+        | Some text -> 
+            let matches = symbolPattern.Matches(text)
+            let test(m: Match) = m.Value = findSymbol
+            if Seq.exists test matches then 
+                Some text 
+            else 
+                None
+
+    // Find all uses of a symbol, across all open projects
+    let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
+        // TODO only search 1 file for local variables and private symbols
+        async {
+            dprintfn "Looking for references to %s in %s" symbol.FullName (printProjectNames(projects.OpenProjects))
+            let all = System.Collections.Generic.List<FSharpSymbolUse>()
+            for projectOptions in projects.OpenProjects do 
+                for sourceFile in projectOptions.SourceFiles do 
+                    let uri = Uri("file://" + sourceFile)
+                    match exactlyMatches(symbol.DisplayName, uri) with 
+                    | None -> () 
+                    | Some sourceText ->
+                        try
+                            dprintfn "Checking %s for references to %s" sourceFile symbol.DisplayName // TODO show progress bar
+                            let sourceVersion = docs.GetVersion(uri) |> Option.defaultValue 0
+                            let! _, maybeCheck = checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions)
+                            match maybeCheck with 
+                            | FSharpCheckFileAnswer.Aborted -> ()
+                            | FSharpCheckFileAnswer.Succeeded(check) -> 
+                                let! uses = check.GetUsesOfSymbolInFile(symbol)
+                                for u in uses do 
+                                    all.Add(u)
+                        with e -> 
+                            dprintfn "Error checking %s: %s" sourceFile e.Message
+            return List.ofSeq(all)
+        }
 
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
@@ -690,17 +711,8 @@ type Server(client: ILanguageClient) =
                 match maybeSymbol with 
                 | None -> return [] 
                 | Some s -> 
-                    // TODO only check files that contain s.Symbol.FullName
-                    // maybeMatchesQuery is similar
-                    // GetUsesOfSymbolInFile can be used to refine the guess
-                    dprintfn "Looking for references to %s in %s" s.Symbol.FullName (printProjectNames(projects.OpenProjects))
-                    let all = System.Collections.Generic.List<Location>()
-                    for options in projects.OpenProjects do 
-                        let! check = checker.ParseAndCheckProject(options)
-                        let! uses = check.GetUsesOfSymbol(s.Symbol)
-                        for u in uses do 
-                            all.Add(useLocation(u))
-                    return List.ofSeq(all)
+                    let! uses = findAllSymbolUses(s.Symbol)
+                    return List.map useLocation uses
             }
         member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
@@ -711,7 +723,8 @@ type Server(client: ILanguageClient) =
                     dprintfn "%s" e 
                     return []
                 | Ok parse ->
-                    return List.map asSymbolInformation (flattenSymbols(parse))
+                    let flat = flattenSymbols(parse)
+                    return List.map asSymbolInformation flat
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
             async {
@@ -733,7 +746,7 @@ type Server(client: ILanguageClient) =
                                             all.Add(asSymbolInformation(declaration, container))
                                 with e -> 
                                     dprintfn "Error parsing %s: %s" sourceFile e.Message
-                return List.ofSeq all
+                return List.ofSeq(all)
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
         member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = TODO()
@@ -749,16 +762,11 @@ type Server(client: ILanguageClient) =
                 match maybeSymbol with 
                 | None -> return {documentChanges=[]}
                 | Some s -> 
-                    // TODO only check files that contain s.Symbol.FullName
-                    dprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName (printProjectNames(projects.OpenProjects))
-                    let all = System.Collections.Generic.List<FSharpSymbolUse>()
-                    for options in projects.OpenProjects do 
-                        let! check = checker.ParseAndCheckProject(options)
-                        let! usages = check.GetUsesOfSymbol(s.Symbol)
-                        for u in usages do 
-                            all.Add u
-                    let byFile = Seq.groupBy (fun (usage:FSharpSymbolUse) -> usage.FileName) all
-                    let renames = Seq.map (fun (file, uses) -> renameTo(p.newName, file, uses)) byFile
+                    let! uses = findAllSymbolUses(s.Symbol)
+                    let byFile = List.groupBy (fun (usage:FSharpSymbolUse) -> usage.FileName) uses
+                    let fileNames = List.map fst byFile
+                    dprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName (String.concat ", " fileNames)
+                    let renames = List.map (fun (file, uses) -> renameTo(p.newName, file, uses)) byFile
                     return {documentChanges=List.ofSeq(renames)}
             }
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
