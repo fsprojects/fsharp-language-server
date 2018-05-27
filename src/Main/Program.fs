@@ -408,9 +408,46 @@ type Server(client: ILanguageClient) =
                     return! forceCheckOpenFile(uri)
 
         }
+
+    // When we check a long series of files, create a progress bar
+    // These functions should be called in a `use` block to ensure the progress bar is closed:
+    //   use notifyStartCheckFiles(n)
+    //   for ... do
+    //     notifyCheckFile(f)
+    let notifyStartCheckFiles(nFiles: int): IDisposable = 
+        client.CustomNotification("fsharp/startCheckFiles", JsonValue.Number(decimal(nFiles)))
+        let notifyEnd() = client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
+        { new IDisposable with member this.Dispose() = notifyEnd() }
+    let notifyCheckFile(sourceFile: FileInfo) = 
+        client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
+
+    // Create a progress bar on the first lint operation, which can take a while
+    // TODO instead of using isFirstLint, check how many files actually need to be checked
+    let mutable isFirstLint = true
+    let onStartLint(): IDisposable = 
+        if isFirstLint then 
+            // This is the total number of open files
+            // The number of files we need to check to perform the first lint is strictly less than this number
+            // It's a decent approximation of how long the user should expect to wait
+            let nFiles = List.sum [for p in projects.OpenProjects do yield p.SourceFiles.Length]
+            let progressBar = notifyStartCheckFiles(nFiles)
+            let finish() = 
+                isFirstLint <- false
+                progressBar.Dispose()
+            { new IDisposable with member this.Dispose() = finish()}
+        else 
+            // On subsequent lints, don't show a progress bar
+            // Our assumption is that subsequent lints are not that long
+            { new IDisposable with member this.Dispose() = () }
+    let onCheckFile(sourceFile: FileInfo) = 
+        if isFirstLint then 
+            notifyCheckFile(sourceFile)
+    let _ = checker.BeforeBackgroundFileCheck.Add(fun(file, _) -> onCheckFile(FileInfo(file)))
+
     // Check a file and send all errors to the client
     let lint(uri: Uri): Async<unit> = 
         async {
+            use _ = onStartLint()
             let! check = forceCheckOpenFile(uri)
             let errors = 
                 match check with
@@ -539,28 +576,25 @@ type Server(client: ILanguageClient) =
                         | None -> () 
                         | Some sourceText -> yield projectOptions, uri, sourceText
             ]
-            try
-                // Send a notification to the client to create a progress indicator
-                client.CustomNotification("fsharp/startCheckFiles", JsonValue.Number(decimal(candidates.Length)))
-                // Check each candidate file
-                for projectOptions, sourceUri, sourceText in candidates do 
-                    try
-                        // Send a notification to the client updating the progress indicator
-                        let sourceFile = FileInfo(sourceUri.LocalPath)
-                        client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
-                        // Check file
-                        let sourceVersion = docs.GetVersion(sourceUri) |> Option.defaultValue 0
-                        let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceUri.LocalPath, sourceVersion, sourceText, projectOptions)
-                        match maybeCheck with 
-                        | FSharpCheckFileAnswer.Aborted -> ()
-                        | FSharpCheckFileAnswer.Succeeded(check) -> 
-                            let! uses = check.GetUsesOfSymbolInFile(symbol)
-                            for u in uses do 
-                                all.Add(u)
-                    with e -> 
-                        dprintfn "Error checking %s: %s" sourceUri.LocalPath e.Message
-            finally
-                client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
+            use _ = notifyStartCheckFiles(candidates.Length)
+            // Check each candidate file
+            for projectOptions, sourceUri, sourceText in candidates do 
+                try
+                    // Send a notification to the client updating the progress indicator
+                    let sourceFile = FileInfo(sourceUri.LocalPath)
+                    notifyCheckFile(sourceFile)
+                    
+                    // Check file
+                    let sourceVersion = docs.GetVersion(sourceUri) |> Option.defaultValue 0
+                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceUri.LocalPath, sourceVersion, sourceText, projectOptions)
+                    match maybeCheck with 
+                    | FSharpCheckFileAnswer.Aborted -> ()
+                    | FSharpCheckFileAnswer.Succeeded(check) -> 
+                        let! uses = check.GetUsesOfSymbolInFile(symbol)
+                        for u in uses do 
+                            all.Add(u)
+                with e -> 
+                    dprintfn "Error checking %s: %s" sourceUri.LocalPath e.Message
             return List.ofSeq(all)
         }
 
