@@ -1,4 +1,4 @@
-module Main.Tests.Common
+module Projects.Tests.Common
 
 open System
 open System.IO

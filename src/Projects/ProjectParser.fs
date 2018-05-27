@@ -1,4 +1,4 @@
-namespace Main 
+namespace Projects 
 
 open LSP.Log
 open System

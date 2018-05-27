@@ -13,6 +13,6 @@
     <PackageReference Include="NUnit3TestAdapter" Version="3.9.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Main\Main.fsproj" />
+    <ProjectReference Include="..\..\src\FSharpLanguageServer\FSharpLanguageServer.fsproj" />
   </ItemGroup>
 </Project>

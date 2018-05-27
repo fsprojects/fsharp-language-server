@@ -1,7 +1,7 @@
-module Main.Tests.ProjectParserTests
+module Projects.Tests.ProjectParserTests
 
-open Main
-open Main.Tests.Common
+open Projects
+open Projects.Tests.Common
 open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices

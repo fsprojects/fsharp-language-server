@@ -1,7 +1,7 @@
-module Main.Tests.ServerTests
+module FSharpLanguageServer.Tests.ServerTests
 
-open Main.Tests.Common
-open Main.Program
+open FSharpLanguageServer.Tests.Common
+open FSharpLanguageServer.Program
 open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
@@ -146,17 +146,6 @@ let ``report a type error when a file is saved``() =
     let messages = diagnosticMessages(client)
     let isTypeError(m: string) = m.Contains("This expression was expected to have type")
     if not (List.exists isTypeError messages) then Assert.Fail(sprintf "No type error in %A" messages)
-
-[<Test>]
-let ``report a type error when a referenced file is changed``() = 
-    let (client, server) = createServerAndReadFile("BreakParentReference.fs")
-    server.DidOpenTextDocument(openFile "BreakParentTarget.fs") |> Async.RunSynchronously
-    client.Diagnostics.Clear()
-    server.DidChangeTextDocument(edit "BreakParentTarget.fs" 3 17 "1" "\"1\"") |> Async.RunSynchronously
-    server.DidSaveTextDocument(save "BreakParentTarget.fs") |> Async.RunSynchronously
-    let files = [for group in client.Diagnostics do yield group.uri]
-    let isBreakParent(uri: Uri) = uri.LocalPath.EndsWith "BreakParentReference.fs"
-    if not (List.exists isBreakParent files) then Assert.Fail(sprintf "Didn't lint BreakParentReference.fs in %A" files)
 
 [<Test>]
 let ``reference other file in same project``() = 

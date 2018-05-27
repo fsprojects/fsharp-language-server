@@ -101,7 +101,7 @@ function createProgressListener(client: LanguageClient) {
 
 function binName() {
 	if (process.platform === 'win32')
-		return path.join('src', 'Main', 'bin', 'Release', 'netcoreapp2.0', 'win10-x64', 'publish', 'Main.exe')
+		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'win10-x64', 'publish', 'FSharpLanguageServer.exe')
 	else
-		return path.join('src', 'Main', 'bin', 'Release', 'netcoreapp2.0', 'osx.10.11-x64', 'publish', 'Main')
+		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'osx.10.11-x64', 'publish', 'FSharpLanguageServer')
 }

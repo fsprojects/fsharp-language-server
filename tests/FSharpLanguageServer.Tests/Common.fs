@@ -1,4 +1,4 @@
-module Main.Tests.Common
+module FSharpLanguageServer.Tests.Common
 
 open System
 open System.IO

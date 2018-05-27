@@ -1,4 +1,4 @@
-module Main.Program
+module FSharpLanguageServer.Program
 
 open LSP.Log
 open Microsoft.FSharp.Compiler
@@ -11,6 +11,7 @@ open LSP
 open LSP.Types
 open LSP.Json
 open LSP.Json.JsonExtensions
+open Projects
 
 let private TODO() = raise (Exception "TODO")
 

@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{29A9E10D-C8C7-416D-B32D-820658A129A6}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Main", "src\Main\Main.fsproj", "{D0C97655-008A-4376-87A3-FD072D076F16}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharpLanguageServer", "src\FSharpLanguageServer\FSharpLanguageServer.fsproj", "{D0C97655-008A-4376-87A3-FD072D076F16}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "LSP", "src\LSP\LSP.fsproj", "{AD9284CA-9934-4A4B-9C5C-AE680DFE0451}"
 EndProject

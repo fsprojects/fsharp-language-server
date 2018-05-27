@@ -1,4 +1,4 @@
-namespace Main 
+namespace Projects 
 
 open LSP.Log
 open System
@@ -10,7 +10,7 @@ open LSP.Json
 open LSP.Json.JsonExtensions
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
-open ProjectParser
+open Projects.ProjectParser
 
 // Maintains caches of parsed versions of .fsproj files
 type ProjectManager() = 

@@ -21,8 +21,8 @@
 	],
 	"main": "./out/client/extension",
 	"files": [
-		"./src/Main/bin/Release/netcoreapp2.0/osx.10.11-x64/publish",
-		"./src/Main/bin/Release/netcoreapp2.0/win10-x64/publish"
+		"./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/osx.10.11-x64/publish",
+		"./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/win10-x64/publish"
 	],
 	"contributes": {
 		"languages": [

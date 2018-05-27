@@ -17,7 +17,7 @@
 - When autocomplete is empty, force a check
 
 # Optimizations
-- Change name Main to FSharpLanguageServer
+- Switch to dotnet-proj-info
 
 # Features
 - Docstrings on autocomplete and hover

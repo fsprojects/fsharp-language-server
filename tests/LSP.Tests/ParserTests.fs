@@ -75,7 +75,7 @@ let ``parse a DidChangeConfiguration notification`` () =
 let ``parse a DidOpenTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs",
+            "uri": "file://workspace/FSharpLanguageServer.fs",
             "languageId": "fsharp",
             "version": 1,
             "text": "let x = 1"
@@ -85,7 +85,7 @@ let ``parse a DidOpenTextDocument notification`` () =
     let expected = (DidOpenTextDocument {
             textDocument = 
                 {
-                    uri = Uri("file://workspace/Main.fs")
+                    uri = Uri("file://workspace/FSharpLanguageServer.fs")
                     languageId = "fsharp"
                     version = 1
                     text = "let x = 1"
@@ -97,7 +97,7 @@ let ``parse a DidOpenTextDocument notification`` () =
 let ``parse a DidChangeTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs",
+            "uri": "file://workspace/FSharpLanguageServer.fs",
             "version": 1
         },
         "contentChanges": [{
@@ -108,7 +108,7 @@ let ``parse a DidChangeTextDocument notification`` () =
     let expected = (DidChangeTextDocument {
             textDocument = 
                 {
-                    uri = Uri("file://workspace/Main.fs")
+                    uri = Uri("file://workspace/FSharpLanguageServer.fs")
                     version = 1
                 }
             contentChanges = 
@@ -126,7 +126,7 @@ let ``parse a DidChangeTextDocument notification`` () =
 let ``parse a DidChangeTextDocument notification with range`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs",
+            "uri": "file://workspace/FSharpLanguageServer.fs",
             "version": 1
         },
         "contentChanges": [{
@@ -142,7 +142,7 @@ let ``parse a DidChangeTextDocument notification with range`` () =
     let expected = (DidChangeTextDocument {
             textDocument = 
                 {
-                    uri = Uri("file://workspace/Main.fs")
+                    uri = Uri("file://workspace/FSharpLanguageServer.fs")
                     version = 1
                 }
             contentChanges = 
@@ -161,13 +161,13 @@ let ``parse a DidChangeTextDocument notification with range`` () =
 let ``parse a WillSaveTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "reason": 2
     }"""
     let found = parseNotification("textDocument/willSave", Some(json))
     let expected = (WillSaveTextDocument {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             reason = TextDocumentSaveReason.AfterDelay
         })
     Assert.AreEqual(expected, found)
@@ -176,13 +176,13 @@ let ``parse a WillSaveTextDocument notification`` () =
 let ``parse a WillSaveWaitUntilTextDocument request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "reason": 2
     }"""
     let found = parseRequest("textDocument/willSaveWaitUntil", json)
     let expected = (WillSaveWaitUntilTextDocument {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             reason = TextDocumentSaveReason.AfterDelay
         })
     Assert.AreEqual(expected, found)
@@ -191,12 +191,12 @@ let ``parse a WillSaveWaitUntilTextDocument request`` () =
 let ``parse a DidSaveTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         }
     }"""
     let found = parseNotification("textDocument/didSave", Some(json))
     let expected = (DidSaveTextDocument {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             text = None
         })
     Assert.AreEqual(expected, found)
@@ -205,13 +205,13 @@ let ``parse a DidSaveTextDocument notification`` () =
 let ``parse a DidSaveTextDocument notification with text`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "text": "let x = 1"
     }"""
     let found = parseNotification("textDocument/didSave", Some(json))
     let expected = (DidSaveTextDocument {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             text = Some "let x = 1"
         })
     Assert.AreEqual(expected, found)
@@ -220,12 +220,12 @@ let ``parse a DidSaveTextDocument notification with text`` () =
 let ``parse a DidCloseTextDocument notification`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         }
     }"""
     let found = parseNotification("textDocument/didClose", Some(json))
     let expected = (DidCloseTextDocument {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
         })
     Assert.AreEqual(expected, found)
 
@@ -233,7 +233,7 @@ let ``parse a DidCloseTextDocument notification`` () =
 let ``parse a DidChangeWatchedFiles notification`` () = 
     let json = JsonValue.Parse """{
         "changes": [{
-            "uri": "file://workspace/Main.fs",
+            "uri": "file://workspace/FSharpLanguageServer.fs",
             "type": 2
         }]
     }"""
@@ -241,7 +241,7 @@ let ``parse a DidChangeWatchedFiles notification`` () =
     let expected = (DidChangeWatchedFiles {
             changes = 
                 [{
-                    uri = Uri("file://workspace/Main.fs")
+                    uri = Uri("file://workspace/FSharpLanguageServer.fs")
                     ``type`` = FileChangeType.Changed
                 }]
         })
@@ -299,7 +299,7 @@ let ``parse capabilities as map`` () =
 let ``parse Completion request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "position": {
             "line": 0,
@@ -310,7 +310,7 @@ let ``parse Completion request`` () =
     let expected = (Completion {
             textDocument = 
                 {
-                    uri = Uri("file://workspace/Main.fs")
+                    uri = Uri("file://workspace/FSharpLanguageServer.fs")
                 }
             position = 
                 {
@@ -417,7 +417,7 @@ let ``parse maximal ResolveCompletionItem request`` () =
 let ``parse SignatureHelp request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "position": {
             "line": 0,
@@ -426,7 +426,7 @@ let ``parse SignatureHelp request`` () =
     }"""
     let found = parseRequest("textDocument/signatureHelp", json)
     let expected = (SignatureHelp {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             position = 
                 {
                     line = 0
@@ -439,7 +439,7 @@ let ``parse SignatureHelp request`` () =
 let ``parse GotoDefinition request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "position": {
             "line": 0,
@@ -448,7 +448,7 @@ let ``parse GotoDefinition request`` () =
     }"""
     let found = parseRequest("textDocument/definition", json)
     let expected = (GotoDefinition {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             position = 
                 {
                     line = 0
@@ -461,7 +461,7 @@ let ``parse GotoDefinition request`` () =
 let ``parse FindReferences request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "position": {
             "line": 0,
@@ -473,7 +473,7 @@ let ``parse FindReferences request`` () =
     }"""
     let found = parseRequest("textDocument/references", json)
     let expected = (FindReferences {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             position = { line = 0; character = 5 }
             context = { includeDeclaration = true }
         })
@@ -483,7 +483,7 @@ let ``parse FindReferences request`` () =
 let ``parse DocumentHighlight request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "position": {
             "line": 0,
@@ -492,7 +492,7 @@ let ``parse DocumentHighlight request`` () =
     }"""
     let found = parseRequest("textDocument/documentHighlight", json)
     let expected = (DocumentHighlight {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             position = { line = 0; character = 5 }
         })
     Assert.AreEqual(expected, found)
@@ -501,12 +501,12 @@ let ``parse DocumentHighlight request`` () =
 let ``parse DocumentSymbols request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         }
     }"""
     let found = parseRequest("textDocument/documentSymbol", json)
     let expected = (DocumentSymbols {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
         })
     Assert.AreEqual(expected, found)
 
@@ -525,7 +525,7 @@ let ``parse WorkspaceSymbols request`` () =
 let ``parse minimal CodeActions request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "range": {
             "start": {"line": 1, "character": 0},
@@ -543,7 +543,7 @@ let ``parse minimal CodeActions request`` () =
     }"""
     let found = parseRequest("textDocument/codeAction", json)
     let expected = (CodeActions {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             range = 
                 {
                     start = {line = 1; character = 0}
@@ -571,7 +571,7 @@ let ``parse minimal CodeActions request`` () =
 let ``parse maximal CodeActions request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "range": {
             "start": {"line": 1, "character": 0},
@@ -592,7 +592,7 @@ let ``parse maximal CodeActions request`` () =
     }"""
     let found = parseRequest("textDocument/codeAction", json)
     let expected = (CodeActions {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             range = 
                 { 
                     start = {line = 1; character = 0}
@@ -620,7 +620,7 @@ let ``parse maximal CodeActions request`` () =
 let ``parse CodeActions request with an integer code`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "range": {
             "start": {"line": 1, "character": 0},
@@ -639,7 +639,7 @@ let ``parse CodeActions request with an integer code`` () =
     }"""
     let found = parseRequest("textDocument/codeAction", json)
     let expected = (CodeActions {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             range = 
                 {
                     start = {line = 1; character = 0}
@@ -667,12 +667,12 @@ let ``parse CodeActions request with an integer code`` () =
 let ``parse CodeLens request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         }
     }"""
     let found = parseRequest("textDocument/codeLens", json)
     let expected = (Request.CodeLens {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
         })
     Assert.AreEqual(expected, found)
 
@@ -730,12 +730,12 @@ let ``parse maximal ResolveCodeLens request`` () =
 let ``parse DocumentLink request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         }
     }"""
     let found = parseRequest("textDocument/documentLink", json)
     let expected = (DocumentLink {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
         })
     Assert.AreEqual(expected, found)
 
@@ -762,7 +762,7 @@ let ``parse ResolveDocumentLink request`` () =
 let ``parse DocumentFormatting request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "options": {
             "tabSize": 1,
@@ -774,7 +774,7 @@ let ``parse DocumentFormatting request`` () =
     }"""
     let found = parseRequest("textDocument/formatting", json)
     let expected = (DocumentFormatting {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             options = 
                 {
                     tabSize = 1
@@ -795,7 +795,7 @@ let ``parse DocumentFormatting request`` () =
 let ``parse DocumentRangeFormatting request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "options": {
             "tabSize": 1,
@@ -811,7 +811,7 @@ let ``parse DocumentRangeFormatting request`` () =
     }"""
     let found = parseRequest("textDocument/rangeFormatting", json)
     let expected = (DocumentRangeFormatting {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             options = 
                 {
                     tabSize = 1
@@ -837,7 +837,7 @@ let ``parse DocumentRangeFormatting request`` () =
 let ``parse DocumentOnTypeFormatting request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "options": {
             "tabSize": 1,
@@ -854,7 +854,7 @@ let ``parse DocumentOnTypeFormatting request`` () =
     }"""
     let found = parseRequest("textDocument/onTypeFormatting", json)
     let expected = (DocumentOnTypeFormatting {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             options = 
                 {
                     tabSize = 1
@@ -881,7 +881,7 @@ let ``parse DocumentOnTypeFormatting request`` () =
 let ``parse Rename request`` () = 
     let json = JsonValue.Parse """{
         "textDocument": {
-            "uri": "file://workspace/Main.fs"
+            "uri": "file://workspace/FSharpLanguageServer.fs"
         },
         "position": {
             "line": 0,
@@ -891,7 +891,7 @@ let ``parse Rename request`` () =
     }"""
     let found = parseRequest("textDocument/rename", json)
     let expected = (Rename {
-            textDocument = { uri = Uri("file://workspace/Main.fs") }
+            textDocument = { uri = Uri("file://workspace/FSharpLanguageServer.fs") }
             position = 
                 {
                     line = 0
