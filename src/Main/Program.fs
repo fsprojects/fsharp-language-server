@@ -530,24 +530,38 @@ type Server(client: ILanguageClient) =
         async {
             dprintfn "Looking for references to %s in %s" symbol.FullName (printProjectNames(projects.OpenProjects))
             let all = System.Collections.Generic.List<FSharpSymbolUse>()
-            for projectOptions in projects.OpenProjects do 
-                for sourceFile in projectOptions.SourceFiles do 
-                    let uri = Uri("file://" + sourceFile)
-                    match exactlyMatches(symbol.DisplayName, uri) with 
-                    | None -> () 
-                    | Some sourceText ->
-                        try
-                            dprintfn "Checking %s for references to %s" sourceFile symbol.DisplayName // TODO show progress bar
-                            let sourceVersion = docs.GetVersion(uri) |> Option.defaultValue 0
-                            let! _, maybeCheck = checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions)
-                            match maybeCheck with 
-                            | FSharpCheckFileAnswer.Aborted -> ()
-                            | FSharpCheckFileAnswer.Succeeded(check) -> 
-                                let! uses = check.GetUsesOfSymbolInFile(symbol)
-                                for u in uses do 
-                                    all.Add(u)
-                        with e -> 
-                            dprintfn "Error checking %s: %s" sourceFile e.Message
+            // Figure out which files might have a reference to `symbol` by searching the text
+            let candidates = [
+                for projectOptions in projects.OpenProjects do 
+                    for sourceFile in projectOptions.SourceFiles do 
+                        let uri = Uri("file://" + sourceFile)
+                        match exactlyMatches(symbol.DisplayName, uri) with 
+                        | None -> () 
+                        | Some sourceText -> yield projectOptions, uri, sourceText
+            ]
+            try
+                // Send a notification to the client to create a progress indicator
+                client.CustomNotification("fsharp/startCheckFiles", JsonValue.Number(decimal(candidates.Length)))
+                // Check each candidate file
+                for projectOptions, sourceUri, sourceText in candidates do 
+                    try
+                        // Send a notification to the client updating the progress indicator
+                        let sourceFile = FileInfo(sourceUri.LocalPath)
+                        client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
+                        // Check file
+                        let sourceVersion = docs.GetVersion(sourceUri) |> Option.defaultValue 0
+                        let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceUri.LocalPath, sourceVersion, sourceText, projectOptions)
+                        match maybeCheck with 
+                        | FSharpCheckFileAnswer.Aborted -> ()
+                        | FSharpCheckFileAnswer.Succeeded(check) -> 
+                            let! uses = check.GetUsesOfSymbolInFile(symbol)
+                            for u in uses do 
+                                all.Add(u)
+                    with e -> 
+                        dprintfn "Error checking %s: %s" sourceUri.LocalPath e.Message
+            finally
+                client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
+            
             return List.ofSeq(all)
         }
 

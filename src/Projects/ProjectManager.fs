@@ -116,6 +116,7 @@ type ProjectManager() =
             dprintfn "    %s" f.FullName
         let options = 
             {
+                // TODO include output dll somehow; see what dotnet-proj-info does?
                 ExtraProjectInfo = None 
                 IsIncompleteTypeCheckEnvironment = false 
                 LoadTime = proj.file.LastWriteTime

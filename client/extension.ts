@@ -5,8 +5,8 @@
 'use strict';
 
 import * as path from 'path';
-import { workspace, ExtensionContext } from 'vscode';
-import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient';
+import { window, workspace, ExtensionContext, Progress } from 'vscode';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
 
 export function activate(context: ExtensionContext) {
 
@@ -36,11 +36,62 @@ export function activate(context: ExtensionContext) {
 	}
 	
 	// Create the language client and start the client.
-	let disposable = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions).start();
+	let client = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions);
+	let disposable = client.start();
 	
 	// Push the disposable to the context's subscriptions so that the 
 	// client can be deactivated on extension deactivation
 	context.subscriptions.push(disposable);
+
+	// When the language client activates, register a progress-listener
+	client.onReady().then(() => createProgressListener(client));
+}
+
+function createProgressListener(client: LanguageClient) {
+	// Create a "checking files" progress indicator
+	let progressListener = new class {
+		countChecked = 0
+		nFiles = 0
+		progress: Progress<{message?: string}>
+		resolve: (nothing: {}) => void
+		
+		startCheckFiles(nFiles: number) {
+			// TODO implement user cancellation
+			// TODO Change 15 to ProgressLocation.Notification
+			window.withProgress({title: `Checking ${nFiles} files`, location: 15}, progress => new Promise((resolve, _reject) => {
+				this.countChecked = 0;
+				this.nFiles = nFiles;
+				this.progress = progress;
+				this.resolve = resolve;
+			}));
+		}
+
+		private percentComplete() {
+			return Math.floor(this.countChecked / (this.nFiles + 1) * 100);
+		}
+
+		checkFile(fileName: string) {
+			let oldPercent = this.percentComplete();
+			this.countChecked++;
+			let newPercent = this.percentComplete();
+			let report = {message: fileName, increment: newPercent - oldPercent};
+			this.progress.report(report);
+		}
+
+		endCheckFiles() {
+			this.resolve({})
+		}
+	}
+	// Use custom notifications to drive progressListener
+	client.onNotification(new NotificationType('fsharp/startCheckFiles'), (nFiles: number) => {
+		progressListener.startCheckFiles(nFiles);
+	});
+	client.onNotification(new NotificationType('fsharp/checkFile'), (fileName: string) => {
+		progressListener.checkFile(fileName);
+	});
+	client.onNotification(new NotificationType('fsharp/endCheckFiles'), () => {
+		progressListener.endCheckFiles();
+	});
 }
 
 function binName() {

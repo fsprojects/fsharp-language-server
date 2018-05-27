@@ -82,10 +82,10 @@ let readMessages(receive: BinaryReader): seq<Parser.Message> =
 
 type RealClient (send: BinaryWriter) = 
     interface ILanguageClient with 
-        member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
+        member this.PublishDiagnostics(p: PublishDiagnosticsParams): unit = 
             let json = serializePublishDiagnostics(p)
             notifyClient(send, "textDocument/publishDiagnostics", json)
-        member this.RegisterCapability (p: RegisterCapability): unit = 
+        member this.RegisterCapability(p: RegisterCapability): unit = 
             dprintfn "Register capability %A" p
             match p with 
             | RegisterCapability.DidChangeWatchedFiles _ -> 
@@ -93,6 +93,10 @@ type RealClient (send: BinaryWriter) =
                 let message = {registrations=[register]}
                 let json = serializeRegistrationParams(message)
                 notifyClient(send, "client/registerCapability", json)
+        member this.CustomNotification(method: string, json: JsonValue): unit = 
+            let jsonString = json.ToString(JsonSaveOptions.DisableFormatting)
+            dprintfn "Send custom notification %s %s" method jsonString
+            notifyClient(send, method, jsonString)
 
 type private PendingTask = 
 | ProcessNotification of method: string * task: Async<unit> 

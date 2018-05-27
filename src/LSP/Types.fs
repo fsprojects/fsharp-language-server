@@ -703,3 +703,4 @@ type RegistrationParams = {
 type ILanguageClient =
     abstract member PublishDiagnostics: PublishDiagnosticsParams -> unit 
     abstract member RegisterCapability: RegisterCapability -> unit
+    abstract member CustomNotification: string * JsonValue -> unit
