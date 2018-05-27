@@ -400,13 +400,10 @@ type Server(client: ILanguageClient) =
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
                 | Some(parseResult, checkResult, version) -> 
-                    // Queue a checking operation
-                    checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions) |> ignore
                     // Return the cached check, even if it is out-of-date
                     return Ok(parseResult, checkResult)
                 | _ -> 
                     return! forceCheckOpenFile(uri)
-
         }
 
     // When we check a long series of files, create a progress bar
@@ -457,6 +454,7 @@ type Server(client: ILanguageClient) =
         else 
             { new IDisposable with member this.Dispose() = () }
     let onCheckFile(sourceFile: FileInfo) = 
+        dprintfn "Checking %s, queue length %d" sourceFile.FullName checker.CurrentQueueLength
         // Remember that we've checked this version of the file, 
         // so that we can accurately calculate how many files we need to check in the future
         lastCheckedOnDisk.[sourceFile.FullName] <- sourceFile.LastWriteTime
@@ -467,16 +465,28 @@ type Server(client: ILanguageClient) =
     let _ = checker.BeforeBackgroundFileCheck.Add(fun(file, _) -> onCheckFile(FileInfo(file)))
 
     // Check a file and send all errors to the client
-    let lint(uri: Uri): Async<unit> = 
+    let checkNow(uri: Uri): Async<unit> = 
         async {
             use _ = onStartLint(FileInfo(uri.LocalPath))
-            let! check = forceCheckOpenFile(uri)
+            let! check = checkOpenFile(uri)
             let errors = 
                 match check with
                 | Error(errors) -> errors
                 | Ok(parseResult, checkResult) -> asDiagnostics(parseResult.Errors)@asDiagnostics(checkResult.Errors)
             client.PublishDiagnostics({uri=uri; diagnostics=errors})
         }
+    // Check a file once 1s passes with no check requests
+    let mutable debounceCheck = 0
+    let checkLater(uri: Uri): unit = 
+        let id = debounceCheck + 1
+        debounceCheck <- id
+        Async.Start(async {
+            do! Async.Sleep(1000)
+            if debounceCheck = id then
+                dprintfn "Starting check %d because 1s went by with no edits" id
+                do! checkNow(uri)
+                dprintfn "Finished check %d" id
+        })
     // Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
@@ -669,11 +679,12 @@ type Server(client: ILanguageClient) =
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
                 docs.Open(p)
-                do! lint(p.textDocument.uri)
+                do! checkNow(p.textDocument.uri)
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
                 docs.Change(p)
+                checkLater(p.textDocument.uri)
             }
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
@@ -684,7 +695,7 @@ type Server(client: ILanguageClient) =
                 let names = List.map uriFileName files
                 dprintfn "Lint %s" (String.Join(", ", names))
                 for f in files do 
-                    do! lint(f)
+                    do! checkNow(f)
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
@@ -709,7 +720,7 @@ type Server(client: ILanguageClient) =
                 // In theory we could optimize this by only re-linting descendents of changed projects, 
                 // but in practice that will make little difference
                 for f in docs.OpenFiles() do 
-                    do! lint(f) 
+                    do! checkNow(f) 
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {

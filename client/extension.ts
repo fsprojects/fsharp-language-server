@@ -71,14 +71,19 @@ function createProgressListener(client: LanguageClient) {
 		}
 
 		checkFile(fileName: string) {
-			let oldPercent = this.percentComplete();
-			this.countChecked++;
-			let newPercent = this.percentComplete();
-			let report = {message: fileName, increment: newPercent - oldPercent};
-			this.progress.report(report);
+			if (this.progress != null) {
+				let oldPercent = this.percentComplete();
+				this.countChecked++;
+				let newPercent = this.percentComplete();
+				let report = {message: fileName, increment: newPercent - oldPercent};
+				this.progress.report(report);
+			}
 		}
 
 		endCheckFiles() {
+			this.countChecked = 0
+			this.nFiles = 0
+			this.progress = null
 			this.resolve({})
 		}
 	}
