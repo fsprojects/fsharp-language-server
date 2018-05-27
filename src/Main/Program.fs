@@ -175,7 +175,7 @@ let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem =
 // Used in rendering autocomplete lists
 let private asCompletionList(ds: FSharpDeclarationListInfo): CompletionList = 
     let items = [for i in ds.Items do yield asCompletionItem(i)]
-    {isIncomplete=false; items=items}
+    {isIncomplete=List.isEmpty(items); items=items}
 
 // Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
 let private asParameterInformation(p: FSharpMethodGroupItemParameter): ParameterInformation = 
@@ -421,33 +421,55 @@ type Server(client: ILanguageClient) =
     let notifyCheckFile(sourceFile: FileInfo) = 
         client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
 
-    // Create a progress bar on the first lint operation, which can take a while
-    // TODO instead of using isFirstLint, check how many files actually need to be checked
-    let mutable isFirstLint = true
-    let onStartLint(): IDisposable = 
-        if isFirstLint then 
-            // This is the total number of open files
-            // The number of files we need to check to perform the first lint is strictly less than this number
-            // It's a decent approximation of how long the user should expect to wait
-            let nFiles = List.sum [for p in projects.OpenProjects do yield p.SourceFiles.Length]
-            let progressBar = notifyStartCheckFiles(nFiles)
-            let finish() = 
-                isFirstLint <- false
-                progressBar.Dispose()
-            { new IDisposable with member this.Dispose() = finish()}
+    // Create a progress bar on long lint operations
+    let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
+    let compilationOrderAncestors(goal: FileInfo) = 
+        let transitiveDeps = 
+            match projects.FindProjectOptions(goal) with 
+            | Ok(projectOptions) -> projects.TransitiveDeps(FileInfo(projectOptions.ProjectFileName))
+            | Error(_) -> []
+        let compileOrder = [
+            for p in transitiveDeps do
+                for f in p.SourceFiles do 
+                    yield FileInfo(f)
+        ]
+        let notGoal(candidate: FileInfo) = candidate.FullName <> goal.FullName
+        List.takeWhile notGoal compileOrder
+    let changedOnDisk(sourceFile: FileInfo) = 
+        let isChecked, checkedTime = lastCheckedOnDisk.TryGetValue(sourceFile.FullName)
+        if not(isChecked) then 
+            dprintfn "%s needs to be checked because it has never been checked" sourceFile.Name 
+            true
+        else if sourceFile.LastWriteTime > checkedTime then 
+            dprintfn "%s need to be checked because write-time %A > check-time %A" sourceFile.Name sourceFile.LastWriteTime.TimeOfDay checkedTime.TimeOfDay 
+            true
+        else false
+    let onStartLint(goal: FileInfo): IDisposable = 
+        // Figure out how many files *actually* need to be checked in order to check `goal`
+        let ancestors = compilationOrderAncestors(goal)
+        dprintfn "There are %d ancestors leading to %s" (List.length(ancestors)) goal.Name
+        let todo = List.filter changedOnDisk ancestors
+        let nFiles = List.length todo + 1
+        // If we need to check more than 1 file, create a progress bar
+        if nFiles > 1 then 
+            notifyStartCheckFiles(nFiles)
+        // Otherwise do nothing
         else 
-            // On subsequent lints, don't show a progress bar
-            // Our assumption is that subsequent lints are not that long
             { new IDisposable with member this.Dispose() = () }
     let onCheckFile(sourceFile: FileInfo) = 
-        if isFirstLint then 
-            notifyCheckFile(sourceFile)
+        // Remember that we've checked this version of the file, 
+        // so that we can accurately calculate how many files we need to check in the future
+        lastCheckedOnDisk.[sourceFile.FullName] <- sourceFile.LastWriteTime
+        // Notify the client that the file is being checked
+        // If a progress bar is showing, it will be advanced
+        notifyCheckFile(sourceFile)
+    // TODO there might be a thread safety issue here---is this getting called from a separate thread?
     let _ = checker.BeforeBackgroundFileCheck.Add(fun(file, _) -> onCheckFile(FileInfo(file)))
 
     // Check a file and send all errors to the client
     let lint(uri: Uri): Async<unit> = 
         async {
-            use _ = onStartLint()
+            use _ = onStartLint(FileInfo(uri.LocalPath))
             let! check = forceCheckOpenFile(uri)
             let errors = 
                 match check with

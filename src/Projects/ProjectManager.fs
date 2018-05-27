@@ -165,8 +165,33 @@ type ProjectManager() =
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
             analyzedByProjectFile.[projectFile.FullName]
         else Error(sprintf "No .fsproj file references %s" sourceFile.FullName)
+    // All open projects, in dependency order
+    // Ancestor projects come before projects that depend on them
     member this.OpenProjects: FSharpProjectOptions list = 
-        [ for each in analyzedByProjectFile.Values do 
-            match each with 
-            | Ok options -> yield options 
-            | Error _ -> () ]
+        let touched = new HashSet<String>()
+        let result = new System.Collections.Generic.List<FSharpProjectOptions>()
+        let rec walk(key: string) = 
+            if touched.Add(key) then 
+                match analyzedByProjectFile.[key] with 
+                | Error _ -> () 
+                | Ok options -> 
+                    for _, parent in options.ReferencedProjects do 
+                        walk(parent.ProjectFileName)
+                    result.Add(options)
+        for key in analyzedByProjectFile.Keys do 
+            walk(key)
+        List.ofSeq(result)
+    // All transitive dependencies of `projectFile`, in dependency order
+    member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
+        let touched = new HashSet<String>()
+        let result = new System.Collections.Generic.List<FSharpProjectOptions>()
+        let rec walk(key: string) = 
+            if touched.Add(key) then 
+                match analyzedByProjectFile.[key] with 
+                | Error _ -> () 
+                | Ok options -> 
+                    for _, parent in options.ReferencedProjects do 
+                        walk(parent.ProjectFileName)
+                    result.Add(options)
+        walk(projectFile.FullName)
+        List.ofSeq(result)
