@@ -91,7 +91,6 @@ type RealClient (send: BinaryWriter) =
             let json = serializeShowMessage(p)
             notifyClient(send, "window/showMessage", json)
         member this.RegisterCapability(p: RegisterCapability): unit = 
-            dprintfn "Register capability %A" p
             match p with 
             | RegisterCapability.DidChangeWatchedFiles _ -> 
                 let register = {id=Guid.NewGuid().ToString(); method="workspace/didChangeWatchedFiles"; registerOptions=p}
@@ -100,7 +99,6 @@ type RealClient (send: BinaryWriter) =
                 notifyClient(send, "client/registerCapability", json)
         member this.CustomNotification(method: string, json: JsonValue): unit = 
             let jsonString = json.ToString(JsonSaveOptions.DisableFormatting)
-            dprintfn "Send custom notification %s %s" method jsonString
             notifyClient(send, method, jsonString)
 
 type private PendingTask = 
