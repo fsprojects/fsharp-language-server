@@ -561,9 +561,15 @@ type Server(client: ILanguageClient) =
                         dprintfn "Error checking %s: %s" sourceUri.LocalPath e.Message
             finally
                 client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
-            
             return List.ofSeq(all)
         }
+
+    // Tell the user if we run out of memory
+    // TODO add a setting to increase max memory
+    let maxMemoryWarning() = 
+        let message = sprintf "Reached max memory %d MB" checker.MaxMemory
+        client.ShowMessage({``type``=MessageType.Warning; message=message})
+    let _ = checker.MaxMemoryReached.Add(maxMemoryWarning)
 
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 

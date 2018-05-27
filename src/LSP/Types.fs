@@ -660,11 +660,28 @@ type ILanguageServer =
     abstract member ExecuteCommand: ExecuteCommandParams -> Async<unit>
     abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> Async<unit>
 
-// TODO IAsyncLanguageServer that supports request cancellation
-
 type PublishDiagnosticsParams = {
     uri: Uri 
     diagnostics: Diagnostic list
+}
+
+[<RequireQualifiedAccess>]
+type MessageType = 
+| Error 
+| Warning 
+| Info 
+| Log
+
+let writeMessageType(t: MessageType) = 
+    match t with 
+    | MessageType.Error -> 1
+    | MessageType.Warning -> 2
+    | MessageType.Info -> 3
+    | MessageType.Log -> 4
+
+type ShowMessageParams = {
+    ``type``: MessageType
+    message: string 
 }
 
 module WatchKind =
@@ -702,5 +719,6 @@ type RegistrationParams = {
 
 type ILanguageClient =
     abstract member PublishDiagnostics: PublishDiagnosticsParams -> unit 
+    abstract member ShowMessage: ShowMessageParams -> unit
     abstract member RegisterCapability: RegisterCapability -> unit
     abstract member CustomNotification: string * JsonValue -> unit

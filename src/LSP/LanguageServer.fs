@@ -24,7 +24,8 @@ let private jsonWriteOptions =
               writeMarkedString;
               writeDocumentHighlightKind;
               writeSymbolKind;
-              writeRegisterCapability ] }
+              writeRegisterCapability;
+              writeMessageType ] }
 
 let private serializeInitializeResult = serializerFactory<InitializeResult> jsonWriteOptions
 let private serializeTextEditList = serializerFactory<TextEdit list> jsonWriteOptions
@@ -45,6 +46,7 @@ let private serializeDocumentLinkList = serializerFactory<DocumentLink list> jso
 let private serializeDocumentLink = serializerFactory<DocumentLink> jsonWriteOptions
 let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteOptions
 let private serializePublishDiagnostics = serializerFactory<PublishDiagnosticsParams> jsonWriteOptions
+let private serializeShowMessage = serializerFactory<ShowMessageParams> jsonWriteOptions
 let private serializeRegistrationParams = serializerFactory<RegistrationParams> jsonWriteOptions
 
 let private writeClient (client: BinaryWriter, messageText: string) =
@@ -85,6 +87,9 @@ type RealClient (send: BinaryWriter) =
         member this.PublishDiagnostics(p: PublishDiagnosticsParams): unit = 
             let json = serializePublishDiagnostics(p)
             notifyClient(send, "textDocument/publishDiagnostics", json)
+        member this.ShowMessage(p: ShowMessageParams): unit = 
+            let json = serializeShowMessage(p)
+            notifyClient(send, "window/showMessage", json)
         member this.RegisterCapability(p: RegisterCapability): unit = 
             dprintfn "Register capability %A" p
             match p with 
