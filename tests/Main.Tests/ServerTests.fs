@@ -326,4 +326,6 @@ let ``rename across files``() =
 let ``match title case queries``() = 
     Assert.True(matchesTitleCase("fb", "FooBar"))
     Assert.True(matchesTitleCase("fob", "FooBar"))
+    Assert.True(matchesTitleCase("fb", "AnyPrefixFooBar"))
+    Assert.True(matchesTitleCase("fb", "UPPERFooBar"))
     Assert.False(matchesTitleCase("fb", "Foobar"))

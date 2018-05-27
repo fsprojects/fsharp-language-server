@@ -214,7 +214,7 @@ let matchesTitleCase(find: string, candidate: string): bool =
             true 
         else false 
     let isStartOfWord(i) = 
-        0 < i && i < candidate.Length && Char.IsLower(candidate.[i - 1]) && Char.IsUpper(candidate.[i])
+        0 <= i && i < candidate.Length && Char.IsUpper(candidate.[i])
     let matchStartOfNextWord(f) = 
         let test(i) = isStartOfWord(i) && lowerEquals(candidate.[i], f)
         while i < candidate.Length && not(test(i)) do
