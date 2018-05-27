@@ -5,9 +5,10 @@ open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
 open System.IO
+open System.Text.RegularExpressions
+open System.Threading
 open LSP
 open LSP.Types
-open System.Text.RegularExpressions
 open LSP.Json
 open LSP.Json.JsonExtensions
 
@@ -465,7 +466,8 @@ type Server(client: ILanguageClient) =
     let _ = checker.BeforeBackgroundFileCheck.Add(fun(file, _) -> onCheckFile(FileInfo(file)))
 
     // Check a file and send all errors to the client
-    let checkNow(uri: Uri): Async<unit> = 
+    let mutable cancelCheckLater = new CancellationTokenSource()
+    let checkTask(uri: Uri): Async<unit> = 
         async {
             use _ = onStartLint(FileInfo(uri.LocalPath))
             let! check = checkOpenFile(uri)
@@ -475,18 +477,21 @@ type Server(client: ILanguageClient) =
                 | Ok(parseResult, checkResult) -> asDiagnostics(parseResult.Errors)@asDiagnostics(checkResult.Errors)
             client.PublishDiagnostics({uri=uri; diagnostics=errors})
         }
+    // Check a file immediately, cancelling any deferred check
+    let checkNow(uri: Uri): Async<unit> = 
+        cancelCheckLater.Cancel()
+        checkTask(uri)
     // Check a file once 1s passes with no check requests
-    let mutable debounceCheck = 0
     let checkLater(uri: Uri): unit = 
-        let id = debounceCheck + 1
-        debounceCheck <- id
+        // Cancel the previous checkLater operation
+        cancelCheckLater.Cancel()
+        // Replace the previous checkLater operation
+        cancelCheckLater <- new CancellationTokenSource()
         Async.Start(async {
             do! Async.Sleep(1000)
-            if debounceCheck = id then
-                dprintfn "Starting check %d because 1s went by with no edits" id
-                do! checkNow(uri)
-                dprintfn "Finished check %d" id
-        })
+            do! checkTask(uri)
+        }, cancelCheckLater.Token)
+        
     // Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
