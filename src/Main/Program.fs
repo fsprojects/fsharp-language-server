@@ -508,7 +508,7 @@ type Server(client: ILanguageClient) =
                 | None -> 
                     dprintfn "No identifier at %d in line '%s'" position.character line 
                     return None
-                | Some endOfIdentifier -> 
+                | Some(endOfIdentifier) -> 
                     dprintfn "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
                     let names = findNamesUnderCursor(line, endOfIdentifier - 1)
                     let dotName = String.concat "." names
@@ -546,11 +546,6 @@ type Server(client: ILanguageClient) =
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
-    let printProjectNames(openProjects: FSharpProjectOptions list): string = 
-        let projectName(f: FSharpProjectOptions) = f.ProjectFileName
-        let names = List.map projectName openProjects
-        String.concat ", " names
-
     // Quickly check if a file *might* contain a symbol matching query
     let symbolPattern = Regex(@"\w+")
     let maybeMatchesQuery(query: string, uri: Uri): string option = 
@@ -573,6 +568,11 @@ type Server(client: ILanguageClient) =
                 Some text 
             else 
                 None
+    
+    // Join the names of all open projects
+    let printProjectNames(openProjects: FSharpProjectOptions list): string = 
+        let names = [for p in openProjects do yield p.ProjectFileName]
+        String.concat ", " names
 
     // Find all uses of a symbol, across all open projects
     let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
