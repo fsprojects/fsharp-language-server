@@ -14,9 +14,10 @@
 # Bugs
 - Autocompleting in strings
 - $(TargetFramework) doesn't get substituted in .fsproj files
+- When autocomplete is empty, force a check
 
 # Optimizations
-Don't check entire project for rename if symbol is local
+- Change name Main to FSharpLanguageServer
 
 # Features
 - Docstrings on autocomplete and hover

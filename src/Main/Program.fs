@@ -576,21 +576,75 @@ type Server(client: ILanguageClient) =
 
     // Find all uses of a symbol, across all open projects
     let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
-        // TODO only search 1 file for local variables and private symbols
         async {
-            dprintfn "Looking for references to %s in %s" symbol.FullName (printProjectNames(projects.OpenProjects))
-            let all = System.Collections.Generic.List<FSharpSymbolUse>()
-            // Figure out which files might have a reference to `symbol` by searching the text
-            let candidates = [
+            // If the symbol is private or internal, we only need to scan 1 file or project
+            let isPrivate, isInternal = 
+                match FSharpSymbol.GetAccessibility(symbol) with 
+                | Some(a) when a.IsPrivate -> true, true
+                | Some(a) when a.IsInternal -> false, true
+                | _ -> false, false
+            // Figure out what project and file the symbol is declared in
+            // This might be nothing if the symbol is declared outside the workspace
+            let symbolDeclarationProject, symbolDeclarationFile = 
+                match symbol.DeclarationLocation with 
+                | None -> None, None
+                | Some(range) -> 
+                    let f = FileInfo(range.FileName)
+                    match projects.FindProjectOptions(f) with 
+                    | Error(_) -> None, Some(f)
+                    | Ok(projectOptions) -> Some(projectOptions), Some(f)
+            if isPrivate then 
+                dprintfn "Symbol %s is private so we will only check declaration file %A" symbol.FullName symbolDeclarationFile
+            elif isInternal then 
+                dprintfn "Symbol %s is internal so we will onlcy check declaration project %A" symbol.FullName symbolDeclarationProject
+            // Is fileName the same file symbol was declared in?
+            let isSymbolFile(fileName: string) =
+                match symbolDeclarationFile with None -> false | Some(f) -> f.FullName = fileName
+            // Is candidate the same project that symbol was declared in?
+            let isSymbolProject(candidate: FSharpProjectOptions) = 
+                match symbolDeclarationProject with None -> false | Some(p) -> candidate.ProjectFileName = p.ProjectFileName
+            // Does fileName come after symbol in dependency order, meaning it can see symbol?
+            let isDependent(fileName: string) = 
+                match symbolDeclarationProject, symbolDeclarationFile with 
+                | Some(parentProject), Some(parentFile) -> 
+                    let mutable foundSymbolFile = false 
+                    let mutable result = false 
+                    for p in projects.OpenProjects do 
+                        for f in p.SourceFiles do 
+                            foundSymbolFile <- foundSymbolFile || isSymbolFile(f) 
+                            if f = fileName then result <- foundSymbolFile 
+                    result
+                | _, _ -> true
+            // Is symbol visible from file?
+            let isVisibleFrom(project: FSharpProjectOptions, file: string) = 
+                if isPrivate then 
+                    isSymbolFile(file)
+                elif isInternal then 
+                    isSymbolProject(project) && isDependent(file)
+                else 
+                    isDependent(file)
+            // Find all source files that can see symbol
+            let visible = [
                 for projectOptions in projects.OpenProjects do 
-                    for sourceFile in projectOptions.SourceFiles do 
-                        let uri = Uri("file://" + sourceFile)
-                        match exactlyMatches(symbol.DisplayName, uri) with 
-                        | None -> () 
-                        | Some sourceText -> yield projectOptions, uri, sourceText
+                    for fileName in projectOptions.SourceFiles do 
+                        if isVisibleFrom(projectOptions, fileName) then 
+                            yield projectOptions, FileInfo(fileName)
             ]
-            use _ = notifyStartCheckFiles(candidates.Length)
+            let visibleNames = String.concat ", " [for _, f in visible do yield f.Name]
+            dprintfn "Symbol %s is visible from %s" symbol.FullName visibleNames
+            // Check source files for possible symbol references using string matching
+            let candidates = [
+                for projectOptions, sourceFile in visible do 
+                    let uri = Uri("file://" + sourceFile.FullName)
+                    match exactlyMatches(symbol.DisplayName, uri) with 
+                    | None -> ()
+                    | Some(sourceText) -> yield projectOptions, uri, sourceText
+            ]
+            let candidateNames = String.concat ", " [for _, uri, _ in candidates do yield FileInfo(uri.LocalPath).Name]
+            dprintfn "Name %s appears in %s" symbol.DisplayName candidateNames
             // Check each candidate file
+            use _ = notifyStartCheckFiles(candidates.Length)
+            let all = System.Collections.Generic.List<FSharpSymbolUse>()
             for projectOptions, sourceUri, sourceText in candidates do 
                 try
                     // Send a notification to the client updating the progress indicator
