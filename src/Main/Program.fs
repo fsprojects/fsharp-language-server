@@ -568,11 +568,6 @@ type Server(client: ILanguageClient) =
                 Some text 
             else 
                 None
-    
-    // Join the names of all open projects
-    let printProjectNames(openProjects: FSharpProjectOptions list): string = 
-        let names = [for p in openProjects do yield p.ProjectFileName]
-        String.concat ", " names
 
     // Find all uses of a symbol, across all open projects
     let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
@@ -850,7 +845,8 @@ type Server(client: ILanguageClient) =
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
             async {
-                dprintfn "Looking for symbols matching %s in %s" p.query (printProjectNames(projects.OpenProjects))
+                let projectNames = String.concat ", " [for p in projects.OpenProjects do yield p.ProjectFileName]
+                dprintfn "Looking for symbols matching %s in %s" p.query projectNames
                 // Read open projects until we find at least 50 symbols that match query
                 let all = System.Collections.Generic.List<SymbolInformation>()
                 for projectOptions in projects.OpenProjects do 
