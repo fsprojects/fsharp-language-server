@@ -573,6 +573,7 @@ type Server(client: ILanguageClient) =
     let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
         async {
             // If the symbol is private or internal, we only need to scan 1 file or project
+            // TODO this only detects symbols *declared* private, many symbols are implicitly private
             let isPrivate, isInternal = 
                 match FSharpSymbol.GetAccessibility(symbol) with 
                 | Some(a) when a.IsPrivate -> true, true
