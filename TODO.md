@@ -13,6 +13,7 @@
 
 # Bugs
 - Autocompleting in strings
+- $(TargetFramework) doesn't get substituted in .fsproj files
 
 # Optimizations
 Don't check entire project for rename if symbol is local

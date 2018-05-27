@@ -419,38 +419,40 @@ type Server(client: ILanguageClient) =
     let notifyCheckFile(sourceFile: FileInfo) = 
         client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
 
-    // Create a progress bar on long lint operations
+    // Create a progress bar on long check operations
     let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
-    let compilationOrderAncestors(goal: FileInfo) = 
-        let transitiveDeps = 
+    let onStartCheck(goal: FileInfo): IDisposable = 
+        // Get all transitive dependencies in order
+        let projectOrder = 
             match projects.FindProjectOptions(goal) with 
             | Ok(projectOptions) -> projects.TransitiveDeps(FileInfo(projectOptions.ProjectFileName))
             | Error(_) -> []
-        let compileOrder = [
-            for p in transitiveDeps do
-                for f in p.SourceFiles do 
-                    yield FileInfo(f)
-        ]
-        let notGoal(candidate: FileInfo) = candidate.FullName <> goal.FullName
-        List.takeWhile notGoal compileOrder
-    let changedOnDisk(sourceFile: FileInfo) = 
-        let isChecked, checkedTime = lastCheckedOnDisk.TryGetValue(sourceFile.FullName)
-        if not(isChecked) then 
-            dprintfn "%s needs to be checked because it has never been checked" sourceFile.Name 
-            true
-        else if sourceFile.LastWriteTime > checkedTime then 
-            dprintfn "%s need to be checked because write-time %A > check-time %A" sourceFile.Name sourceFile.LastWriteTime.TimeOfDay checkedTime.TimeOfDay 
-            true
-        else false
-    let onStartLint(goal: FileInfo): IDisposable = 
         // Figure out how many files *actually* need to be checked in order to check `goal`
-        let ancestors = compilationOrderAncestors(goal)
-        dprintfn "There are %d ancestors leading to %s" (List.length(ancestors)) goal.Name
-        let todo = List.filter changedOnDisk ancestors
-        let nFiles = List.length todo + 1
+        let mutable foundChanged = false
+        let mutable foundGoal = false
+        let needsRecompile = System.Collections.Generic.List<FileInfo>()
+        for p in projectOrder do
+            for fName in p.SourceFiles do 
+                let f = FileInfo(fName)
+                let isChecked, checkedTime = lastCheckedOnDisk.TryGetValue(f.FullName)
+                if f.FullName = goal.FullName then 
+                    foundGoal <- true
+                    needsRecompile.Add(f)
+                elif foundGoal then 
+                    ()
+                elif foundChanged then 
+                    needsRecompile.Add(f)
+                elif not(isChecked) then 
+                    dprintfn "%s needs to be checked because it has never been checked" f.Name 
+                    foundChanged <- true
+                    needsRecompile.Add(f)
+                elif f.LastWriteTime > checkedTime then 
+                    dprintfn "%s need to be checked because write-time %A > check-time %A" f.Name f.LastWriteTime.TimeOfDay checkedTime.TimeOfDay 
+                    foundChanged <- true
+                    needsRecompile.Add(f)
         // If we need to check more than 1 file, create a progress bar
-        if nFiles > 1 then 
-            notifyStartCheckFiles(nFiles)
+        if needsRecompile.Count > 1 then 
+            notifyStartCheckFiles(needsRecompile.Count)
         // Otherwise do nothing
         else 
             { new IDisposable with member this.Dispose() = () }
@@ -469,7 +471,7 @@ type Server(client: ILanguageClient) =
     let mutable cancelCheckLater = new CancellationTokenSource()
     let checkTask(uri: Uri): Async<unit> = 
         async {
-            use _ = onStartLint(FileInfo(uri.LocalPath))
+            use _ = onStartCheck(FileInfo(uri.LocalPath))
             let! check = checkOpenFile(uri)
             let errors = 
                 match check with
@@ -543,32 +545,6 @@ type Server(client: ILanguageClient) =
                 let range = refineRenameRange(u.Symbol, u.FileName, u.RangeAlternate)
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
-
-    // Determine if one .fs file is an ancestor of another, so that we can correctly invalidate descendents when the user saves changes
-    let isAncestorInProject(project: FSharpProjectOptions, parent: FileInfo, child: FileInfo) = 
-        match Array.tryFindIndex ((=) parent.FullName) project.SourceFiles, Array.tryFindIndex ((=) child.FullName) project.SourceFiles with 
-        | Some(iParent), Some(iChild) -> iParent < iChild 
-        | _, _ -> false
-    let isAncestorProject(parentProject: FSharpProjectOptions, childProject: FSharpProjectOptions) = 
-        let rec traverse (p: FSharpProjectOptions): bool = 
-            let traverseNext(_, next) = traverse next
-            let stop = p.ProjectFileName = parentProject.ProjectFileName
-            stop || Array.exists traverseNext p.ReferencedProjects
-        parentProject.ProjectFileName <> childProject.ProjectFileName && traverse childProject
-    let isAncestor(parent: Uri, child: Uri): bool = 
-        let parentFile = FileInfo(parent.LocalPath)
-        let childFile = FileInfo(child.LocalPath)
-        match projects.FindProjectOptions(parentFile), projects.FindProjectOptions(childFile) with 
-        | Ok(parentProject), Ok(childProject) -> 
-            isAncestorInProject(parentProject, parentFile, childFile) || isAncestorProject(parentProject, childProject)
-        | _, _ -> false
-    
-    // List of all .fs files that depend on `uri`
-    // These are the files that are invalidated when the user saves changes to `uri`
-    let openDescendentFiles(uri: Uri): Uri list = 
-        [for candidate in docs.OpenFiles() do 
-            if isAncestor(uri, candidate) then 
-                yield candidate ]
 
     let printProjectNames(openProjects: FSharpProjectOptions list): string = 
         let projectName(f: FSharpProjectOptions) = f.ProjectFileName
@@ -695,12 +671,7 @@ type Server(client: ILanguageClient) =
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
-                let files = p.textDocument.uri::openDescendentFiles(p.textDocument.uri)
-                let uriFileName(uri:Uri) = FileInfo(uri.LocalPath).Name
-                let names = List.map uriFileName files
-                dprintfn "Lint %s" (String.Join(", ", names))
-                for f in files do 
-                    do! checkNow(f)
+                do! checkNow(p.textDocument.uri)
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
@@ -721,8 +692,8 @@ type Server(client: ILanguageClient) =
                             projects.DeleteProjectFile(file)
                     elif file.Name = "project.assets.json" then 
                         projects.UpdateAssetsJson(file)
-                // Re-lint all open files
-                // In theory we could optimize this by only re-linting descendents of changed projects, 
+                // Re-check all open files
+                // In theory we could optimize this by only re-checking descendents of changed projects, 
                 // but in practice that will make little difference
                 for f in docs.OpenFiles() do 
                     do! checkNow(f) 
