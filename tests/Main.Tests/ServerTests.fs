@@ -11,6 +11,7 @@ open NUnit.Framework
 open LSP.Types
 open LSP
 open LSP.Log
+open LSP.Json
 
 [<SetUp>]
 let setup() = 
@@ -31,15 +32,21 @@ let ``check errors in some text``() =
 type MockClient() = 
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
-        member this.PublishDiagnostics (p: PublishDiagnosticsParams): unit = 
+        member this.PublishDiagnostics(p: PublishDiagnosticsParams): unit = 
             let file = FileInfo(p.uri.LocalPath)
             dprintfn "Received %d diagnostics for %s" p.diagnostics.Length file.Name
             this.Diagnostics.Add(p)
-        member this.RegisterCapability (p: RegisterCapability): unit = 
+        member this.ShowMessage(p: ShowMessageParams): unit = 
+            ()
+        member this.RegisterCapability(p: RegisterCapability): unit = 
+            ()
+        member this.CustomNotification(method: string, p: JsonValue): unit = 
             ()
 
 let private diagnosticMessages (client: MockClient): string list = 
-    List.collect (fun publish -> List.map (fun diag -> diag.message) publish.diagnostics) (List.ofSeq client.Diagnostics)
+    [ for publish in client.Diagnostics do 
+        for diagnostic in publish.diagnostics do 
+            yield diagnostic.message ]
 
 let createServer(): MockClient * ILanguageServer = 
     let client = MockClient()
