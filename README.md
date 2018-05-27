@@ -45,11 +45,7 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 ## How is this project different than [Ionide](https://github.com/ionide)?
 Ionide is a suite of F# plugins for VSCode that implements an IDE-type experience. This project is focused on implementing the core code intelligence features with maximum reliability and performance. 
 
-The implementation is essentially a language-server-protocol wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/). This approach has significant speed benefits. For example, autocompleting immediately after opening a medium-sized file in F# Language Server (left) and Ionide (right):
-
-![Autocomplete cold](videos/LSP-vs-Ionide-Cold.gif)
-
-After warming up the compiler with several autocompletes:
+The implementation is essentially a language-server-protocol wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/). This approach has significant speed benefits. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
 
 ![Autocomplete cold](videos/LSP-vs-Ionide-Warm.gif)
 
