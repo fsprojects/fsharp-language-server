@@ -744,6 +744,8 @@ type Server(client: ILanguageClient) =
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
                 docs.Close(p)
+                // Only show errors for open files
+                publishErrors(p.textDocument.uri, Error([]))
             }
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {
