@@ -6,6 +6,20 @@ open System
 open System.IO
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open NUnit.Framework
+open LSP.Types 
+open LSP.Json
+
+type MockClient() = 
+    member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
+    interface ILanguageClient with 
+        member this.PublishDiagnostics(p: PublishDiagnosticsParams): unit = 
+            ()
+        member this.ShowMessage(p: ShowMessageParams): unit = 
+            ()
+        member this.RegisterCapability(p: RegisterCapability): unit = 
+            ()
+        member this.CustomNotification(method: string, p: JsonValue): unit = 
+            ()
 
 [<SetUp>]
 let setup() = 
@@ -17,51 +31,44 @@ let private endsWith (name: string) (f: string) = f.EndsWith name
 
 [<Test>]
 let ``find project file`` () = 
-    let projects = ProjectManager()
+    let projects = ProjectManager(MockClient())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
-    projects.AddWorkspaceRoot root 
+    Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
-    let project = projects.FindProjectOptions file
+    let project = projects.FindProjectOptions(file)
     match project with 
-    | Error m -> Assert.Fail m
-    | Ok f -> if not (f.ProjectFileName.EndsWith "MainProject.fsproj") then Assert.Fail(sprintf "%A" f)
+    | Error(m) -> Assert.Fail(m)
+    | Ok(f) -> if not(f.ProjectFileName.EndsWith "MainProject.fsproj") then Assert.Fail(sprintf "%A" f)
 
 [<Test>]
 let ``find an local dll`` () = 
-    let projects = ProjectManager()
+    let projects = ProjectManager(MockClient())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo
-    projects.AddWorkspaceRoot root 
+    Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
     match projects.FindProjectOptions(file) with 
-    | Error m -> Assert.Fail m
-    | Ok parsed -> if not (Seq.exists (endsWith "LocalDll.dll") parsed.OtherOptions) then Assert.Fail(sprintf "%A" parsed.OtherOptions)
+    | Error(m) -> Assert.Fail m
+    | Ok(parsed) -> if not (Seq.exists (endsWith "LocalDll.dll") parsed.OtherOptions) then Assert.Fail(sprintf "%A" parsed.OtherOptions)
 
 [<Test>]
 let ``project-file-not-found`` () = 
-    let projects = ProjectManager()
+    let projects = ProjectManager(MockClient())
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
     let project = projects.FindProjectOptions file
     match project with 
-    | Ok f -> Assert.Fail(sprintf "Shouldn't have found project file %s" f.ProjectFileName)
-    | Error m -> ()
+    | Ok(f) -> Assert.Fail(sprintf "Shouldn't have found project file %s" f.ProjectFileName)
+    | Error(m) -> ()
 
 [<Test>]
 let ``bad project file`` () = 
-    let projects = ProjectManager()
+    let projects = ProjectManager(MockClient())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "BadProject"|] |> DirectoryInfo
-    projects.AddWorkspaceRoot root 
-
-[<Test>]
-let ``parse a project file with dependencies`` () = 
-    let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Projects"; "Projects.fsproj"|])
-    let parsed = match ProjectParser.parseFsProj file with Ok p -> p
-    if not (Seq.exists (fileHasName "ProjectManager.fs") parsed.compileInclude) then Assert.Fail(sprintf "%A" parsed.compileInclude)
-    if not (Seq.exists (fileHasName "LSP.fsproj") parsed.projectReferenceInclude) then Assert.Fail(sprintf "%A" parsed.projectReferenceInclude)
+    Async.RunSynchronously(projects.AddWorkspaceRoot root)
 
 [<Test>]
 let ``find an fsproj in a parent dir`` () = 
-    let projects = ProjectManager()
-    projects.AddWorkspaceRoot projectRoot
+    let projects = ProjectManager(MockClient())
+    Async.RunSynchronously(projects.AddWorkspaceRoot(projectRoot))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "src"; "Projects"; "ProjectManager.fs"|])
     let parsed = match projects.FindProjectOptions(file) with Ok p -> p
     if not (Seq.exists (endsWith "ProjectManager.fs") parsed.SourceFiles) then Assert.Fail("Failed")

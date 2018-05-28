@@ -318,7 +318,7 @@ let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDecl
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
-    let projects = ProjectManager()
+    let projects = ProjectManager(client)
     let checker = FSharpChecker.Create()
 
     // Get a file from docs, or read it from disk
@@ -671,13 +671,17 @@ type Server(client: ILanguageClient) =
     // Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
 
+    // Defer initialization operations until Initialized() is called,
+    // so that the client-side code int client/extension.ts starts running immediately
+    let mutable deferredInitialize = async { () }
+
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams) =
             async {
                 match p.rootUri with 
                 | Some root -> 
-                    dprintfn "Adding workspace root %s ~ %s" root.AbsoluteUri root.LocalPath
-                    projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath)) 
+                    dprintfn "Add workspace root %s ~ %s" root.AbsoluteUri root.LocalPath
+                    deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath)) 
                 | _ -> ()
                 return { 
                     capabilities = 
@@ -700,7 +704,7 @@ type Server(client: ILanguageClient) =
                 }
             }
         member this.Initialized(): Async<unit> = 
-            async { () }
+            deferredInitialize
         member this.Shutdown(): Async<unit> = 
             async { () }
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
@@ -912,7 +916,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
             async {
                 for root in p.event.added do 
-                    projects.AddWorkspaceRoot(DirectoryInfo(root.uri.LocalPath))
+                    do! projects.AddWorkspaceRoot(DirectoryInfo(root.uri.LocalPath))
                 // TODO removed
             }
 

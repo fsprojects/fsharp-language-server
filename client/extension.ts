@@ -44,10 +44,38 @@ export function activate(context: ExtensionContext) {
 	context.subscriptions.push(disposable);
 
 	// When the language client activates, register a progress-listener
-	client.onReady().then(() => createProgressListener(client));
+	client.onReady().then(() => createProgressListeners(client));
 }
 
-function createProgressListener(client: LanguageClient) {
+type EventNames = {
+	startEvent: string 
+	incrementEvent: string 
+	endEvent: string 
+	title: (nFiles: number) => string
+}
+
+function createProgressListeners(client: LanguageClient) {
+	let checkEvent = {
+		startEvent: 'fsharp/startCheckFiles',
+		incrementEvent: 'fsharp/checkFile',
+		endEvent: 'fsharp/endCheckFiles',
+		title(nFiles: number) {
+			return `Check ${nFiles} files`
+		}
+	}
+	let analyzeEvent = {
+		startEvent: 'fsharp/startAnalyzeProjects',
+		incrementEvent: 'fsharp/analyzeProject',
+		endEvent: 'fsharp/endAnalyzeProjects',
+		title(nFiles: number) {
+			return `Analyze ${nFiles} projects`
+		}
+	}
+	createProgressListener(checkEvent, client);
+	createProgressListener(analyzeEvent, client);
+}
+
+function createProgressListener(names: EventNames, client: LanguageClient) {
 	// Create a "checking files" progress indicator
 	let progressListener = new class {
 		countChecked = 0
@@ -58,7 +86,7 @@ function createProgressListener(client: LanguageClient) {
 		startCheckFiles(nFiles: number) {
 			// TODO implement user cancellation
 			// TODO Change 15 to ProgressLocation.Notification
-			window.withProgress({title: `Checking ${nFiles} files`, location: 15}, progress => new Promise((resolve, _reject) => {
+			window.withProgress({title: names.title(nFiles), location: 15}, progress => new Promise((resolve, _reject) => {
 				this.countChecked = 0;
 				this.nFiles = nFiles;
 				this.progress = progress;
@@ -88,13 +116,13 @@ function createProgressListener(client: LanguageClient) {
 		}
 	}
 	// Use custom notifications to drive progressListener
-	client.onNotification(new NotificationType('fsharp/startCheckFiles'), (nFiles: number) => {
+	client.onNotification(new NotificationType(names.startEvent), (nFiles: number) => {
 		progressListener.startCheckFiles(nFiles);
 	});
-	client.onNotification(new NotificationType('fsharp/checkFile'), (fileName: string) => {
+	client.onNotification(new NotificationType(names.incrementEvent), (fileName: string) => {
 		progressListener.checkFile(fileName);
 	});
-	client.onNotification(new NotificationType('fsharp/endCheckFiles'), () => {
+	client.onNotification(new NotificationType(names.endEvent), () => {
 		progressListener.endCheckFiles();
 	});
 }

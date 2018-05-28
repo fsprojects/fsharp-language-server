@@ -16,7 +16,6 @@
 
 # Bugs
 - Autocompleting in strings
-- $(TargetFramework) doesn't get substituted in .fsproj files
 
 # Optimizations
 

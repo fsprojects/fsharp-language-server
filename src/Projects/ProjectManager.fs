@@ -8,148 +8,119 @@ open System.Net
 open System.Xml
 open LSP.Json
 open LSP.Json.JsonExtensions
+open LSP.Types
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Projects.ProjectParser
 
 // Maintains caches of parsed versions of .fsproj files
-type ProjectManager() = 
+type ProjectManager(client: ILanguageClient) = 
     // Index mapping .fs source files to .fsproj project files that reference them
     let projectFileBySourceFile = new Dictionary<String, FileInfo>()
-    // Parse ?.fsproj and project.assets.json, but dont trace the dependencies yet
-    let parseProject(fsproj: FileInfo) = 
-        let assetsFile = FileInfo(Path.Combine [|fsproj.Directory.FullName; "obj"; "project.assets.json"|])
-        let proj = parseFsProj(fsproj)
-        let assets = parseAssets(assetsFile)
-        // Register all sources as children of this .fsproj file
-        match proj with 
-        | Ok(p) -> 
-            for f in p.compileInclude do
-                projectFileBySourceFile.[f.FullName] <- fsproj
-        | _ -> ()
-        // If both .fsproj and project.assets.json are Ok, return result
-        match proj, assets with 
-        | Error(e), _ -> Error(e)
-        | _, Error(e) -> Error(e)
-        | Ok(proj), Ok(assets) -> Ok(proj, assets)
-    // If ?.fsproj and project.assets.json can both be found and parsed, combine them into FSharpProjectOptions
-    let analyzedByProjectFile = new Dictionary<String, Result<FSharpProjectOptions, string>>()
-    // Find .dll corresponding to an .fsproj file 
-    // For example, sample/IndirectDep/IndirectDep.fsproj corresponds to sample/IndirectDep/bin/Debug/netcoreapp2.0/IndirectDep.dll
-    // See https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-    let projectDll(fsproj: FileInfo): string = 
-        // TODO Does it actually matter if I find a real .dll? Can I just use bin/Debug/placeholder/ProjectName.dll?
-        // TODO Alternatively, output each project to a temporary directory and reference those .dlls
-        // ProjectName.dll
-        let dll = fsproj.Name.Substring(0, fsproj.Name.Length - fsproj.Extension.Length) + ".dll" 
-        let outputs = ["obj"; "bin"]
-        let configs = ["Debug"; "Release"]
-        let frameworkPrefixes = ["netcoreapp"; "netstandard"; "net"]
-        let list = [
-            // obj
-            for output in outputs do 
-                // Debug
-                for config in configs do 
-                    // If obj/Debug exists, search it
-                    let outputDir = DirectoryInfo(Path.Combine [|fsproj.Directory.FullName; output; config|])
-                    if outputDir.Exists then 
-                        // Look for a directory with a name starting with netcoreapp
-                        for frameworkPrefix in frameworkPrefixes do 
-                            // netcoreapp2.0
-                            for framework in outputDir.GetDirectories() do 
-                                // netcoreapp2.0 starts with netcoreapp
-                                if framework.Name.StartsWith(frameworkPrefix) then 
-                                    // obj/Debug/netcoreapp2.0/ProjectName.dll
-                                    let candidate = Path.Combine(framework.FullName, dll)
-                                    if File.Exists(candidate) then 
-                                        yield candidate
-        ]
-        if list.Length > 0 then 
-            list.[0] 
-        else
-            Path.Combine [|fsproj.Directory.FullName; "obj"; "placeholder"; dll|]
-    let ancestorDlls(refs: (string * FSharpProjectOptions)[]): string list = 
-        let result = HashSet<string>()
-        let rec traverse(refs: (string * FSharpProjectOptions)[]) = 
-            for dll, options in refs do
-                result.Add(dll) |> ignore
-                traverse(options.ReferencedProjects )
-        traverse(refs)
-        List.ofSeq(result)
-    // For each successfully analyzed parent project, yield (dll, options)
-    let rec projectReferences (proj: FsProj): (string * FSharpProjectOptions) list =
-        let result = Dictionary<string, string * FSharpProjectOptions>()
-        for parent in proj.projectReferenceInclude do 
-            let found, maybeOptions = analyzedByProjectFile.TryGetValue(parent.FullName)
-            if found then 
-                match maybeOptions with 
-                | Error(e) -> 
-                    dprintfn "Project %s parent %s was excluded because analysis failed with error %s" proj.file.Name parent.Name e
-                | Ok options -> 
-                    // Add direct reference to parent 
-                    let projectFile = FileInfo(options.ProjectFileName)
-                    let projectDll = projectDll(projectFile) 
-                    result.[options.ProjectFileName] <- (projectDll, options)
-                    // Add indirect references
-                    for (ancestorDll, ancestorOptions) in options.ReferencedProjects do 
-                        result.[ancestorOptions.ProjectFileName] <- (ancestorDll, ancestorOptions)
-            else dprintfn "Project %s parent %s was excluded because it was not analyzed" proj.file.Name parent.Name
-        List.ofSeq(result.Values)
-    and analyzeProject (proj: FsProj, assets: ProjectAssets): Result<FSharpProjectOptions, string> = 
-        dprintfn "Analyzing %s" proj.file.FullName
-        // Recursively ensure that all ancestors are analyzed and cached
-        for parent in proj.projectReferenceInclude do 
-            ensureAnalyzed(parent)
-        let libraryDlls = findLibraryDlls(assets)@proj.referenceHintPath
-        let projectRefs = Seq.toArray(projectReferences(proj))
-        let projectDlls = ancestorDlls(projectRefs)
-        dprintfn "Project %s" proj.file.FullName
-        dprintfn "  Libraries:"
-        for f in libraryDlls do 
-            dprintfn "    %s" f.FullName
-        dprintfn "  Projects:"
-        for dll, options in projectRefs do 
-            let relativeDll = Path.GetRelativePath(options.ProjectFileName, dll)
-            dprintfn "    %s ~ %s" options.ProjectFileName relativeDll
-        dprintfn "  Sources:"
-        for f in proj.compileInclude do 
-            dprintfn "    %s" f.FullName
-        let options = 
-            {
-                // TODO include output dll somehow; see what dotnet-proj-info does?
+    // Cache the result of project cracking
+    let analyzedByProjectFile = new Dictionary<String, Result<CrackedProject * FSharpProjectOptions, string>>()
+
+    // When we analyze multiple project files, create a progress bar
+    // These functions should be called in a `use` block to ensure the progress bar is closed:
+    //   use notifyStartAnalyzeProjects(n)
+    //   for ... do
+    //     notifyAnalyzeProject(f)
+    let notifyStartAnalyzeProjects(nFiles: int): IDisposable = 
+        client.CustomNotification("fsharp/startAnalyzeProjects", JsonValue.Number(decimal(nFiles)))
+        let notifyEnd() = client.CustomNotification("fsharp/endAnalyzeProjects", JsonValue.Null)
+        { new IDisposable with member this.Dispose() = notifyEnd() }
+    let notifyAnalyzeProject(fsproj: FileInfo) = 
+        client.CustomNotification("fsharp/analyzeProject", JsonValue.String(fsproj.Name))
+
+    // Analyze a project and add it to the cache
+    let rec analyzeProject(fsproj: FileInfo) = 
+        dprintfn "Analyzing %s" fsproj.Name
+        notifyAnalyzeProject(fsproj)
+        match ProjectParser.crack(fsproj) with 
+        | Error(e) -> analyzedByProjectFile.[fsproj.FullName] <- Error(e)
+        | Ok(cracked) -> 
+            // Ensure we've analyzed all dependencies
+            // We'll need their target dlls to form FSharpProjectOptions
+            for r in cracked.projectReferences do 
+                ensureAnalyzed(r)
+            // Populate source -> project cache
+            for s in cracked.sources do 
+                projectFileBySourceFile.[s.FullName] <- fsproj
+            // Convert to FSharpProjectOptions
+            let options = {
                 ExtraProjectInfo = None 
                 IsIncompleteTypeCheckEnvironment = false 
-                LoadTime = proj.file.LastWriteTime
+                LoadTime = fsproj.LastWriteTime
                 OriginalLoadReferences = []
-                OtherOptions = [|   yield "--noframework"
-                                    // https://fsharp.github.io/FSharp.Compiler.Service/project.html#Analyzing-multiple-projects
-                                    for f in projectDlls do
-                                        yield "-r:" + f
-                                    for f in libraryDlls do 
-                                        yield "-r:" + f.FullName |]
-                ProjectFileName = proj.file.FullName 
-                ReferencedProjects = projectRefs
-                SourceFiles = [| for f in proj.compileInclude do yield f.FullName |]
+                OtherOptions = 
+                    [|
+                        // Dotnet framework should be specified explicitly
+                        yield "--noframework"
+                        // Reference output of other projects
+                        for r in cracked.projectReferences do 
+                            match analyzedByProjectFile.[r.FullName] with 
+                            | Error(_) -> () 
+                            | Ok(cracked, _) -> yield "-r:" + cracked.target.FullName
+                        // Reference packages
+                        for r in cracked.packageReferences do 
+                            yield "-r:" + r.FullName
+                    |]
+                ProjectFileName = fsproj.FullName 
+                ReferencedProjects = 
+                    [|
+                        for r in cracked.projectReferences do 
+                            match analyzedByProjectFile.[r.FullName] with 
+                            | Error(_) -> () 
+                            | Ok(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
+                    |]
+                SourceFiles = 
+                    [|
+                        for f in cracked.sources do 
+                            yield f.FullName
+                    |]
                 Stamp = None 
                 UnresolvedReferences = None 
                 UseScriptResolutionRules = false
             }
-        Ok options
-    and ensureAnalyzed (fsproj: FileInfo) = 
+            // Cache inferred options
+            analyzedByProjectFile.[fsproj.FullName] <- Ok(cracked, options)
+            // Log what we inferred
+            // This is long but it's useful
+            dprintfn "FSharpProjectOptions: "
+            dprintfn "  ProjectFileName: %A" options.ProjectFileName
+            dprintfn "  SourceFiles: %A" options.SourceFiles
+            dprintfn "  ReferencedProjects: %A" [for dll, _ in options.ReferencedProjects do yield dll]
+            dprintfn "  OtherOptions: %A" options.OtherOptions
+            dprintfn "  LoadTime: %A" options.LoadTime
+            dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
+            dprintfn "  IsIncompleteTypeCheckEnvironment: %A" options.IsIncompleteTypeCheckEnvironment
+            dprintfn "  OriginalLoadReferences: %A" options.OriginalLoadReferences
+            dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
+            dprintfn "  Stamp: %A" options.Stamp
+            dprintfn "  UnresolvedReferences: %A" options.UnresolvedReferences
+            dprintfn "  UseScriptResolutionRules: %A" options.UseScriptResolutionRules
+    and ensureAnalyzed(fsproj: FileInfo) = 
+        // TODO detect loop by caching set of `currentlyAnalyzing` projects
         if not (analyzedByProjectFile.ContainsKey(fsproj.FullName)) then 
-            analyzedByProjectFile.[fsproj.FullName] <- Result.bind analyzeProject (parseProject(fsproj))
+            analyzeProject(fsproj)
+
+    // Analyze multiple projects, with a progress bar
+    let ensureAll(fsprojs: FileInfo list) = 
+        use progress = notifyStartAnalyzeProjects(List.length(fsprojs))
+        for f in fsprojs do ensureAnalyzed(f)
+
     // Re-analyze all projects
     let resetCaches() = 
-        let projects = List.ofSeq(Seq.map FileInfo (analyzedByProjectFile.Keys))
+        let projects = [for f in analyzedByProjectFile.Keys do yield FileInfo(f)]
         dprintfn "Re-analyze %A" [for p in projects do yield p.Name]
         analyzedByProjectFile.Clear()
         projectFileBySourceFile.Clear()
-        for p in projects do 
-            ensureAnalyzed(p)
-    member this.AddWorkspaceRoot(root: DirectoryInfo) = 
-        let all = root.EnumerateFiles("*.fsproj", SearchOption.AllDirectories)
-        for f in all do 
-            ensureAnalyzed(f)
+        ensureAll(projects)
+    member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> = 
+        async {
+            let all = root.EnumerateFiles("*.fsproj", SearchOption.AllDirectories)
+            ensureAll(List.ofSeq(all))
+        }
     member this.DeleteProjectFile(fsproj: FileInfo) = 
         analyzedByProjectFile.Remove(fsproj.FullName) |> ignore
         resetCaches()
@@ -157,13 +128,15 @@ type ProjectManager() =
         resetCaches()
     member this.NewProjectFile(fsproj: FileInfo) = 
         resetCaches()
-        ensureAnalyzed fsproj
+        ensureAll([fsproj])
     member this.UpdateAssetsJson(assets: FileInfo) = 
         resetCaches()
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, string> = 
         if projectFileBySourceFile.ContainsKey(sourceFile.FullName) then 
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
-            analyzedByProjectFile.[projectFile.FullName]
+            match analyzedByProjectFile.[projectFile.FullName] with 
+            | Error(e) -> Error(e)
+            | Ok(_, options) -> Ok(options)
         else Error(sprintf "No .fsproj file references %s" sourceFile.FullName)
     // All open projects, in dependency order
     // Ancestor projects come before projects that depend on them
@@ -173,8 +146,8 @@ type ProjectManager() =
         let rec walk(key: string) = 
             if touched.Add(key) then 
                 match analyzedByProjectFile.[key] with 
-                | Error _ -> () 
-                | Ok options -> 
+                | Error(_) -> () 
+                | Ok(_, options) -> 
                     for _, parent in options.ReferencedProjects do 
                         walk(parent.ProjectFileName)
                     result.Add(options)
@@ -188,8 +161,8 @@ type ProjectManager() =
         let rec walk(key: string) = 
             if touched.Add(key) then 
                 match analyzedByProjectFile.[key] with 
-                | Error _ -> () 
-                | Ok options -> 
+                | Error(_) -> () 
+                | Ok(_, options) -> 
                     for _, parent in options.ReferencedProjects do 
                         walk(parent.ProjectFileName)
                     result.Add(options)
