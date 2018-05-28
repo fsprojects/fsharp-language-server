@@ -195,3 +195,17 @@ type ProjectManager() =
                     result.Add(options)
         walk(projectFile.FullName)
         List.ofSeq(result)
+    member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) = 
+        match this.FindProjectOptions(fromSourceFile) with 
+        | Error(_) -> false 
+        | Ok(fromProjectOptions) ->
+            // If fromSourceFile is in the same project as targetSourceFile, check if iFrom comes after iTarget in the source file order
+            if Array.contains targetSourceFile.FullName fromProjectOptions.SourceFiles then 
+                let iTarget = Array.IndexOf(fromProjectOptions.SourceFiles, targetSourceFile.FullName)
+                let iFrom = Array.IndexOf(fromProjectOptions.SourceFiles, fromSourceFile.FullName)
+                iFrom >= iTarget
+            // Otherwise, check if targetSourceFile is in the transitive dependencies of fromProjectOptions
+            else
+                let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
+                let deps = this.TransitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))
+                List.exists containsTarget deps

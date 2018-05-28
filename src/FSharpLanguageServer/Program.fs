@@ -410,19 +410,23 @@ type Server(client: ILanguageClient) =
 
     // When we check a long series of files, create a progress bar
     // These functions should be called in a `use` block to ensure the progress bar is closed:
-    //   use notifyStartCheckFiles(n)
+    //   use createCheckProgressBar(n)
     //   for ... do
-    //     notifyCheckFile(f)
-    let notifyStartCheckFiles(nFiles: int): IDisposable = 
-        client.CustomNotification("fsharp/startCheckFiles", JsonValue.Number(decimal(nFiles)))
-        let notifyEnd() = client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
-        { new IDisposable with member this.Dispose() = notifyEnd() }
-    let notifyCheckFile(sourceFile: FileInfo) = 
+    //     incrementCheckProgressBar(f)
+    let createCheckProgressBar(nFiles: int): IDisposable = 
+        if nFiles > 1 then 
+            client.CustomNotification("fsharp/startCheckFiles", JsonValue.Number(decimal(nFiles)))
+            let notifyEnd() = client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
+            { new IDisposable with member this.Dispose() = notifyEnd() }
+        else 
+            { new IDisposable with member this.Dispose() = () }
+    let incrementCheckProgressBar(sourceFile: FileInfo) = 
         client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
 
-    // Create a progress bar on long check operations
+    // When we first open a file, sometimes we need to check a lot of transitive dependencies
+    // Create a progress bar telling the user what we're doing
     let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
-    let onStartCheck(goal: FileInfo): IDisposable = 
+    let onOpen(goal: FileInfo): IDisposable = 
         // Get all transitive dependencies in order
         let projectOrder = 
             match projects.FindProjectOptions(goal) with 
@@ -451,12 +455,7 @@ type Server(client: ILanguageClient) =
                     dprintfn "%s need to be checked because write-time %A > check-time %A" f.Name f.LastWriteTime.TimeOfDay checkedTime.TimeOfDay 
                     foundChanged <- true
                     needsRecompile.Add(f)
-        // If we need to check more than 1 file, create a progress bar
-        if needsRecompile.Count > 1 then 
-            notifyStartCheckFiles(needsRecompile.Count)
-        // Otherwise do nothing
-        else 
-            { new IDisposable with member this.Dispose() = () }
+        createCheckProgressBar(needsRecompile.Count)
     let onCheckFile(sourceFile: FileInfo) = 
         dprintfn "Checking %s, queue length %d" sourceFile.FullName checker.CurrentQueueLength
         // Remember that we've checked this version of the file, 
@@ -464,36 +463,43 @@ type Server(client: ILanguageClient) =
         lastCheckedOnDisk.[sourceFile.FullName] <- sourceFile.LastWriteTime
         // Notify the client that the file is being checked
         // If a progress bar is showing, it will be advanced
-        notifyCheckFile(sourceFile)
+        incrementCheckProgressBar(sourceFile)
     // TODO there might be a thread safety issue here---is this getting called from a separate thread?
     let _ = checker.BeforeBackgroundFileCheck.Add(fun(file, _) -> onCheckFile(FileInfo(file)))
 
-    // Check a file and send all errors to the client
-    let mutable cancelCheckLater = new CancellationTokenSource()
-    let checkTask(uri: Uri): Async<unit> = 
+    // We keep track of files that have been invalidated by user edits,
+    // and check them when the user stops doing things for 1 second
+    let needsBackgroundCheck = System.Collections.Concurrent.ConcurrentDictionary<string, Uri>()
+    // We need to be able to cancel this process if the user requests something in the middle of a backround check
+    let mutable cancelBackgroundCheck = new CancellationTokenSource()
+    // Check a file and send diagnostics to the client
+    let publishErrors(uri: Uri, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>) = 
+        let errors = 
+            match check with
+            | Error(errors) -> errors
+            | Ok(parseResult, checkResult) -> asDiagnostics(parseResult.Errors)@asDiagnostics(checkResult.Errors)
+        client.PublishDiagnostics({uri=uri; diagnostics=errors})
+    let doCheck(uri: Uri): Async<unit> = 
         async {
-            use _ = onStartCheck(FileInfo(uri.LocalPath))
             let! check = checkOpenFile(uri)
-            let errors = 
-                match check with
-                | Error(errors) -> errors
-                | Ok(parseResult, checkResult) -> asDiagnostics(parseResult.Errors)@asDiagnostics(checkResult.Errors)
-            client.PublishDiagnostics({uri=uri; diagnostics=errors})
+            publishErrors(uri, check)
+            needsBackgroundCheck.TryRemove(uri.ToString()) |> ignore
         }
-    // Check a file immediately, cancelling any deferred check
-    let checkNow(uri: Uri): Async<unit> = 
-        cancelCheckLater.Cancel()
-        checkTask(uri)
-    // Check a file once 1s passes with no check requests
-    let checkLater(uri: Uri): unit = 
-        // Cancel the previous checkLater operation
-        cancelCheckLater.Cancel()
-        // Replace the previous checkLater operation
-        cancelCheckLater <- new CancellationTokenSource()
+    // Request that all URIs in `needsBackgroundCheck` be checked when the user stops doing things for 1 second
+    let requestBackgroundCheck(): unit = 
+        cancelBackgroundCheck.Cancel()
+        cancelBackgroundCheck <- new CancellationTokenSource()
         Async.Start(async {
             do! Async.Sleep(1000)
-            do! checkTask(uri)
-        }, cancelCheckLater.Token)
+            for uri in needsBackgroundCheck.Values do 
+                do! doCheck(uri)
+        }, cancelBackgroundCheck.Token)
+    // Request that `uri` be checked when the user stops doing things for 1 second
+    let checkInBackground(uri: Uri): unit = 
+        if needsBackgroundCheck.TryAdd(uri.ToString(), uri) then 
+            let name = FileInfo(uri.LocalPath).Name
+            dprintfn "Invalidated %s" name
+        requestBackgroundCheck()
         
     // Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
@@ -601,25 +607,18 @@ type Server(client: ILanguageClient) =
             let isSymbolProject(candidate: FSharpProjectOptions) = 
                 match symbolDeclarationProject with None -> false | Some(p) -> candidate.ProjectFileName = p.ProjectFileName
             // Does fileName come after symbol in dependency order, meaning it can see symbol?
-            let isDependent(fileName: string) = 
-                match symbolDeclarationProject, symbolDeclarationFile with 
-                | Some(parentProject), Some(parentFile) -> 
-                    let mutable foundSymbolFile = false 
-                    let mutable result = false 
-                    for p in projects.OpenProjects do 
-                        for f in p.SourceFiles do 
-                            foundSymbolFile <- foundSymbolFile || isSymbolFile(f) 
-                            if f = fileName then result <- foundSymbolFile 
-                    result
-                | _, _ -> true
+            let isVisibleFromFile(fromFile: FileInfo) = 
+                match symbolDeclarationFile with 
+                | Some(symbolFile) -> projects.IsVisible(symbolFile, fromFile)
+                | _ -> true
             // Is symbol visible from file?
             let isVisibleFrom(project: FSharpProjectOptions, file: string) = 
                 if isPrivate then 
                     isSymbolFile(file)
                 elif isInternal then 
-                    isSymbolProject(project) && isDependent(file)
+                    isSymbolProject(project) && isVisibleFromFile(FileInfo(file))
                 else 
-                    isDependent(file)
+                    isVisibleFromFile(FileInfo(file))
             // Find all source files that can see symbol
             let visible = [
                 for projectOptions in projects.OpenProjects do 
@@ -640,13 +639,13 @@ type Server(client: ILanguageClient) =
             let candidateNames = String.concat ", " [for _, uri, _ in candidates do yield FileInfo(uri.LocalPath).Name]
             dprintfn "Name %s appears in %s" symbol.DisplayName candidateNames
             // Check each candidate file
-            use _ = notifyStartCheckFiles(candidates.Length)
+            use _ = createCheckProgressBar(candidates.Length)
             let all = System.Collections.Generic.List<FSharpSymbolUse>()
             for projectOptions, sourceUri, sourceText in candidates do 
                 try
                     // Send a notification to the client updating the progress indicator
                     let sourceFile = FileInfo(sourceUri.LocalPath)
-                    notifyCheckFile(sourceFile)
+                    incrementCheckProgressBar(sourceFile)
                     
                     // Check file
                     let sourceVersion = docs.GetVersion(sourceUri) |> Option.defaultValue 0
@@ -711,18 +710,36 @@ type Server(client: ILanguageClient) =
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
                 docs.Open(p)
-                do! checkNow(p.textDocument.uri)
+                use _ = onOpen(FileInfo(p.textDocument.uri.LocalPath))
+                // Cancel any background check that is in-progress
+                cancelBackgroundCheck.Cancel()
+                do! doCheck(p.textDocument.uri)
+                // In case we cancelled a background check
+                // If there is nothing in `needsBackgroundCheck`, this will do nothing
+                requestBackgroundCheck()
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
                 docs.Change(p)
-                checkLater(p.textDocument.uri)
+                checkInBackground(p.textDocument.uri)
             }
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
-                do! checkNow(p.textDocument.uri)
+                let targetUri = p.textDocument.uri
+                let targetFile = FileInfo(targetUri.LocalPath)
+                let todo = [
+                    for fromUri in docs.OpenFiles() do 
+                        let fromFile = FileInfo(fromUri.LocalPath)
+                        if projects.IsVisible(targetFile, fromFile) then 
+                            yield fromUri
+                ]
+                use _ = createCheckProgressBar(List.length(todo))
+                for uri in todo do 
+                    let! check = forceCheckOpenFile(uri)
+                    publishErrors(uri, check)
+                    needsBackgroundCheck.TryRemove(uri.ToString()) |> ignore
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
@@ -747,7 +764,7 @@ type Server(client: ILanguageClient) =
                 // In theory we could optimize this by only re-checking descendents of changed projects, 
                 // but in practice that will make little difference
                 for f in docs.OpenFiles() do 
-                    do! checkNow(f) 
+                    checkInBackground(f) 
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {

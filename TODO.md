@@ -11,6 +11,9 @@
   - not
   - done
 
+# Cleanup
+- Convert Uri to FileInfo as early as possible
+
 # Bugs
 - Autocompleting in strings
 - $(TargetFramework) doesn't get substituted in .fsproj files
