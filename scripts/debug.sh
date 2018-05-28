@@ -1,5 +1,6 @@
 
 #!/usr/bin/env bash
+set -e
 # Builds src/FSharpLanguageServer/bin/Release/netcoreapp2.0/osx.10.11-x64/publish/FSharpLanguageServer
 dotnet build src/FSharpLanguageServer
 dotnet publish -c Release -r osx.10.11-x64 src/FSharpLanguageServer
