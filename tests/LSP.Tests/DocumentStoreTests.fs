@@ -2,6 +2,7 @@ module LSP.DocumentStoreTests
 
 open System
 open System.Text
+open System.IO
 open Types
 open NUnit.Framework
 
@@ -57,7 +58,7 @@ let ``open document``() =
               version = 1
               text = helloWorld } }
     store.Open(openDoc)
-    let found = store.GetText(exampleUri)
+    let found = store.GetText(FileInfo(exampleUri.LocalPath))
     Assert.AreEqual(Some(helloWorld), found)
 
 let exampleUri = Uri("file://example.txt")
@@ -86,7 +87,7 @@ let ``replace a document``() =
                 rangeLength = None 
                 text = newText } ] }
     store.Change(replaceAll)
-    let found = store.GetText(exampleUri)
+    let found = store.GetText(FileInfo(exampleUri.LocalPath))
     Assert.AreEqual(Some(newText), found)
 
 [<Test>]
@@ -103,5 +104,5 @@ let ``patch a document``() =
                 rangeLength = None 
                 text = newText } ] }
     store.Change(replaceAll)
-    let found = store.GetText(exampleUri)
+    let found = store.GetText(FileInfo(exampleUri.LocalPath))
     Assert.AreEqual(Some("Hello George!"), found)

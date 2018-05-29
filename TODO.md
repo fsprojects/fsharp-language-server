@@ -12,7 +12,6 @@
   - done
 
 # Cleanup
-- Convert Uri to FileInfo as early as possible
 
 # Bugs
 - Autocompleting in strings

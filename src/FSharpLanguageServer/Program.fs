@@ -321,52 +321,50 @@ type Server(client: ILanguageClient) =
     let checker = FSharpChecker.Create()
 
     // Get a file from docs, or read it from disk
-    let getOrRead(uri: Uri): string option = 
-        match docs.GetText(uri) with 
+    let getOrRead(file: FileInfo): string option = 
+        match docs.GetText(file) with 
         | Some text -> Some(text)
-        | None when File.Exists(uri.LocalPath) -> Some(File.ReadAllText(uri.LocalPath))
+        | None when file.Exists -> Some(File.ReadAllText(file.FullName))
         | None -> None
 
     // Read a specific line from a file
-    let lineContent(uri: Uri, targetLine: int): string = 
-        let text = getOrRead(uri) |> Option.defaultValue ""
+    let lineContent(file: FileInfo, targetLine: int): string = 
+        let text = getOrRead(file) |> Option.defaultValue ""
         let reader = new StringReader(text)
         let mutable line = 0
         while line < targetLine && reader.Peek() <> -1 do 
             reader.ReadLine() |> ignore
             line <- line + 1
         if reader.Peek() = -1 then 
-            dprintfn "Reached EOF before line %d in file %O" targetLine uri
+            dprintfn "Reached EOF before line %d in file %O" targetLine file.Name
             "" 
         else 
             reader.ReadLine()
 
     // Parse a file 
-    let parseFile(uri: Uri): Async<Result<FSharpParseFileResults, string>> = 
+    let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> = 
         async {
-            let file = FileInfo(uri.LocalPath)
-            match projects.FindProjectOptions(file), getOrRead(uri) with 
+            match projects.FindProjectOptions(file), getOrRead(file) with 
             | Error e, _ ->
                 return Error(sprintf "Can't find symbols in %s because of error in project options: %s" file.Name e)
             | _, None -> 
                 return Error(sprintf "%s was closed" file.FullName)
             | Ok(projectOptions), Some(sourceText) -> 
-                match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
+                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
                 | Some(parse, _, _) -> 
                     return Ok parse
                 | None ->
                     try
                         let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                        let! parse = checker.ParseFile(uri.LocalPath, sourceText, parsingOptions)
+                        let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                         return Ok(parse)
                     with e -> 
                         return Error(e.Message)
         }
     // Typecheck a file, ignoring caches
-    let forceCheckOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+    let forceCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.LocalPath)
-            match projects.FindProjectOptions(file), docs.Get(uri) with 
+            match projects.FindProjectOptions(file), docs.Get(file) with 
             | _, None -> 
                 // If file doesn't exist, there's nothing to report
                 dprintfn "%s was closed" file.FullName
@@ -374,16 +372,15 @@ type Server(client: ILanguageClient) =
             | Error(e), _ -> 
                 return Error [errorAtTop(e)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
-                let! force = checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions)
+                let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
                 match force with 
                 | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
                 | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
         }
     // Typecheck a file
-    let checkOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+    let checkOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.LocalPath)
-            match projects.FindProjectOptions(file), docs.GetVersion(uri) with 
+            match projects.FindProjectOptions(file), docs.GetVersion(file) with 
             | _, None -> 
                 // If file doesn't exist, there's nothing to report
                 dprintfn "%s was closed" file.FullName
@@ -391,28 +388,27 @@ type Server(client: ILanguageClient) =
             | Error(e), _ -> 
                 return Error [errorAtTop e]
             | Ok(projectOptions), Some(sourceVersion) -> 
-                match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
+                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
                 | Some(parseResult, checkResult, version) when version = sourceVersion -> 
                     return Ok(parseResult, checkResult)
                 | _ -> 
-                    return! forceCheckOpenFile(uri)
+                    return! forceCheckOpenFile(file)
         }
     // Typecheck a file quickly and a little less accurately
     // If the file has never been checked before, this is the same as `checkOpenFile`
     // If the file has been checked before, the previous check is returned, and a new check is queued
-    let quickCheckOpenFile(uri: Uri): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+    let quickCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            let file = FileInfo(uri.LocalPath)
-            match projects.FindProjectOptions(file), docs.Get(uri) with 
+            match projects.FindProjectOptions(file), docs.Get(file) with 
             | Error(e), _ -> return Error [errorAtTop e]
-            | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
+            | _, None -> return Error [errorAtTop (sprintf "No source file %A" file.FullName)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
-                match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
+                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
                 | Some(parseResult, checkResult, version) -> 
                     // Return the cached check, even if it is out-of-date
                     return Ok(parseResult, checkResult)
                 | _ -> 
-                    return! forceCheckOpenFile(uri)
+                    return! forceCheckOpenFile(file)
         }
 
     // When we check a long series of files, create a progress bar
@@ -475,21 +471,21 @@ type Server(client: ILanguageClient) =
 
     // We keep track of files that have been invalidated by user edits,
     // and check them when the user stops doing things for 1 second
-    let needsBackgroundCheck = System.Collections.Concurrent.ConcurrentDictionary<string, Uri>()
+    let needsBackgroundCheck = System.Collections.Concurrent.ConcurrentDictionary<string, FileInfo>()
     // We need to be able to cancel this process if the user requests something in the middle of a backround check
     let mutable cancelBackgroundCheck = new CancellationTokenSource()
     // Check a file and send diagnostics to the client
-    let publishErrors(uri: Uri, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>) = 
+    let publishErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>) = 
         let errors = 
             match check with
             | Error(errors) -> errors
             | Ok(parseResult, checkResult) -> asDiagnostics(parseResult.Errors)@asDiagnostics(checkResult.Errors)
-        client.PublishDiagnostics({uri=uri; diagnostics=errors})
-    let doCheck(uri: Uri): Async<unit> = 
+        client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
+    let doCheck(file: FileInfo): Async<unit> = 
         async {
-            let! check = checkOpenFile(uri)
-            publishErrors(uri, check)
-            needsBackgroundCheck.TryRemove(uri.ToString()) |> ignore
+            let! check = checkOpenFile(file)
+            publishErrors(file, check)
+            needsBackgroundCheck.TryRemove(file.FullName) |> ignore
         }
     // Request that all URIs in `needsBackgroundCheck` be checked when the user stops doing things for 1 second
     let requestBackgroundCheck(): unit = 
@@ -497,26 +493,27 @@ type Server(client: ILanguageClient) =
         cancelBackgroundCheck <- new CancellationTokenSource()
         Async.Start(async {
             do! Async.Sleep(1000)
-            for uri in needsBackgroundCheck.Values do 
-                do! doCheck(uri)
+            for file in needsBackgroundCheck.Values do 
+                do! doCheck(file)
         }, cancelBackgroundCheck.Token)
     // Request that `uri` be checked when the user stops doing things for 1 second
-    let checkInBackground(uri: Uri): unit = 
-        if needsBackgroundCheck.TryAdd(uri.ToString(), uri) then 
-            let name = FileInfo(uri.LocalPath).Name
+    let checkInBackground(file: FileInfo): unit = 
+        if needsBackgroundCheck.TryAdd(file.FullName, file) then 
+            let name = FileInfo(file.FullName).Name
             dprintfn "Invalidated %s" name
         requestBackgroundCheck()
         
     // Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
-            let! c = checkOpenFile(textDocument.uri)
+            let file = FileInfo(textDocument.uri.LocalPath)
+            let! c = checkOpenFile(file)
             match c with 
             | Error(errors) -> 
                 dprintfn "Check failed, ignored %d errors" (List.length errors)
                 return None
             | Ok(parseResult, checkResult) -> 
-                let line = lineContent(textDocument.uri, position.line)
+                let line = lineContent(file, position.line)
                 match findEndOfIdentifierUnderCursor(line, position.character) with 
                 | None -> 
                     dprintfn "No identifier at %d in line '%s'" position.character line 
@@ -534,12 +531,12 @@ type Server(client: ILanguageClient) =
 
     // Find the exact location of a symbol within a fully-qualified name
     // For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`
-    let refineRenameRange(s: FSharpSymbol, file: string, range: Range.range): Range = 
-        let uri = Uri("file://" + file)
+    let refineRenameRange(s: FSharpSymbol, file: FileInfo, range: Range.range): Range = 
+        let uri = Uri("file://" + file.FullName)
         let line = range.End.Line - 1
         let startColumn = if range.Start.Line - 1 < line then 0 else range.Start.Column
         let endColumn = range.End.Column
-        let lineText = lineContent(uri, line )
+        let lineText = lineContent(file, line )
         let find = lineText.LastIndexOf(s.DisplayName, endColumn, endColumn - startColumn)
         if find = -1 then
             dprintfn "Couldn't find '%s' in line '%s'" s.DisplayName lineText 
@@ -550,19 +547,19 @@ type Server(client: ILanguageClient) =
                 ``end``={line=line; character=find + s.DisplayName.Length}
             }
     // Rename one usage of a symbol
-    let renameTo(newName: string, file: string, usages: FSharpSymbolUse seq): TextDocumentEdit = 
-        let uri = Uri("file://" + file)
-        let version = docs.GetVersion(uri) |> Option.defaultValue 0
+    let renameTo(newName: string, file: FileInfo, usages: FSharpSymbolUse seq): TextDocumentEdit = 
+        let uri = Uri("file://" + file.FullName)
+        let version = docs.GetVersion(file) |> Option.defaultValue 0
         let edits = [
             for u in usages do 
-                let range = refineRenameRange(u.Symbol, u.FileName, u.RangeAlternate)
+                let range = refineRenameRange(u.Symbol, FileInfo(u.FileName), u.RangeAlternate)
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
     // Quickly check if a file *might* contain a symbol matching query
     let symbolPattern = Regex(@"\w+")
-    let maybeMatchesQuery(query: string, uri: Uri): string option = 
-        match getOrRead(uri) with 
+    let maybeMatchesQuery(query: string, file: FileInfo): string option = 
+        match getOrRead(file) with 
         | None -> None 
         | Some text -> 
             let matches = symbolPattern.Matches(text)
@@ -571,8 +568,8 @@ type Server(client: ILanguageClient) =
                 Some text 
             else 
                 None
-    let exactlyMatches(findSymbol: string, uri: Uri): string option =
-        match getOrRead(uri) with 
+    let exactlyMatches(findSymbol: string, file: FileInfo): string option =
+        match getOrRead(file) with 
         | None -> None 
         | Some text -> 
             let matches = symbolPattern.Matches(text)
@@ -637,25 +634,23 @@ type Server(client: ILanguageClient) =
             // Check source files for possible symbol references using string matching
             let candidates = [
                 for projectOptions, sourceFile in visible do 
-                    let uri = Uri("file://" + sourceFile.FullName)
-                    match exactlyMatches(symbol.DisplayName, uri) with 
+                    match exactlyMatches(symbol.DisplayName, sourceFile) with 
                     | None -> ()
-                    | Some(sourceText) -> yield projectOptions, uri, sourceText
+                    | Some(sourceText) -> yield projectOptions, sourceFile, sourceText
             ]
-            let candidateNames = String.concat ", " [for _, uri, _ in candidates do yield FileInfo(uri.LocalPath).Name]
+            let candidateNames = String.concat ", " [for _, file, _ in candidates do yield file.Name]
             dprintfn "Name %s appears in %s" symbol.DisplayName candidateNames
             // Check each candidate file
             use _ = createCheckProgressBar(candidates.Length)
             let all = System.Collections.Generic.List<FSharpSymbolUse>()
-            for projectOptions, sourceUri, sourceText in candidates do 
+            for projectOptions, sourceFile, sourceText in candidates do 
                 try
                     // Send a notification to the client updating the progress indicator
-                    let sourceFile = FileInfo(sourceUri.LocalPath)
                     incrementCheckProgressBar(sourceFile)
                     
                     // Check file
-                    let sourceVersion = docs.GetVersion(sourceUri) |> Option.defaultValue 0
-                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceUri.LocalPath, sourceVersion, sourceText, projectOptions)
+                    let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
+                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, sourceText, projectOptions)
                     match maybeCheck with 
                     | FSharpCheckFileAnswer.Aborted -> ()
                     | FSharpCheckFileAnswer.Succeeded(check) -> 
@@ -663,7 +658,7 @@ type Server(client: ILanguageClient) =
                         for u in uses do 
                             all.Add(u)
                 with e -> 
-                    dprintfn "Error checking %s: %s" sourceUri.LocalPath e.Message
+                    dprintfn "Error checking %s: %s" sourceFile.Name e.Message
             return List.ofSeq(all)
         }
 
@@ -719,19 +714,21 @@ type Server(client: ILanguageClient) =
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Open(p)
-                use _ = onOpen(FileInfo(p.textDocument.uri.LocalPath))
+                use _ = onOpen(file)
                 // Cancel any background check that is in-progress
                 cancelBackgroundCheck.Cancel()
-                do! doCheck(p.textDocument.uri)
+                do! doCheck(file)
                 // In case we cancelled a background check
                 // If there is nothing in `needsBackgroundCheck`, this will do nothing
                 requestBackgroundCheck()
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Change(p)
-                checkInBackground(p.textDocument.uri)
+                checkInBackground(file)
             }
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
@@ -740,10 +737,9 @@ type Server(client: ILanguageClient) =
                 let targetUri = p.textDocument.uri
                 let targetFile = FileInfo(targetUri.LocalPath)
                 let todo = [
-                    for fromUri in docs.OpenFiles() do 
-                        let fromFile = FileInfo(fromUri.LocalPath)
+                    for fromFile in docs.OpenFiles() do 
                         if projects.IsVisible(targetFile, fromFile) then 
-                            yield fromUri
+                            yield fromFile
                 ]
                 use _ = createCheckProgressBar(List.length(todo))
                 for uri in todo do 
@@ -753,9 +749,10 @@ type Server(client: ILanguageClient) =
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Close(p)
                 // Only show errors for open files
-                publishErrors(p.textDocument.uri, Error([]))
+                publishErrors(file, Error([]))
             }
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {
@@ -780,15 +777,16 @@ type Server(client: ILanguageClient) =
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
-                dprintfn "Autocompleting at %s(%d,%d)" p.textDocument.uri.LocalPath p.position.line p.position.character
-                let! c = quickCheckOpenFile(p.textDocument.uri)
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+                dprintfn "Autocompleting at %s(%d,%d)" file.Name p.position.line p.position.character
+                let! c = quickCheckOpenFile(file)
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = lineContent(p.textDocument.uri, p.position.line)
+                    let line = lineContent(file, p.position.line)
                     let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                     let nameParts = partialName.QualifyingIdents@[partialName.PartialIdent]
                     dprintfn "Autocompleting %s" (String.concat "." nameParts)
@@ -799,13 +797,14 @@ type Server(client: ILanguageClient) =
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
-                let! c = checkOpenFile(p.textDocument.uri)
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let! c = checkOpenFile(file)
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = lineContent(p.textDocument.uri, p.position.line)
+                    let line = lineContent(file, p.position.line)
                     let names = findNamesUnderCursor(line, p.position.character)
                     let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier)
                     return Some(asHover(tips))
@@ -824,13 +823,14 @@ type Server(client: ILanguageClient) =
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
-                let! c = quickCheckOpenFile(p.textDocument.uri)
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let! c = quickCheckOpenFile(file)
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = lineContent(p.textDocument.uri, p.position.line)
+                    let line = lineContent(file, p.position.line)
                     match findMethodCallBeforeCursor(line, p.position.character) with 
                     | None -> 
                         dprintfn "No method call in line %s" line 
@@ -865,7 +865,8 @@ type Server(client: ILanguageClient) =
         member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
             async {
-                let! maybeParse = parseFile(p.textDocument.uri)
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let! maybeParse = parseFile(file)
                 match maybeParse with 
                 | Error e -> 
                     dprintfn "%s" e 
@@ -881,20 +882,20 @@ type Server(client: ILanguageClient) =
                 // Read open projects until we find at least 50 symbols that match query
                 let all = System.Collections.Generic.List<SymbolInformation>()
                 for projectOptions in projects.OpenProjects do 
-                    for sourceFile in projectOptions.SourceFiles do 
+                    for sourceFileName in projectOptions.SourceFiles do 
+                        let sourceFile = FileInfo(sourceFileName)
                         if all.Count < 50 then 
-                            let uri = Uri("file://" + sourceFile)
-                            match maybeMatchesQuery(p.query, uri) with 
+                            match maybeMatchesQuery(p.query, sourceFile) with 
                             | None -> () 
                             | Some sourceText ->
                                 try
                                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                                    let! parse = checker.ParseFile(uri.LocalPath, sourceText, parsingOptions)
+                                    let! parse = checker.ParseFile(sourceFile.FullName, sourceText, parsingOptions)
                                     for declaration, container in flattenSymbols(parse) do 
                                         if matchesQuery(p.query, declaration.Name) then 
                                             all.Add(asSymbolInformation(declaration, container))
                                 with e -> 
-                                    dprintfn "Error parsing %s: %s" sourceFile e.Message
+                                    dprintfn "Error parsing %s: %s" sourceFile.Name e.Message
                 return List.ofSeq(all)
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
@@ -915,14 +916,15 @@ type Server(client: ILanguageClient) =
                     let byFile = List.groupBy (fun (usage:FSharpSymbolUse) -> usage.FileName) uses
                     let fileNames = List.map fst byFile
                     dprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName (String.concat ", " fileNames)
-                    let renames = List.map (fun (file, uses) -> renameTo(p.newName, file, uses)) byFile
+                    let renames = [for fileName, uses in byFile do yield renameTo(p.newName, FileInfo(fileName), uses)]
                     return {documentChanges=List.ofSeq(renames)}
             }
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
             async {
                 for root in p.event.added do 
-                    do! projects.AddWorkspaceRoot(DirectoryInfo(root.uri.LocalPath))
+                    let file = FileInfo(root.uri.LocalPath)
+                    do! projects.AddWorkspaceRoot(file.Directory)
                 // TODO removed
             }
 
