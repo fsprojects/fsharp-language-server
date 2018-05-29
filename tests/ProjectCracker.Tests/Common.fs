@@ -1,4 +1,4 @@
-module Projects.Tests.Common
+module ProjectCrackerTestsCommon
 
 open System
 open System.IO

@@ -35,10 +35,10 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 
 - src/LSP.Json: Forked from FSharp.Data to work around https://github.com/Microsoft/visualfsharp/issues/3303
 - src/LSP: Server-side implementation of [language server protocol](https://microsoft.github.io/language-server-protocol/specification)
-- src/Projects: Figures out [F# compiler options](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/compiler-options) by reading .fsproj and project.assets.json files
+- src/ProjectCracker: Figures out [F# compiler options](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/compiler-options) by reading .fsproj and project.assets.json files
 - src/FSharpLanguageServer: F# language server
 - tests/LSP.Tests
-- tests/Projects.Tests
+- tests/ProjectCracker.Tests
 - tests/FSharpLanguageServer.Tests
 - sample: Example projects used by tests
 

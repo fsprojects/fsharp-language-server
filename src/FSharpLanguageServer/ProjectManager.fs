@@ -11,7 +11,7 @@ open LSP.Json.JsonExtensions
 open LSP.Types
 open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
-open Projects.ProjectParser
+open ProjectCracker
 
 // Maintains caches of parsed versions of .fsproj files
 type ProjectManager(client: ILanguageClient) = 
@@ -36,7 +36,7 @@ type ProjectManager(client: ILanguageClient) =
     let rec analyzeProject(fsproj: FileInfo) = 
         dprintfn "Analyzing %s" fsproj.Name
         notifyAnalyzeProject(fsproj)
-        match Projects.ProjectParser.crack(fsproj) with 
+        match ProjectCracker.crack(fsproj) with 
         | Error(e) -> analyzedByProjectFile.[fsproj.FullName] <- Error(e)
         | Ok(cracked) -> 
             // Ensure we've analyzed all dependencies

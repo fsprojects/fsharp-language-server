@@ -1,7 +1,7 @@
-module Projects.Tests.ProjectParserTests
+module ProjectCrackerTests
 
-open Projects
-open Projects.Tests.Common
+open ProjectCracker
+open ProjectCrackerTestsCommon
 open System
 open System.IO
 open System.Text.RegularExpressions
@@ -19,7 +19,7 @@ let containsFileName(name: string, files: FileInfo list) =
 [<Test>]
 let ``crack a project file``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "MainProject.fsproj"|] |> FileInfo 
-    match ProjectParser.crack(fsproj) with 
+    match ProjectCracker.crack(fsproj) with 
     | Error(e) -> Assert.Fail(e)
     | Ok(cracked) -> 
         // Direct project reference

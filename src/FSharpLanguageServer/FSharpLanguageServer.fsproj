@@ -19,6 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
-    <ProjectReference Include="..\Projects\Projects.fsproj" />
+    <ProjectReference Include="..\ProjectCracker\ProjectCracker.fsproj" />
   </ItemGroup>
 </Project>

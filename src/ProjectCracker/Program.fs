@@ -1,4 +1,4 @@
-module ProjectCracker 
+module ProjectCrackerMain
 
 open System
 open System.IO
@@ -58,12 +58,12 @@ let private buildSomethingWellBehaved() =
 
 let private crackWithProjectParser() = 
     let fsproj = FileInfo("/Users/georgefraser/Documents/FSharp.Compiler.Service/fcs/FSharp.Compiler.Service/FSharp.Compiler.Service.fsproj")
-    match Projects.ProjectParser.crackWithProjectAssetsJson(fsproj) with 
+    match ProjectCracker.crackWithProjectAssetsJson(fsproj) with 
     | Error(e) -> printfn "%s" e 
     | Ok(cracked) -> printfn "%A" cracked
 
 [<EntryPoint>]
 let main(argv: array<string>): int = 
-    // Projects.ProjectParser.buildFcs()
+    // ProjectCracker.buildFcs()
     buildSomethingWellBehaved()
     0
