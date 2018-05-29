@@ -16,8 +16,11 @@
 
 # Bugs
 - Autocompleting in strings
+- Files in unrelated projects are invalidating open files
 
 # Optimizations
+- Use .sln files to decide what .fsproj files to load
+- Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
 
 # Features
 - Docstrings on autocomplete and hover

@@ -1,4 +1,4 @@
-namespace Projects 
+namespace FSharpLanguageServer 
 
 open LSP.Log
 open System
@@ -36,7 +36,7 @@ type ProjectManager(client: ILanguageClient) =
     let rec analyzeProject(fsproj: FileInfo) = 
         dprintfn "Analyzing %s" fsproj.Name
         notifyAnalyzeProject(fsproj)
-        match ProjectParser.crack(fsproj) with 
+        match Projects.ProjectParser.crack(fsproj) with 
         | Error(e) -> analyzedByProjectFile.[fsproj.FullName] <- Error(e)
         | Ok(cracked) -> 
             // Ensure we've analyzed all dependencies

@@ -6,6 +6,7 @@
   <ItemGroup>
     <Compile Include="Common.fs" />
     <Compile Include="ServerTests.fs" />
+    <Compile Include="ProjectManagerTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.5.0" />

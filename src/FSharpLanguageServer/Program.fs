@@ -11,7 +11,6 @@ open LSP
 open LSP.Types
 open LSP.Json
 open LSP.Json.JsonExtensions
-open Projects
 
 let private TODO() = raise (Exception "TODO")
 
@@ -457,7 +456,6 @@ type Server(client: ILanguageClient) =
                     needsRecompile.Add(f)
         createCheckProgressBar(needsRecompile.Count)
     let onCheckFile(sourceFile: FileInfo) = 
-        dprintfn "Checking %s, queue length %d" sourceFile.FullName checker.CurrentQueueLength
         // Remember that we've checked this version of the file, 
         // so that we can accurately calculate how many files we need to check in the future
         lastCheckedOnDisk.[sourceFile.FullName] <- sourceFile.LastWriteTime

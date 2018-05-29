@@ -5,7 +5,6 @@ open Projects.Tests.Common
 open System
 open System.IO
 open System.Text.RegularExpressions
-open Microsoft.FSharp.Compiler.SourceCodeServices
 open NUnit.Framework
 
 [<SetUp>]

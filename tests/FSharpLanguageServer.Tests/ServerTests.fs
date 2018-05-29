@@ -78,6 +78,7 @@ let createServerAndReadFile(name: string): MockClient * ILanguageServer =
     let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
     let sampleRootUri = Uri("file://" + sampleRootPath)
     server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> Async.RunSynchronously |> ignore
+    server.Initialized() |> Async.RunSynchronously
     server.DidOpenTextDocument(openFile name) |> Async.RunSynchronously
     (client, server)
 
