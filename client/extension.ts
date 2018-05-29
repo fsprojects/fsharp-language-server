@@ -28,6 +28,7 @@ export function activate(context: ExtensionContext) {
 			// Synchronize the setting section 'languageServerExample' to the server
 			configurationSection: 'fsharp',
 			// Notify the server about file changes to F# project files contain in the workspace
+			// TODO: is there a way to configure this via the language server protocol?
 			fileEvents: [
 				workspace.createFileSystemWatcher('**/*.fsproj'),
 				workspace.createFileSystemWatcher('**/project.assets.json')

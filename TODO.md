@@ -17,7 +17,6 @@
 # Bugs
 - Autocompleting in strings
 - Files in unrelated projects are invalidating open files
-- Clear errors on delete-file
 
 # Optimizations
 - Use .sln files to decide what .fsproj files to load

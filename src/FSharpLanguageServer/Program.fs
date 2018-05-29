@@ -349,7 +349,7 @@ type Server(client: ILanguageClient) =
             | Error e, _ ->
                 return Error(sprintf "Can't find symbols in %s because of error in project options: %s" file.Name e)
             | _, None -> 
-                return Error(sprintf "Can't find symbols in non-existant file %s" file.FullName)
+                return Error(sprintf "%s was closed" file.FullName)
             | Ok(projectOptions), Some(sourceText) -> 
                 match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
                 | Some(parse, _, _) -> 
@@ -367,8 +367,12 @@ type Server(client: ILanguageClient) =
         async {
             let file = FileInfo(uri.LocalPath)
             match projects.FindProjectOptions(file), docs.Get(uri) with 
-            | Error(e), _ -> return Error [errorAtTop(e)]
-            | _, None -> return Error [errorAtTop(sprintf "No source file %A" uri)]
+            | _, None -> 
+                // If file doesn't exist, there's nothing to report
+                dprintfn "%s was closed" file.FullName
+                return Error []
+            | Error(e), _ -> 
+                return Error [errorAtTop(e)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 let! force = checker.ParseAndCheckFileInProject(uri.LocalPath, sourceVersion, sourceText, projectOptions)
                 match force with 
@@ -380,8 +384,12 @@ type Server(client: ILanguageClient) =
         async {
             let file = FileInfo(uri.LocalPath)
             match projects.FindProjectOptions(file), docs.GetVersion(uri) with 
-            | Error(e), _ -> return Error [errorAtTop e]
-            | _, None -> return Error [errorAtTop (sprintf "No source file %A" uri)]
+            | _, None -> 
+                // If file doesn't exist, there's nothing to report
+                dprintfn "%s was closed" file.FullName
+                return Error []
+            | Error(e), _ -> 
+                return Error [errorAtTop e]
             | Ok(projectOptions), Some(sourceVersion) -> 
                 match checker.TryGetRecentCheckResultsForFile(uri.LocalPath, projectOptions) with 
                 | Some(parseResult, checkResult, version) when version = sourceVersion -> 
