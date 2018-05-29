@@ -58,12 +58,12 @@ let private buildSomethingWellBehaved() =
 
 let private crackWithProjectParser() = 
     let fsproj = FileInfo("/Users/georgefraser/Documents/FSharp.Compiler.Service/fcs/FSharp.Compiler.Service/FSharp.Compiler.Service.fsproj")
-    match ProjectCracker.crackWithProjectAssetsJson(fsproj) with 
+    match ProjectCracker.BackupCracker.crackWithProjectAssetsJson(fsproj) with 
     | Error(e) -> printfn "%s" e 
     | Ok(cracked) -> printfn "%A" cracked
 
 [<EntryPoint>]
 let main(argv: array<string>): int = 
     // ProjectCracker.buildFcs()
-    buildSomethingWellBehaved()
+    crackWithProjectParser()
     0
