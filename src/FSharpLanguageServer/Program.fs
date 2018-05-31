@@ -11,59 +11,9 @@ open LSP
 open LSP.Types
 open LSP.Json
 open LSP.Json.JsonExtensions
+open Conversions
 
 let private TODO() = raise (Exception "TODO")
-
-// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
-let private errorAsRange(err: FSharpErrorInfo): Range = 
-    {
-        // Got error "The field, constructor or member 'StartLine' is not defined"
-        start = {line=err.StartLineAlternate-1; character=err.StartColumn}
-        ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
-    }
-
-// Convert an F# Compiler Services 'FSharpErrorSeverity' to an LSP 'DiagnosticSeverity'
-let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
-    match s with 
-    | FSharpErrorSeverity.Warning -> DiagnosticSeverity.Warning 
-    | FSharpErrorSeverity.Error -> DiagnosticSeverity.Error 
-
-// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Diagnostic'
-let private asDiagnostic(err: FSharpErrorInfo): Diagnostic = 
-    {
-        range = errorAsRange(err)
-        severity = Some(asDiagnosticSeverity err.Severity)
-        code = Some(sprintf "%d: %s" err.ErrorNumber err.Subcategory)
-        source = None
-        message = err.Message
-    }
-    
-// Some compiler errors have no location in the file and should be displayed at the top of the file
-let private hasNoLocation(err: FSharpErrorInfo): bool = 
-    err.StartLineAlternate-1 = 0 && 
-    err.StartColumn = 0 &&
-    err.EndLineAlternate-1 = 0 &&
-    err.EndColumn = 0
-
-// A special error message that shows at the top of the file
-let private errorAtTop(message: string): Diagnostic =
-    {
-        range = { start = {line=0; character=0}; ``end`` = {line=0; character=1} }
-        severity = Some(DiagnosticSeverity.Error) 
-        code = None
-        source = None 
-        message = message
-    }
-
-// Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
-let private asDiagnostics(errors: FSharpErrorInfo[]): Diagnostic list =
-    [ 
-        for err in errors do 
-            if hasNoLocation(err) then 
-                yield errorAtTop(sprintf "%s: %s" err.Subcategory err.Message)
-            else
-                yield asDiagnostic(err) 
-    ]
 
 // Look for a fully qualified name leading up to the cursor
 // (exposed for testing)
@@ -133,74 +83,6 @@ let private countCommas(lineContent: string, endOfMethodName: int, cursor: int):
             count <- count + 1
     count
 
-// Convert an F# `FSharpToolTipElement` to an LSP `Hover`
-let private asHover(FSharpToolTipText tips): Hover = 
-    let convert = 
-        [ for t in tips do
-            match t with 
-            | FSharpToolTipElement.None -> () 
-            | FSharpToolTipElement.Group elements -> 
-                for e in elements do 
-                    yield HighlightedString(e.MainDescription, "fsharp")
-            | FSharpToolTipElement.CompositionError err -> 
-                yield PlainString(err)]
-    {contents=convert; range=None}
-
-// Convert an F# `FSharpToolTipText` to text
-let private asDocumentation(FSharpToolTipText tips): string option = 
-    match tips with 
-    | [FSharpToolTipElement.Group [e]] -> Some e.MainDescription
-    | _ -> None // When there are zero or multiple overloads, don't display docs
-
-// Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
-let private asCompletionItemKind(k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
-    match k with 
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Field -> Some(CompletionItemKind.Field)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Property -> Some(CompletionItemKind.Property)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Method isExtension -> Some(CompletionItemKind.Method)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Event -> None
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Argument -> Some(CompletionItemKind.Variable)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Other -> None
-
-// Convert an F# `FSharpDeclarationListItem` to an LSP `CompletionItem`
-let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem = 
-    { defaultCompletionItem with 
-        label = i.Name 
-        kind = asCompletionItemKind i.Kind
-        detail = Some i.FullName
-        // Stash FullName in data so we can use it later in ResolveCompletionItem
-        data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
-    }
-
-// Convert an F# `FSharpDeclarationListInfo` to an LSP `CompletionList`
-// Used in rendering autocomplete lists
-let private asCompletionList(ds: FSharpDeclarationListInfo): CompletionList = 
-    let items = [for i in ds.Items do yield asCompletionItem(i)]
-    {isIncomplete=List.isEmpty(items); items=items}
-
-// Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
-let private asParameterInformation(p: FSharpMethodGroupItemParameter): ParameterInformation = 
-    {
-        label = p.ParameterName
-        documentation = Some p.Display
-    }
-
-// Convert an F# method name + `FSharpMethodGroupItem` to an LSP `SignatureInformation`
-// Used in providing signature help after autocompleting
-let private asSignatureInformation(methodName: string, s: FSharpMethodGroupItem): SignatureInformation = 
-    let doc = match s.Description with 
-                | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription 
-                | _ -> 
-                    dprintfn "Can't render documentation %A" s.Description 
-                    None 
-    let parameterName(p: FSharpMethodGroupItemParameter) = p.ParameterName
-    let parameterNames = Array.map parameterName s.Parameters
-    {
-        label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames) 
-        documentation = doc 
-        parameters = Array.map asParameterInformation s.Parameters |> List.ofArray
-    }
-
 // Check if `candidate` contains all the characters of `find`, in-order, case-insensitive
 // Matches can be discontinuous if the letters of `find` match the first letters of words in `candidate`
 // For example, fb matches FooBar, but it doesn't match Foobar
@@ -239,40 +121,6 @@ let private containerName(s: FSharpSymbol): string option =
     else 
         Some(s.FullName)
 
-// Convert an F# `Range.pos` to an LSP `Position`
-let private asPosition(p: Range.pos): Position = 
-    {
-        line=p.Line-1
-        character=p.Column
-    }
-
-// Convert an F# `Range.range` to an LSP `Range`
-let private asRange(r: Range.range): Range = 
-    {
-        start=asPosition r.Start
-        ``end``=asPosition r.End
-    }
-
-// Convert an F# `Range.range` to an LSP `Location`
-let private asLocation(l: Range.range): Location = 
-    { 
-        uri=Uri("file://" + l.FileName)
-        range = asRange l 
-    }
-
-// Get the lcation where `s` was declared
-let private declarationLocation(s: FSharpSymbol): Location option = 
-    match s.DeclarationLocation with 
-    | None -> 
-        dprintfn "Symbol %s has no declaration" s.FullName 
-        None 
-    | Some l ->
-        Some(asLocation(l))
-
-// Get the location where `s` was used
-let private useLocation(s: FSharpSymbolUse): Location = 
-    asLocation(s.RangeAlternate)
-
 // Find the first overload in `method` that is compatible with `activeParameter`
 // TODO actually consider types
 let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGroupItem[]): int option = 
@@ -281,32 +129,6 @@ let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGr
         if result = -1 && (activeParameter = 0 || activeParameter < methods.[i].Parameters.Length) then 
             result <- i 
     if result = -1 then None else Some result
-
-// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
-// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
-let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind = 
-    match k with 
-    | NamespaceDecl -> SymbolKind.Namespace
-    | ModuleFileDecl -> SymbolKind.Module
-    | ExnDecl -> SymbolKind.Class
-    | ModuleDecl -> SymbolKind.Module
-    | TypeDecl -> SymbolKind.Interface
-    | MethodDecl -> SymbolKind.Method
-    | PropertyDecl -> SymbolKind.Property
-    | FieldDecl -> SymbolKind.Field
-    | OtherDecl -> SymbolKind.Variable
-
-// Convert an F# `FSharpNavigationDeclarationItem` to an LSP `SymbolInformation`
-// `FSharpNavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
-// `container` is present when `d` is part of a module or type
-let private asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
-    let declarationName(d: FSharpNavigationDeclarationItem) = d.Name
-    {
-        name=d.Name 
-        kind=asSymbolKind d.Kind 
-        location=asLocation d.Range 
-        containerName=Option.map declarationName container
-    }
 
 // Find all symbols in a parsed AST
 let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
@@ -317,8 +139,8 @@ let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDecl
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
-    let projects = ProjectManager(client)
     let checker = FSharpChecker.Create()
+    let projects = ProjectManager(client, checker)
 
     // Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option = 
@@ -341,12 +163,23 @@ type Server(client: ILanguageClient) =
         else 
             reader.ReadLine()
 
+    let analyzeScriptOptions(file: FileInfo): Async<FSharpProjectOptions * Diagnostic list> = 
+        async {
+            dprintfn "Creating project options for script %s" file.Name
+            let source = File.ReadAllText(file.FullName)
+            let! options, errors = checker.GetProjectOptionsFromScript(file.FullName, source, file.LastWriteTime)
+            if not(List.isEmpty(errors)) then 
+                dprintfn "Encountered errors while analyzing script %s: %A" file.Name errors
+            dprintfn "Script %s has options %A" file.Name options
+            return options, asDiagnostics(errors)
+        }
+
     // Parse a file 
     let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> = 
         async {
             match projects.FindProjectOptions(file), getOrRead(file) with 
             | Error e, _ ->
-                return Error(sprintf "Can't find symbols in %s because of error in project options: %s" file.Name e)
+                return Error(sprintf "Can't find symbols in %s because of error in project options" file.Name)
             | _, None -> 
                 return Error(sprintf "%s was closed" file.FullName)
             | Ok(projectOptions), Some(sourceText) -> 
@@ -369,8 +202,8 @@ type Server(client: ILanguageClient) =
                 // If file doesn't exist, there's nothing to report
                 dprintfn "%s was closed" file.FullName
                 return Error []
-            | Error(e), _ -> 
-                return Error [errorAtTop(e)]
+            | Error(errs), _ -> 
+                return Error(errs)
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
                 match force with 
@@ -385,8 +218,8 @@ type Server(client: ILanguageClient) =
                 // If file doesn't exist, there's nothing to report
                 dprintfn "%s was closed" file.FullName
                 return Error []
-            | Error(e), _ -> 
-                return Error [errorAtTop e]
+            | Error(errs), _ -> 
+                return Error(errs)
             | Ok(projectOptions), Some(sourceVersion) -> 
                 match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
                 | Some(parseResult, checkResult, version) when version = sourceVersion -> 
@@ -400,7 +233,7 @@ type Server(client: ILanguageClient) =
     let quickCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.Get(file) with 
-            | Error(e), _ -> return Error [errorAtTop e]
+            | Error(errs), _ -> return Error(errs)
             | _, None -> return Error [errorAtTop (sprintf "No source file %A" file.FullName)]
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
@@ -681,7 +514,7 @@ type Server(client: ILanguageClient) =
             async {
                 match p.rootUri with 
                 | Some root -> 
-                    dprintfn "Add workspace root %s ~ %s" root.AbsoluteUri root.LocalPath
+                    dprintfn "Add workspace root %s" root.LocalPath
                     deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath)) 
                 | _ -> ()
                 return { 
@@ -715,7 +548,9 @@ type Server(client: ILanguageClient) =
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
+                // Store text in docs
                 docs.Open(p)
+                // Possibly create a progress bar
                 use _ = onOpen(file)
                 // Cancel any background check that is in-progress
                 cancelBackgroundCheck.Cancel()
@@ -759,12 +594,10 @@ type Server(client: ILanguageClient) =
                 for change in p.changes do 
                     let file = FileInfo(change.uri.LocalPath)
                     dprintfn "Watched file %s %O" file.FullName change.``type``
-                    if file.Name.EndsWith(".fsproj") then 
+                    if file.Name.EndsWith(".fsproj") || file.Name.EndsWith(".fsx") then 
                         match change.``type`` with 
-                        | FileChangeType.Created ->
-                            projects.NewProjectFile(file)
-                        | FileChangeType.Changed ->
-                            projects.UpdateProjectFile(file)
+                        | FileChangeType.Created | FileChangeType.Changed ->
+                            projects.PutProjectFile(file)
                         | FileChangeType.Deleted ->
                             projects.DeleteProjectFile(file)
                     elif file.Name = "project.assets.json" then 

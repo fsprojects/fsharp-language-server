@@ -1,5 +1,7 @@
 module FSharpLanguageServer.Tests.ProjectManagerTests
 
+open Microsoft.FSharp.Compiler
+open Microsoft.FSharp.Compiler.SourceCodeServices
 open FSharpLanguageServer.Tests.Common
 open FSharpLanguageServer
 open System
@@ -30,28 +32,28 @@ let private endsWith (name: string) (f: string) = f.EndsWith name
 
 [<Test>]
 let ``find project file`` () = 
-    let projects = ProjectManager(MockClient())
+    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
     let project = projects.FindProjectOptions(file)
     match project with 
-    | Error(m) -> Assert.Fail(m)
+    | Error(m) -> Assert.Fail(sprintf "%A" m)
     | Ok(f) -> if not(f.ProjectFileName.EndsWith "MainProject.fsproj") then Assert.Fail(sprintf "%A" f)
 
 // [<Test>] TODO repair this somehow. Another build step?
 let ``find an local dll`` () = 
-    let projects = ProjectManager(MockClient())
+    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
     match projects.FindProjectOptions(file) with 
-    | Error(m) -> Assert.Fail m
+    | Error(m) -> Assert.Fail(sprintf "%A" m)
     | Ok(parsed) -> if not (Seq.exists (endsWith "LocalDll.dll") parsed.OtherOptions) then Assert.Fail(sprintf "%A" parsed.OtherOptions)
 
 [<Test>]
 let ``project-file-not-found`` () = 
-    let projects = ProjectManager(MockClient())
+    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
     let project = projects.FindProjectOptions file
     match project with 
@@ -60,6 +62,6 @@ let ``project-file-not-found`` () =
 
 [<Test>]
 let ``bad project file`` () = 
-    let projects = ProjectManager(MockClient())
+    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "BadProject"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot root)

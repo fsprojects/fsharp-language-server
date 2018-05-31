@@ -31,6 +31,7 @@ export function activate(context: ExtensionContext) {
 			// TODO: is there a way to configure this via the language server protocol?
 			fileEvents: [
 				workspace.createFileSystemWatcher('**/*.fsproj'),
+				workspace.createFileSystemWatcher('**/*.fsx'),
 				workspace.createFileSystemWatcher('**/project.assets.json')
 			]
 		}

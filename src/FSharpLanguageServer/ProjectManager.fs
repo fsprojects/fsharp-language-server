@@ -13,12 +13,17 @@ open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open ProjectCracker
 
-// Maintains caches of parsed versions of .fsproj files
-type ProjectManager(client: ILanguageClient) = 
-    // Index mapping .fs source files to .fsproj project files that reference them
+type private ProjectOptions = 
+| FsprojOptions of CrackedProject * FSharpProjectOptions 
+| FsxOptions of FSharpProjectOptions * FSharpErrorInfo list 
+| BadOptions of string
+
+// Maintains caches of parsed versions of .fsprojOrFsx files
+type ProjectManager(client: ILanguageClient, checker: FSharpChecker) = 
+    // Index mapping .fs source files to .fsprojOrFsx project files that reference them
     let projectFileBySourceFile = new Dictionary<String, FileInfo>()
     // Cache the result of project cracking
-    let analyzedByProjectFile = new Dictionary<String, Result<CrackedProject * FSharpProjectOptions, string>>()
+    let analyzedByProjectFile = new Dictionary<String, ProjectOptions>()
 
     // When we analyze multiple project files, create a progress bar
     // These functions should be called in a `use` block to ensure the progress bar is closed:
@@ -29,23 +34,56 @@ type ProjectManager(client: ILanguageClient) =
         client.CustomNotification("fsharp/startAnalyzeProjects", JsonValue.Number(decimal(nFiles)))
         let notifyEnd() = client.CustomNotification("fsharp/endAnalyzeProjects", JsonValue.Null)
         { new IDisposable with member this.Dispose() = notifyEnd() }
-    let notifyAnalyzeProject(fsproj: FileInfo) = 
-        client.CustomNotification("fsharp/analyzeProject", JsonValue.String(fsproj.Name))
+    let notifyAnalyzeProject(fsprojOrFsx: FileInfo) = 
+        client.CustomNotification("fsharp/analyzeProject", JsonValue.String(fsprojOrFsx.Name))
+
+    let printOptions(options: FSharpProjectOptions) = 
+        // This is long but it's useful
+        dprintfn "%s: " options.ProjectFileName
+        dprintfn "  ProjectFileName: %A" options.ProjectFileName
+        dprintfn "  SourceFiles: %A" options.SourceFiles
+        dprintfn "  ReferencedProjects: %A" [for dll, _ in options.ReferencedProjects do yield dll]
+        dprintfn "  OtherOptions: %A" options.OtherOptions
+        dprintfn "  LoadTime: %A" options.LoadTime
+        dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
+        dprintfn "  IsIncompleteTypeCheckEnvironment: %A" options.IsIncompleteTypeCheckEnvironment
+        dprintfn "  OriginalLoadReferences: %A" options.OriginalLoadReferences
+        dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
+        dprintfn "  Stamp: %A" options.Stamp
+        dprintfn "  UnresolvedReferences: %A" options.UnresolvedReferences
+        dprintfn "  UseScriptResolutionRules: %A" options.UseScriptResolutionRules
+
+    let addToCache(key: FileInfo, value: ProjectOptions) = 
+        // Populate project file -> options cache
+        analyzedByProjectFile.[key.FullName] <- value 
+        // Populate source -> project cache
+        let sources = 
+            match value with 
+            | FsprojOptions(_, options) -> options.SourceFiles
+            | FsxOptions(options, _) -> options.SourceFiles
+            | _ -> [||]
+        for s in sources do 
+            projectFileBySourceFile.[s] <- key
+
+    // Analyze a script file and add it to the cache
+    let analyzeFsx(fsx: FileInfo) = 
+        dprintfn "Creating project options for script %s" fsx.Name
+        let source = File.ReadAllText(fsx.FullName)
+        let options, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime) |> Async.RunSynchronously
+        printOptions(options)
+        addToCache(fsx, FsxOptions(options, errors))
 
     // Analyze a project and add it to the cache
-    let rec analyzeProject(fsproj: FileInfo) = 
+    let rec analyzeFsproj(fsproj: FileInfo) = 
         dprintfn "Analyzing %s" fsproj.Name
         notifyAnalyzeProject(fsproj)
         match ProjectCracker.crack(fsproj) with 
-        | Error(e) -> analyzedByProjectFile.[fsproj.FullName] <- Error(e)
+        | Error(e) -> addToCache(fsproj, BadOptions(e))
         | Ok(cracked) -> 
             // Ensure we've analyzed all dependencies
             // We'll need their target dlls to form FSharpProjectOptions
             for r in cracked.projectReferences do 
-                ensureAnalyzed(r)
-            // Populate source -> project cache
-            for s in cracked.sources do 
-                projectFileBySourceFile.[s.FullName] <- fsproj
+                ensureFsproj(r)
             // Convert to FSharpProjectOptions
             let options = {
                 ExtraProjectInfo = None 
@@ -59,8 +97,8 @@ type ProjectManager(client: ILanguageClient) =
                         // Reference output of other projects
                         for r in cracked.projectReferences do 
                             match analyzedByProjectFile.[r.FullName] with 
-                            | Error(_) -> () 
-                            | Ok(cracked, _) -> yield "-r:" + cracked.target.FullName
+                            | FsprojOptions(cracked, _) -> yield "-r:" + cracked.target.FullName
+                            | _ -> ()
                         // Reference packages
                         for r in cracked.packageReferences do 
                             yield "-r:" + r.FullName
@@ -70,8 +108,8 @@ type ProjectManager(client: ILanguageClient) =
                     [|
                         for r in cracked.projectReferences do 
                             match analyzedByProjectFile.[r.FullName] with 
-                            | Error(_) -> () 
-                            | Ok(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
+                            | FsprojOptions(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
+                            | _ -> ()
                     |]
                 SourceFiles = 
                     [|
@@ -83,31 +121,24 @@ type ProjectManager(client: ILanguageClient) =
                 UseScriptResolutionRules = false
             }
             // Cache inferred options
-            analyzedByProjectFile.[fsproj.FullName] <- Ok(cracked, options)
+            addToCache(fsproj, FsprojOptions(cracked, options))
             // Log what we inferred
-            // This is long but it's useful
-            dprintfn "FSharpProjectOptions: "
-            dprintfn "  ProjectFileName: %A" options.ProjectFileName
-            dprintfn "  SourceFiles: %A" options.SourceFiles
-            dprintfn "  ReferencedProjects: %A" [for dll, _ in options.ReferencedProjects do yield dll]
-            dprintfn "  OtherOptions: %A" options.OtherOptions
-            dprintfn "  LoadTime: %A" options.LoadTime
-            dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
-            dprintfn "  IsIncompleteTypeCheckEnvironment: %A" options.IsIncompleteTypeCheckEnvironment
-            dprintfn "  OriginalLoadReferences: %A" options.OriginalLoadReferences
-            dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
-            dprintfn "  Stamp: %A" options.Stamp
-            dprintfn "  UnresolvedReferences: %A" options.UnresolvedReferences
-            dprintfn "  UseScriptResolutionRules: %A" options.UseScriptResolutionRules
-    and ensureAnalyzed(fsproj: FileInfo) = 
+            printOptions(options)
+    and ensureFsproj(fsproj: FileInfo) = 
         // TODO detect loop by caching set of `currentlyAnalyzing` projects
         if not (analyzedByProjectFile.ContainsKey(fsproj.FullName)) then 
-            analyzeProject(fsproj)
+            analyzeFsproj(fsproj)
 
     // Analyze multiple projects, with a progress bar
-    let ensureAll(fsprojs: FileInfo list) = 
-        use progress = notifyStartAnalyzeProjects(List.length(fsprojs))
-        for f in fsprojs do ensureAnalyzed(f)
+    let ensureAll(fs: FileInfo list) = 
+        use progress = notifyStartAnalyzeProjects(List.length(fs))
+        for f in fs do 
+            if f.Name.EndsWith(".fsx") then 
+                analyzeFsx(f)
+            else if f.Name.EndsWith(".fsproj") then 
+                ensureFsproj(f)
+            else 
+                dprintfn "Don't know how to analyze project %s" f.Name
 
     // Re-analyze all projects
     let resetCaches() = 
@@ -118,26 +149,29 @@ type ProjectManager(client: ILanguageClient) =
         ensureAll(projects)
     member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> = 
         async {
-            let all = root.EnumerateFiles("*.fsproj", SearchOption.AllDirectories)
+            let all = [
+                for f in root.EnumerateFiles("*.fs*", SearchOption.AllDirectories) do 
+                    if f.Name.EndsWith(".fsx") || f.Name.EndsWith(".fsproj") then 
+                        yield f
+            ]
             ensureAll(List.ofSeq(all))
         }
-    member this.DeleteProjectFile(fsproj: FileInfo) = 
-        analyzedByProjectFile.Remove(fsproj.FullName) |> ignore
+    member this.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
+        analyzedByProjectFile.Remove(fsprojOrFsx.FullName) |> ignore
         resetCaches()
-    member this.UpdateProjectFile(fsproj: FileInfo) = 
+    member this.PutProjectFile(fsprojOrFsx: FileInfo) = 
         resetCaches()
-    member this.NewProjectFile(fsproj: FileInfo) = 
-        resetCaches()
-        ensureAll([fsproj])
+        ensureAll([fsprojOrFsx])
     member this.UpdateAssetsJson(assets: FileInfo) = 
         resetCaches()
-    member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, string> = 
+    member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> = 
         if projectFileBySourceFile.ContainsKey(sourceFile.FullName) then 
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
             match analyzedByProjectFile.[projectFile.FullName] with 
-            | Error(e) -> Error(e)
-            | Ok(_, options) -> Ok(options)
-        else Error(sprintf "No .fsproj file references %s" sourceFile.FullName)
+            | FsprojOptions(_, options) | FsxOptions(options, []) -> Ok(options)
+            | FsxOptions(_, errs) -> Error(Conversions.asDiagnostics(errs))
+            | BadOptions(message) -> Error([Conversions.errorAtTop(message)])
+        else Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
     // All open projects, in dependency order
     // Ancestor projects come before projects that depend on them
     member this.OpenProjects: FSharpProjectOptions list = 
@@ -146,11 +180,11 @@ type ProjectManager(client: ILanguageClient) =
         let rec walk(key: string) = 
             if touched.Add(key) then 
                 match analyzedByProjectFile.[key] with 
-                | Error(_) -> () 
-                | Ok(_, options) -> 
+                | FsprojOptions(_, options) | FsxOptions(options, []) -> 
                     for _, parent in options.ReferencedProjects do 
                         walk(parent.ProjectFileName)
                     result.Add(options)
+                | _ -> ()
         for key in analyzedByProjectFile.Keys do 
             walk(key)
         List.ofSeq(result)
@@ -160,14 +194,15 @@ type ProjectManager(client: ILanguageClient) =
         let result = new System.Collections.Generic.List<FSharpProjectOptions>()
         let rec walk(key: string) = 
             if touched.Add(key) then 
-                match analyzedByProjectFile.[key] with 
-                | Error(_) -> () 
-                | Ok(_, options) -> 
+                match analyzedByProjectFile.TryGetValue(key) with 
+                | true, FsprojOptions(_, options) | true, FsxOptions(options, _) -> 
                     for _, parent in options.ReferencedProjects do 
                         walk(parent.ProjectFileName)
                     result.Add(options)
+                | _, _ -> ()
         walk(projectFile.FullName)
         List.ofSeq(result)
+    // Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) = 
         match this.FindProjectOptions(fromSourceFile) with 
         | Error(_) -> false 

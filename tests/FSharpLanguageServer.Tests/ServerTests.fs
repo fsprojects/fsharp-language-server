@@ -170,7 +170,7 @@ let ``reference indirect dependency``() =
 let ``skip file not in project file``() = 
     let (client, server) = createServerAndReadFile("NotInFsproj.fs")
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("No .fsproj file")) messages) then Assert.Fail(sprintf "No 'Not in project' error in %A" messages)
+    if not (List.exists (fun (m:string) -> m.Contains("No .fsproj or .fsx file")) messages) then Assert.Fail(sprintf "No 'Not in project' error in %A" messages)
 
 [<Test>]
 let ``test findNamesUnderCursor``() = 
