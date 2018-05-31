@@ -4,10 +4,8 @@
         ".idea/": true,
         "node_modules/": true,
         "out/": true,
-        "src/**/bin/": true,
-        "src/**/obj/": true,
-        "tests/**/bin/": true,
-        "tests/**/obj/": true
+        "**/bin/": true,
+        "**/obj/": true
     },
     "fsharp.trace.server": "messages"
 }

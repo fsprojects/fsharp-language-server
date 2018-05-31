@@ -31,3 +31,10 @@ let ``crack a project file``() =
             Assert.Fail(sprintf "No IndirectDep.fsproj in %A" cracked.projectReferences)
         // Output dll
         Assert.AreEqual("MainProject.dll", cracked.target.Name)
+
+[<Test>]
+let ``crack script defaults``() = 
+    let cracked = ProjectCracker.scriptBase.Value 
+    let packages = [for f in cracked.packageReferences do yield f.Name]
+    if not(List.contains "FSharp.Core.dll" packages) then 
+        Assert.Fail(sprintf "No FSharp.Core.dll in %A" cracked.packageReferences)

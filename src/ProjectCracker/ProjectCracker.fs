@@ -49,6 +49,7 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
         let analyzer = manager.GetProject(fsproj.FullName)
         let compile = analyzer.Compile()
         // Get key items from build output
+        // TODO consider using checker.GetProjectOptionsFromCommandLineArgs
         let targets = compile.GetItems("IntermediateAssembly")
         let sources = compile.GetItems("Compile")
         let projectReferences = compile.GetItems("ProjectReference")
@@ -62,3 +63,12 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
             packageReferences=files(fsproj, packageReferences)
         })
     with e -> Error(e.Message)
+
+// Get the baseline options for an .fsx script
+// In theory this should be done by FSharpChecker.GetProjectOptionsFromScript,
+// but it appears to be broken on dotnet core: https://github.com/fsharp/FSharp.Compiler.Service/issues/847
+let scriptBase: Lazy<CrackedProject> = 
+    lazy 
+        match crack(FileInfo("/Users/georgefraser/Documents/fsharp-language-server/client/PseudoScript.fsproj")) with 
+        | Ok(options) -> options 
+        | Error(message) -> raise(Exception(sprintf "Failed to load PseudoScript.fsproj: %s" message))
