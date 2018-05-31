@@ -31,11 +31,13 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
     //   for ... do
     //     notifyAnalyzeProject(f)
     let notifyStartAnalyzeProjects(nFiles: int): IDisposable = 
-        client.CustomNotification("fsharp/startAnalyzeProjects", JsonValue.Number(decimal(nFiles)))
-        let notifyEnd() = client.CustomNotification("fsharp/endAnalyzeProjects", JsonValue.Null)
+        let message = JsonValue.Record [|   "title", JsonValue.String(sprintf "Analyze %d projects" nFiles )
+                                            "nFiles", JsonValue.Number(decimal(nFiles)) |]
+        client.CustomNotification("fsharp/startProgress", message)
+        let notifyEnd() = client.CustomNotification("fsharp/endProgress", JsonValue.Null)
         { new IDisposable with member this.Dispose() = notifyEnd() }
     let notifyAnalyzeProject(fsprojOrFsx: FileInfo) = 
-        client.CustomNotification("fsharp/analyzeProject", JsonValue.String(fsprojOrFsx.Name))
+        client.CustomNotification("fsharp/incrementProgress", JsonValue.String(fsprojOrFsx.Name))
 
     let printOptions(options: FSharpProjectOptions) = 
         // This is long but it's useful

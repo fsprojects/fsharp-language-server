@@ -251,13 +251,15 @@ type Server(client: ILanguageClient) =
     //     incrementCheckProgressBar(f)
     let createCheckProgressBar(nFiles: int): IDisposable = 
         if nFiles > 1 then 
-            client.CustomNotification("fsharp/startCheckFiles", JsonValue.Number(decimal(nFiles)))
-            let notifyEnd() = client.CustomNotification("fsharp/endCheckFiles", JsonValue.Null)
+            let message = JsonValue.Record [|   "title", JsonValue.String(sprintf "Check %d files" nFiles )
+                                                "nFiles", JsonValue.Number(decimal(nFiles)) |]
+            client.CustomNotification("fsharp/startProgress", message)
+            let notifyEnd() = client.CustomNotification("fsharp/endProgress", JsonValue.Null)
             { new IDisposable with member this.Dispose() = notifyEnd() }
         else 
             { new IDisposable with member this.Dispose() = () }
     let incrementCheckProgressBar(sourceFile: FileInfo) = 
-        client.CustomNotification("fsharp/checkFile", JsonValue.String(sourceFile.Name))
+        client.CustomNotification("fsharp/incrementProgress", JsonValue.String(sourceFile.Name))
 
     // When we first open a file, sometimes we need to check a lot of transitive dependencies
     // Create a progress bar telling the user what we're doing
