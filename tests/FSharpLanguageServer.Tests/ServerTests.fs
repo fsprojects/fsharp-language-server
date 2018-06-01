@@ -52,35 +52,43 @@ let createServer(): MockClient * ILanguageServer =
     let client = MockClient()
     let server = Server(client) :> ILanguageServer
     (client, server)
-
+    
+// TODO eliminate MainProject assumption
 let absPath(file: string): string = 
     Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; file|]
 
-let readFile(name: string): string * string = 
-    let file = absPath name
-    let fileText = File.ReadAllText(file)
-    (file, fileText)
-    
-let openFile(name: string): DidOpenTextDocumentParams = 
-    let (file, fileText) = readFile name
+let openFile(file: FileInfo): DidOpenTextDocumentParams = 
     {
         textDocument = 
             { 
-                uri=Uri(absPath file) 
+                uri=Uri(file.FullName) 
                 languageId="fsharp"
                 version=0
-                text=fileText
+                text=File.ReadAllText(file.FullName)
             }
     }
 
-let createServerAndReadFile(name: string): MockClient * ILanguageServer = 
-    let (client, server) = createServer()
-    let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
+let initializeServer(server: ILanguageServer, sampleRootPath: string, fileName: string) =
+    let file = FileInfo(Path.Combine(sampleRootPath, fileName))
     let sampleRootUri = Uri("file://" + sampleRootPath)
     server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> Async.RunSynchronously |> ignore
     server.Initialized() |> Async.RunSynchronously
-    server.DidOpenTextDocument(openFile name) |> Async.RunSynchronously
+    server.DidOpenTextDocument(openFile(file)) |> Async.RunSynchronously
+
+// TODO eliminate MainProject assumption
+let createServerAndReadFile(name: string): MockClient * ILanguageServer = 
+    let (client, server) = createServer()
+    let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
+    initializeServer(server, sampleRootPath, name)
     (client, server)
+
+[<Test>]
+let ``open a script file without errors``() = 
+    let (client, server) = createServer()
+    let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "Script"|]
+    initializeServer(server, sampleRootPath, "MainScript.fsx")
+    let diags = [for d in client.Diagnostics do yield! d.diagnostics]
+    if not(List.isEmpty(diags)) then Assert.Fail(sprintf "%A" diags)
 
 [<Test>]
 let ``report a type error when a file is opened``() = 

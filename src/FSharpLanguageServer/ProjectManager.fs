@@ -9,7 +9,6 @@ open System.Xml
 open LSP.Json
 open LSP.Json.JsonExtensions
 open LSP.Types
-open Microsoft.VisualBasic.CompilerServices
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open ProjectCracker
 
@@ -71,7 +70,19 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
     let analyzeFsx(fsx: FileInfo) = 
         dprintfn "Creating project options for script %s" fsx.Name
         let source = File.ReadAllText(fsx.FullName)
-        let options, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime) |> Async.RunSynchronously
+        let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
+        let defaults = ProjectCracker.scriptBase.Value 
+        let combinedOtherOptions = [|
+            for o in inferred.OtherOptions do 
+                yield o 
+            for p in defaults.packageReferences do 
+                // If a dll has already been included by GetProjectOptionsFromScript, skip it
+                let matchesName(path: string) = path.EndsWith(p.Name)
+                let alreadyIncluded = Array.exists matchesName inferred.OtherOptions
+                if not(alreadyIncluded) then
+                    yield "-r:" + p.FullName
+        |]
+        let options = {inferred with OtherOptions = combinedOtherOptions}
         printOptions(options)
         addToCache(fsx, FsxOptions(options, errors))
 

@@ -163,17 +163,6 @@ type Server(client: ILanguageClient) =
         else 
             reader.ReadLine()
 
-    let analyzeScriptOptions(file: FileInfo): Async<FSharpProjectOptions * Diagnostic list> = 
-        async {
-            dprintfn "Creating project options for script %s" file.Name
-            let source = File.ReadAllText(file.FullName)
-            let! options, errors = checker.GetProjectOptionsFromScript(file.FullName, source, file.LastWriteTime)
-            if not(List.isEmpty(errors)) then 
-                dprintfn "Encountered errors while analyzing script %s: %A" file.Name errors
-            dprintfn "Script %s has options %A" file.Name options
-            return options, asDiagnostics(errors)
-        }
-
     // Parse a file 
     let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> = 
         async {

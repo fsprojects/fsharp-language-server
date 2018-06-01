@@ -41,6 +41,17 @@ let ``find project file`` () =
     | Error(m) -> Assert.Fail(sprintf "%A" m)
     | Ok(f) -> if not(f.ProjectFileName.EndsWith "MainProject.fsproj") then Assert.Fail(sprintf "%A" f)
 
+[<Test>]
+let ``find script file`` () = 
+    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let root = Path.Combine [|projectRoot.FullName; "sample"; "Script"|] |> DirectoryInfo
+    Async.RunSynchronously(projects.AddWorkspaceRoot(root))
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "Script"; "LoadedByScript.fs"|])
+    let project = projects.FindProjectOptions(file)
+    match project with 
+    | Error(m) -> Assert.Fail(sprintf "%A" m)
+    | Ok(f) -> if not(f.ProjectFileName.EndsWith "MainScript.fsx.fsproj") then Assert.Fail(sprintf "%A" f)
+
 // [<Test>] TODO repair this somehow. Another build step?
 let ``find an local dll`` () = 
     let projects = ProjectManager(MockClient(), FSharpChecker.Create())
