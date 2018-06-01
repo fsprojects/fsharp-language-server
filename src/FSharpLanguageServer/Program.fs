@@ -587,8 +587,10 @@ type Server(client: ILanguageClient) =
                     dprintfn "Watched file %s %O" file.FullName change.``type``
                     if file.Name.EndsWith(".fsproj") || file.Name.EndsWith(".fsx") then 
                         match change.``type`` with 
-                        | FileChangeType.Created | FileChangeType.Changed ->
-                            projects.PutProjectFile(file)
+                        | FileChangeType.Created ->
+                            projects.NewProjectFile(file)
+                        | FileChangeType.Changed -> 
+                            projects.UpdateProjectFile(file)
                         | FileChangeType.Deleted ->
                             projects.DeleteProjectFile(file)
                     elif file.Name = "project.assets.json" then 
@@ -597,7 +599,7 @@ type Server(client: ILanguageClient) =
                 // In theory we could optimize this by only re-checking descendents of changed projects, 
                 // but in practice that will make little difference
                 for f in docs.OpenFiles() do 
-                    checkInBackground(f) 
+                    checkInBackground(f)
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {

@@ -14,8 +14,6 @@
 
   <ItemGroup>
     <PackageReference Include="FSharp.Compiler.Service" Version="22.0.3" />
-    <!-- Prevents warning, can probably be removed at some point -->
-    <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
   </ItemGroup>
 
   <ItemGroup>

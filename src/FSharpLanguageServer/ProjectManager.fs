@@ -15,7 +15,7 @@ open ProjectCracker
 type private ProjectOptions = 
 | FsprojOptions of CrackedProject * FSharpProjectOptions 
 | FsxOptions of FSharpProjectOptions * FSharpErrorInfo list 
-| BadOptions of string
+| BadOptions of string * DateTime
 
 // Maintains caches of parsed versions of .fsprojOrFsx files
 type ProjectManager(client: ILanguageClient, checker: FSharpChecker) = 
@@ -30,11 +30,13 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
     //   for ... do
     //     notifyAnalyzeProject(f)
     let notifyStartAnalyzeProjects(nFiles: int): IDisposable = 
-        let message = JsonValue.Record [|   "title", JsonValue.String(sprintf "Analyze %d projects" nFiles )
-                                            "nFiles", JsonValue.Number(decimal(nFiles)) |]
-        client.CustomNotification("fsharp/startProgress", message)
-        let notifyEnd() = client.CustomNotification("fsharp/endProgress", JsonValue.Null)
-        { new IDisposable with member this.Dispose() = notifyEnd() }
+        if nFiles > 1 then
+            let message = JsonValue.Record [|   "title", JsonValue.String(sprintf "Analyze %d projects" nFiles )
+                                                "nFiles", JsonValue.Number(decimal(nFiles)) |]
+            client.CustomNotification("fsharp/startProgress", message)
+            let notifyEnd() = client.CustomNotification("fsharp/endProgress", JsonValue.Null)
+            { new IDisposable with member this.Dispose() = notifyEnd() }
+        else { new IDisposable with member this.Dispose() = () }
     let notifyAnalyzeProject(fsprojOrFsx: FileInfo) = 
         client.CustomNotification("fsharp/incrementProgress", JsonValue.String(fsprojOrFsx.Name))
 
@@ -66,6 +68,51 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         for s in sources do 
             projectFileBySourceFile.[s] <- key
 
+    // All transitive deps of an .fsproj file, including itself
+    let transitiveDeps(projectFile: FileInfo) = 
+        let touched = new HashSet<String>()
+        let result = new System.Collections.Generic.List<FSharpProjectOptions>()
+        let rec walk(key: string) = 
+            if touched.Add(key) then 
+                match analyzedByProjectFile.TryGetValue(key) with 
+                | true, FsprojOptions(_, options) | true, FsxOptions(options, _) -> 
+                    for _, parent in options.ReferencedProjects do 
+                        walk(parent.ProjectFileName)
+                    result.Add(options)
+                | _, _ -> ()
+        walk(projectFile.FullName)
+        List.ofSeq(result)
+
+    // When was this .fsx, .fsproj or corresponding project.assets.json file modified?
+    // TODO use checksum instead of time
+    let lastModified(fsprojOrFsx: FileInfo) = 
+        let assets = FileInfo(Path.Combine(fsprojOrFsx.Directory.FullName, "project.assets.json"))
+        if assets.Exists then 
+            max fsprojOrFsx.LastWriteTime assets.LastWriteTime
+        else 
+            fsprojOrFsx.LastWriteTime
+
+    // Has this .fsproj or .fsx file or any of its transitive dependencies been modified?
+    let needsUpdate(fsprojOrFsx: FileInfo) = 
+        match analyzedByProjectFile.TryGetValue(fsprojOrFsx.FullName) with 
+        | false, _ -> true 
+        | _, FsprojOptions(_, options) -> 
+            let deps = transitiveDeps(fsprojOrFsx)
+            let modified = [for d in deps do yield lastModified(FileInfo(d.ProjectFileName))]
+            let lastModified = List.max(modified)
+            lastModified > options.LoadTime
+        | _, FsxOptions(options, _) -> 
+            lastModified(fsprojOrFsx) > options.LoadTime
+        | _, BadOptions(_, checkedTime) -> 
+            lastModified(fsprojOrFsx) > checkedTime
+
+    // What projects need to be updated?
+    let changedProjects() = 
+        [for fileName in analyzedByProjectFile.Keys do 
+            let file = FileInfo(fileName)
+            if needsUpdate(file) then 
+                yield file]
+
     // Analyze a script file and add it to the cache
     let analyzeFsx(fsx: FileInfo) = 
         dprintfn "Creating project options for script %s" fsx.Name
@@ -91,7 +138,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         dprintfn "Analyzing %s" fsproj.Name
         notifyAnalyzeProject(fsproj)
         match ProjectCracker.crack(fsproj) with 
-        | Error(e) -> addToCache(fsproj, BadOptions(e))
+        | Error(e) -> addToCache(fsproj, BadOptions(e, fsproj.LastWriteTime))
         | Ok(cracked) -> 
             // Ensure we've analyzed all dependencies
             // We'll need their target dlls to form FSharpProjectOptions
@@ -153,13 +200,6 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             else 
                 dprintfn "Don't know how to analyze project %s" f.Name
 
-    // Re-analyze all projects
-    let resetCaches() = 
-        let projects = [for f in analyzedByProjectFile.Keys do yield FileInfo(f)]
-        dprintfn "Re-analyze %A" [for p in projects do yield p.Name]
-        analyzedByProjectFile.Clear()
-        projectFileBySourceFile.Clear()
-        ensureAll(projects)
     member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> = 
         async {
             let all = [
@@ -171,19 +211,20 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         }
     member this.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
         analyzedByProjectFile.Remove(fsprojOrFsx.FullName) |> ignore
-        resetCaches()
-    member this.PutProjectFile(fsprojOrFsx: FileInfo) = 
-        resetCaches()
-        ensureAll([fsprojOrFsx])
+        ensureAll(changedProjects())
+    member this.NewProjectFile(fsprojOrFsx: FileInfo) = 
+        ensureAll(fsprojOrFsx::changedProjects())
+    member this.UpdateProjectFile(fsprojOrFsx: FileInfo) = 
+        ensureAll(changedProjects())
     member this.UpdateAssetsJson(assets: FileInfo) = 
-        resetCaches()
+        ensureAll(changedProjects())
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> = 
         if projectFileBySourceFile.ContainsKey(sourceFile.FullName) then 
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
             match analyzedByProjectFile.[projectFile.FullName] with 
             | FsprojOptions(_, options) | FsxOptions(options, []) -> Ok(options)
             | FsxOptions(_, errs) -> Error(Conversions.asDiagnostics(errs))
-            | BadOptions(message) -> Error([Conversions.errorAtTop(message)])
+            | BadOptions(message, _) -> Error([Conversions.errorAtTop(message)])
         else Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
     // All open projects, in dependency order
     // Ancestor projects come before projects that depend on them
@@ -203,18 +244,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         List.ofSeq(result)
     // All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
-        let touched = new HashSet<String>()
-        let result = new System.Collections.Generic.List<FSharpProjectOptions>()
-        let rec walk(key: string) = 
-            if touched.Add(key) then 
-                match analyzedByProjectFile.TryGetValue(key) with 
-                | true, FsprojOptions(_, options) | true, FsxOptions(options, _) -> 
-                    for _, parent in options.ReferencedProjects do 
-                        walk(parent.ProjectFileName)
-                    result.Add(options)
-                | _, _ -> ()
-        walk(projectFile.FullName)
-        List.ofSeq(result)
+        transitiveDeps(projectFile)
     // Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) = 
         match this.FindProjectOptions(fromSourceFile) with 
