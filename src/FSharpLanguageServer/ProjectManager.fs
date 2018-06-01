@@ -86,7 +86,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
     // When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) = 
-        let assets = FileInfo(Path.Combine(fsprojOrFsx.Directory.FullName, "project.assets.json"))
+        let assets = FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
         if assets.Exists then 
             max fsprojOrFsx.LastWriteTime assets.LastWriteTime
         else 
@@ -186,27 +186,25 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             printOptions(options)
     and ensureFsproj(fsproj: FileInfo) = 
         // TODO detect loop by caching set of `currentlyAnalyzing` projects
-        if not (analyzedByProjectFile.ContainsKey(fsproj.FullName)) then 
+        if needsUpdate(fsproj) then 
             analyzeFsproj(fsproj)
 
     // Analyze multiple projects, with a progress bar
-    let ensureAll(fs: FileInfo list) = 
+    let ensureAll(fs: FileInfo list) =
         use progress = notifyStartAnalyzeProjects(List.length(fs))
         for f in fs do 
             if f.Name.EndsWith(".fsx") then 
                 analyzeFsx(f)
-            else if f.Name.EndsWith(".fsproj") then 
+            elif f.Name.EndsWith(".fsproj") then 
                 ensureFsproj(f)
             else 
                 dprintfn "Don't know how to analyze project %s" f.Name
 
     member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> = 
         async {
-            let all = [
-                for f in root.EnumerateFiles("*.fs*", SearchOption.AllDirectories) do 
-                    if f.Name.EndsWith(".fsx") || f.Name.EndsWith(".fsproj") then 
-                        yield f
-            ]
+            let all = [for f in root.EnumerateFiles("*.fs*", SearchOption.AllDirectories) do 
+                        if f.Name.EndsWith(".fsx") || f.Name.EndsWith(".fsproj") then 
+                            yield f]
             ensureAll(List.ofSeq(all))
         }
     member this.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
@@ -222,7 +220,8 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         if projectFileBySourceFile.ContainsKey(sourceFile.FullName) then 
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
             match analyzedByProjectFile.[projectFile.FullName] with 
-            | FsprojOptions(_, options) | FsxOptions(options, []) -> Ok(options)
+            | FsprojOptions(_, options) 
+            | FsxOptions(options, []) -> Ok(options)
             | FsxOptions(_, errs) -> Error(Conversions.asDiagnostics(errs))
             | BadOptions(message, _) -> Error([Conversions.errorAtTop(message)])
         else Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
@@ -258,5 +257,5 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             // Otherwise, check if targetSourceFile is in the transitive dependencies of fromProjectOptions
             else
                 let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
-                let deps = this.TransitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))
+                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))
                 List.exists containsTarget deps

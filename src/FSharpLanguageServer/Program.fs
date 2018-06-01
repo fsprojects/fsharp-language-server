@@ -562,16 +562,14 @@ type Server(client: ILanguageClient) =
             async {
                 let targetUri = p.textDocument.uri
                 let targetFile = FileInfo(targetUri.LocalPath)
-                let todo = [
-                    for fromFile in docs.OpenFiles() do 
-                        if projects.IsVisible(targetFile, fromFile) then 
-                            yield fromFile
-                ]
+                let todo = [ for fromFile in docs.OpenFiles() do 
+                                if projects.IsVisible(targetFile, fromFile) then 
+                                    yield fromFile ]
                 use _ = createCheckProgressBar(List.length(todo))
-                for uri in todo do 
-                    let! check = forceCheckOpenFile(uri)
-                    publishErrors(uri, check)
-                    needsBackgroundCheck.TryRemove(uri.ToString()) |> ignore
+                for file in todo do 
+                    let! check = forceCheckOpenFile(file)
+                    publishErrors(file, check)
+                    needsBackgroundCheck.TryRemove(file.FullName) |> ignore
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
