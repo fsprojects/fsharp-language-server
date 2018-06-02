@@ -218,7 +218,7 @@ type Server(client: ILanguageClient) =
         }
     // Typecheck a file quickly and a little less accurately
     // If the file has never been checked before, this is the same as `checkOpenFile`
-    // If the file has been checked before, the previous check is returned, and a new check is queued
+    // If the file has been checked before, the previous check is returned, even if it's out-of-date
     let quickCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.Get(file) with 
@@ -233,65 +233,33 @@ type Server(client: ILanguageClient) =
                     return! forceCheckOpenFile(file)
         }
 
-    // When we check a long series of files, create a progress bar
-    // These functions should be called in a `use` block to ensure the progress bar is closed:
-    //   use createCheckProgressBar(n)
-    //   for ... do
-    //     incrementCheckProgressBar(f)
-    let createCheckProgressBar(nFiles: int): IDisposable = 
-        if nFiles > 1 then 
-            let message = JsonValue.Record [|   "title", JsonValue.String(sprintf "Check %d files" nFiles )
-                                                "nFiles", JsonValue.Number(decimal(nFiles)) |]
-            client.CustomNotification("fsharp/startProgress", message)
-            let notifyEnd() = client.CustomNotification("fsharp/endProgress", JsonValue.Null)
-            { new IDisposable with member this.Dispose() = notifyEnd() }
-        else 
-            { new IDisposable with member this.Dispose() = () }
-    let incrementCheckProgressBar(sourceFile: FileInfo) = 
-        client.CustomNotification("fsharp/incrementProgress", JsonValue.String(sourceFile.Name))
-
-    // When we first open a file, sometimes we need to check a lot of transitive dependencies
-    // Create a progress bar telling the user what we're doing
+    // When did we last check each file on disk?
     let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
-    let onOpen(goal: FileInfo): IDisposable = 
-        // Get all transitive dependencies in order
-        let projectOrder = 
-            match projects.FindProjectOptions(goal) with 
-            | Ok(projectOptions) -> projects.TransitiveDeps(FileInfo(projectOptions.ProjectFileName))
-            | Error(_) -> []
-        // Figure out how many files *actually* need to be checked in order to check `goal`
-        let mutable foundChanged = false
-        let mutable foundGoal = false
-        let needsRecompile = System.Collections.Generic.List<FileInfo>()
-        for p in projectOrder do
-            for fName in p.SourceFiles do 
-                let f = FileInfo(fName)
-                let isChecked, checkedTime = lastCheckedOnDisk.TryGetValue(f.FullName)
-                if f.FullName = goal.FullName then 
-                    foundGoal <- true
-                    needsRecompile.Add(f)
-                elif foundGoal then 
-                    ()
-                elif foundChanged then 
-                    needsRecompile.Add(f)
-                elif not(isChecked) then 
-                    dprintfn "%s needs to be checked because it has never been checked" f.Name 
-                    foundChanged <- true
-                    needsRecompile.Add(f)
-                elif f.LastWriteTime > checkedTime then 
-                    dprintfn "%s need to be checked because write-time %A > check-time %A" f.Name f.LastWriteTime.TimeOfDay checkedTime.TimeOfDay 
-                    foundChanged <- true
-                    needsRecompile.Add(f)
-        createCheckProgressBar(needsRecompile.Count)
-    let onCheckFile(sourceFile: FileInfo) = 
-        // Remember that we've checked this version of the file, 
-        // so that we can accurately calculate how many files we need to check in the future
-        lastCheckedOnDisk.[sourceFile.FullName] <- sourceFile.LastWriteTime
-        // Notify the client that the file is being checked
-        // If a progress bar is showing, it will be advanced
-        incrementCheckProgressBar(sourceFile)
     // TODO there might be a thread safety issue here---is this getting called from a separate thread?
-    let _ = checker.BeforeBackgroundFileCheck.Add(fun(file, _) -> onCheckFile(FileInfo(file)))
+    do checker.BeforeBackgroundFileCheck.Add(fun(fileName, _) -> 
+        let file = FileInfo(fileName)
+        lastCheckedOnDisk.[file.FullName] <- file.LastWriteTime)
+
+    // Figure out what files will be implicitly recompiled if we recompile `goal`
+    let needsRecompile(goal: FileInfo): List<FileInfo> = 
+        match projects.FindProjectOptions(goal) with 
+        | Ok(projectOptions) -> 
+            // Find all projects that goal depends on, including its own project
+            let projects = projects.TransitiveDeps(FileInfo(projectOptions.ProjectFileName))
+            // Take all files that lead up to goal, not including itself
+            let files = [for p in projects do 
+                            let sourceFiles = Array.map FileInfo p.SourceFiles
+                            let notGoal(f: FileInfo) = f.FullName <> goal.FullName
+                            yield! Array.takeWhile notGoal sourceFiles]
+            // Skip files until we find a modified file, then take all remaining files
+            let notModified(f: FileInfo) = 
+                match lastCheckedOnDisk.TryGetValue(f.FullName) with 
+                | true, lastChecked -> f.LastWriteTime <= lastChecked
+                | _, _ -> false
+            let modified = List.skipWhile notModified files
+            // `goal` should always be on the list
+            modified@[goal]
+        | Error(_) -> []
 
     // We keep track of files that have been invalidated by user edits,
     // and check them when the user stops doing things for 1 second
@@ -465,12 +433,12 @@ type Server(client: ILanguageClient) =
             let candidateNames = String.concat ", " [for _, file, _ in candidates do yield file.Name]
             dprintfn "Name %s appears in %s" symbol.DisplayName candidateNames
             // Check each candidate file
-            use _ = createCheckProgressBar(candidates.Length)
+            use progress = new ProgressBar(candidates.Length, sprintf "Search %d files" candidates.Length, client)
             let all = System.Collections.Generic.List<FSharpSymbolUse>()
             for projectOptions, sourceFile, sourceText in candidates do 
                 try
                     // Send a notification to the client updating the progress indicator
-                    incrementCheckProgressBar(sourceFile)
+                    progress.Increment(sourceFile)
                     
                     // Check file
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
@@ -541,8 +509,10 @@ type Server(client: ILanguageClient) =
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 // Store text in docs
                 docs.Open(p)
-                // Possibly create a progress bar
-                use _ = onOpen(file)
+                // Create a progress bar if #todo > 1
+                let todo = needsRecompile(file)
+                use progress = new ProgressBar(todo.Length, sprintf "Check %d files" todo.Length, client, todo.Length <= 1)
+                use increment = checker.BeforeBackgroundFileCheck.Subscribe(fun (fileName, _) -> progress.Increment(FileInfo(fileName)))
                 // Cancel any background check that is in-progress
                 cancelBackgroundCheck.Cancel()
                 do! doCheck(file)
@@ -560,13 +530,13 @@ type Server(client: ILanguageClient) =
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
-                let targetUri = p.textDocument.uri
-                let targetFile = FileInfo(targetUri.LocalPath)
+                let targetFile = FileInfo(p.textDocument.uri.LocalPath)
                 let todo = [ for fromFile in docs.OpenFiles() do 
                                 if projects.IsVisible(targetFile, fromFile) then 
                                     yield fromFile ]
-                use _ = createCheckProgressBar(List.length(todo))
+                use progress = new ProgressBar(todo.Length, sprintf "Check %d files" todo.Length, client, todo.Length <= 1)
                 for file in todo do 
+                    progress.Increment(file)
                     let! check = forceCheckOpenFile(file)
                     publishErrors(file, check)
                     needsBackgroundCheck.TryRemove(file.FullName) |> ignore

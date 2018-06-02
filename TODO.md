@@ -12,12 +12,9 @@
   - done
 
 # Cleanup
-Make progress message custom, only 1 progress message
 
 # Bugs
 - Autocompleting in strings
-- Files in unrelated projects are invalidating open files
-- .fsx scripts can contain .fs files via #load directives
 
 # Optimizations
 - Use .sln files to decide what .fsproj files to load

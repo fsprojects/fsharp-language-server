@@ -24,22 +24,6 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
     // Cache the result of project cracking
     let analyzedByProjectFile = new Dictionary<String, ProjectOptions>()
 
-    // When we analyze multiple project files, create a progress bar
-    // These functions should be called in a `use` block to ensure the progress bar is closed:
-    //   use notifyStartAnalyzeProjects(n)
-    //   for ... do
-    //     notifyAnalyzeProject(f)
-    let notifyStartAnalyzeProjects(nFiles: int): IDisposable = 
-        if nFiles > 1 then
-            let message = JsonValue.Record [|   "title", JsonValue.String(sprintf "Analyze %d projects" nFiles )
-                                                "nFiles", JsonValue.Number(decimal(nFiles)) |]
-            client.CustomNotification("fsharp/startProgress", message)
-            let notifyEnd() = client.CustomNotification("fsharp/endProgress", JsonValue.Null)
-            { new IDisposable with member this.Dispose() = notifyEnd() }
-        else { new IDisposable with member this.Dispose() = () }
-    let notifyAnalyzeProject(fsprojOrFsx: FileInfo) = 
-        client.CustomNotification("fsharp/incrementProgress", JsonValue.String(fsprojOrFsx.Name))
-
     let printOptions(options: FSharpProjectOptions) = 
         // This is long but it's useful
         dprintfn "%s: " options.ProjectFileName
@@ -133,65 +117,64 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         printOptions(options)
         addToCache(fsx, FsxOptions(options, errors))
 
-    // Analyze a project and add it to the cache
-    let rec analyzeFsproj(fsproj: FileInfo) = 
-        dprintfn "Analyzing %s" fsproj.Name
-        notifyAnalyzeProject(fsproj)
-        match ProjectCracker.crack(fsproj) with 
-        | Error(e) -> addToCache(fsproj, BadOptions(e, fsproj.LastWriteTime))
-        | Ok(cracked) -> 
-            // Ensure we've analyzed all dependencies
-            // We'll need their target dlls to form FSharpProjectOptions
-            for r in cracked.projectReferences do 
-                ensureFsproj(r)
-            // Convert to FSharpProjectOptions
-            let options = {
-                ExtraProjectInfo = None 
-                IsIncompleteTypeCheckEnvironment = false 
-                LoadTime = fsproj.LastWriteTime
-                OriginalLoadReferences = []
-                OtherOptions = 
-                    [|
-                        // Dotnet framework should be specified explicitly
-                        yield "--noframework"
-                        // Reference output of other projects
-                        for r in cracked.projectReferences do 
-                            match analyzedByProjectFile.[r.FullName] with 
-                            | FsprojOptions(cracked, _) -> yield "-r:" + cracked.target.FullName
-                            | _ -> ()
-                        // Reference packages
-                        for r in cracked.packageReferences do 
-                            yield "-r:" + r.FullName
-                    |]
-                ProjectFileName = fsproj.FullName 
-                ReferencedProjects = 
-                    [|
-                        for r in cracked.projectReferences do 
-                            match analyzedByProjectFile.[r.FullName] with 
-                            | FsprojOptions(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
-                            | _ -> ()
-                    |]
-                SourceFiles = 
-                    [|
-                        for f in cracked.sources do 
-                            yield f.FullName
-                    |]
-                Stamp = None 
-                UnresolvedReferences = None 
-                UseScriptResolutionRules = false
-            }
-            // Cache inferred options
-            addToCache(fsproj, FsprojOptions(cracked, options))
-            // Log what we inferred
-            printOptions(options)
-    and ensureFsproj(fsproj: FileInfo) = 
-        // TODO detect loop by caching set of `currentlyAnalyzing` projects
-        if needsUpdate(fsproj) then 
-            analyzeFsproj(fsproj)
-
     // Analyze multiple projects, with a progress bar
     let ensureAll(fs: FileInfo list) =
-        use progress = notifyStartAnalyzeProjects(List.length(fs))
+        use progress = new ProgressBar(fs.Length, sprintf "Analyze %d projects" fs.Length, client, fs.Length <= 1)
+        // Analyze a project and add it to the cache
+        let rec analyzeFsproj(fsproj: FileInfo) = 
+            dprintfn "Analyzing %s" fsproj.Name
+            progress.Increment(fsproj)
+            match ProjectCracker.crack(fsproj) with 
+            | Error(e) -> addToCache(fsproj, BadOptions(e, fsproj.LastWriteTime))
+            | Ok(cracked) -> 
+                // Ensure we've analyzed all dependencies
+                // We'll need their target dlls to form FSharpProjectOptions
+                for r in cracked.projectReferences do 
+                    ensureFsproj(r)
+                // Convert to FSharpProjectOptions
+                let options = {
+                    ExtraProjectInfo = None 
+                    IsIncompleteTypeCheckEnvironment = false 
+                    LoadTime = fsproj.LastWriteTime
+                    OriginalLoadReferences = []
+                    OtherOptions = 
+                        [|
+                            // Dotnet framework should be specified explicitly
+                            yield "--noframework"
+                            // Reference output of other projects
+                            for r in cracked.projectReferences do 
+                                match analyzedByProjectFile.[r.FullName] with 
+                                | FsprojOptions(cracked, _) -> yield "-r:" + cracked.target.FullName
+                                | _ -> ()
+                            // Reference packages
+                            for r in cracked.packageReferences do 
+                                yield "-r:" + r.FullName
+                        |]
+                    ProjectFileName = fsproj.FullName 
+                    ReferencedProjects = 
+                        [|
+                            for r in cracked.projectReferences do 
+                                match analyzedByProjectFile.[r.FullName] with 
+                                | FsprojOptions(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
+                                | _ -> ()
+                        |]
+                    SourceFiles = 
+                        [|
+                            for f in cracked.sources do 
+                                yield f.FullName
+                        |]
+                    Stamp = None 
+                    UnresolvedReferences = None 
+                    UseScriptResolutionRules = false
+                }
+                // Cache inferred options
+                addToCache(fsproj, FsprojOptions(cracked, options))
+                // Log what we inferred
+                printOptions(options)
+        and ensureFsproj(fsproj: FileInfo) = 
+            // TODO detect loop by caching set of `currentlyAnalyzing` projects
+            if needsUpdate(fsproj) then 
+                analyzeFsproj(fsproj)
         for f in fs do 
             if f.Name.EndsWith(".fsx") then 
                 analyzeFsx(f)

@@ -45,7 +45,7 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 ## How is this project different than [Ionide](https://github.com/ionide)?
 Ionide is a suite of F# plugins for VSCode; F# language server is analagous to the [FSAC](https://github.com/fsharp/FsAutoComplete) component. While FSAC is based on a custom JSON protocol; F#LS is based on the [language server protocol](https://microsoft.github.io/language-server-protocol/specification) standard. 
 
-The implementation is essentially a language-server-protocol wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/) and is heavily focused on performance. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
+The implementation is a thin wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/) and is heavily focused on performance. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
 
 ![Autocomplete warm](videos/LSP-vs-Ionide-Warm.gif)
 
