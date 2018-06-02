@@ -102,14 +102,14 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
         let defaults = ProjectCracker.scriptBase.Value 
         let combinedOtherOptions = [|
-            for o in inferred.OtherOptions do 
-                yield o 
             for p in defaults.packageReferences do 
-                // If a dll has already been included by GetProjectOptionsFromScript, skip it
-                let matchesName(path: string) = path.EndsWith(p.Name)
-                let alreadyIncluded = Array.exists matchesName inferred.OtherOptions
-                if not(alreadyIncluded) then
                     yield "-r:" + p.FullName
+            for o in inferred.OtherOptions do 
+                // If a dll is included by default, skip it
+                let matchesName(f: FileInfo) = o.EndsWith(f.Name)
+                let alreadyIncluded = List.exists matchesName defaults.packageReferences
+                if not(alreadyIncluded) then
+                    yield o 
         |]
         let options = {inferred with OtherOptions = combinedOtherOptions}
         printOptions(options)
