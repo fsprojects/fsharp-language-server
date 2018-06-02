@@ -77,14 +77,12 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             fsprojOrFsx.LastWriteTime
 
     // Has this .fsproj or .fsx file or any of its transitive dependencies been modified?
-    let needsUpdate(fsprojOrFsx: FileInfo) = 
+    let rec needsUpdate(fsprojOrFsx: FileInfo) = 
         match analyzedByProjectFile.TryGetValue(fsprojOrFsx.FullName) with 
         | false, _ -> true 
         | _, FsprojOptions(_, options) -> 
-            let deps = transitiveDeps(fsprojOrFsx)
-            let modified = [for d in deps do yield lastModified(FileInfo(d.ProjectFileName))]
-            let lastModified = List.max(modified)
-            lastModified > options.LoadTime
+            let deps = [for _, r in options.ReferencedProjects do yield FileInfo(r.ProjectFileName)]
+            fsprojOrFsx.LastWriteTime > options.LoadTime || List.exists needsUpdate deps
         | _, FsxOptions(options, _) -> 
             lastModified(fsprojOrFsx) > options.LoadTime
         | _, BadOptions(_, checkedTime) -> 
