@@ -99,7 +99,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
     let analyzeFsx(fsx: FileInfo) = 
         dprintfn "Creating project options for script %s" fsx.Name
         let source = File.ReadAllText(fsx.FullName)
-        let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
+        let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=true) |> Async.RunSynchronously
         let defaults = ProjectCracker.scriptBase.Value 
         let combinedOtherOptions = [|
             for p in defaults.packageReferences do 
