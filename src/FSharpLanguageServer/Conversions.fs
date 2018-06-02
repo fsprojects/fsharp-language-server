@@ -69,7 +69,7 @@ let asHover(FSharpToolTipText tips): Hover =
                 for e in elements do 
                     yield HighlightedString(e.MainDescription, "fsharp")
             | FSharpToolTipElement.CompositionError err -> 
-                yield PlainString(err)]
+                dprintfn "Error computing hover: %s" err]
     {contents=convert; range=None}
 
 // Convert an F# `FSharpToolTipText` to text
