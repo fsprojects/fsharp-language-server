@@ -15,33 +15,8 @@ open Conversions
 
 let private TODO() = raise (Exception "TODO")
 
-// Look for a fully qualified name leading up to the cursor
-// (exposed for testing)
-let findNamesUnderCursor(lineContent: string, character: int): string list = 
-    let r = Regex(@"(\w+|``[^`]+``)([\.?](\w+|``[^`]+``))*")
-    let ms = r.Matches(lineContent)
-    let overlaps(m: Match) = m.Index <= character && character <= m.Index + m.Length 
-    let found: Match list = [ for m in ms do if overlaps m then yield m ]
-    match found with 
-    | [] -> 
-        dprintfn "No identifiers at %d in line '%s'" character lineContent
-        [] 
-    | single::[] -> 
-        let r = Regex(@"(\w+|``[^`]+``)")
-        let ms = r.Matches(single.Value)
-        let result = [ for m in ms do 
-                            if single.Index + m.Index <= character then 
-                                if m.Value.StartsWith("``") then
-                                    yield m.Value.Substring(2, m.Value.Length - 4)
-                                else
-                                    yield m.Value ]
-        result
-    | multiple -> 
-        dprintfn "Line %s offset %d matched multiple groups %A" lineContent character multiple 
-        []
-
-// Look for a method call like foo.MyMethod() before the cursor
-// (exposed for testing)
+/// Look for a method call like foo.MyMethod() before the cursor
+/// (exposed for testing)
 let findMethodCallBeforeCursor(lineContent: string, cursor: int): int option = 
     let mutable found = -1
     let mutable parenDepth = 0
@@ -62,20 +37,7 @@ let findMethodCallBeforeCursor(lineContent: string, cursor: int): int option =
             None 
         else Some prefix.Length
 
-// Look for an identifier under the cursor and find the end of it
-let private findEndOfIdentifierUnderCursor(lineContent: string, cursor: int): int option = 
-    let r = Regex(@"\w+|``[^`]+``")
-    let ms = r.Matches(lineContent)
-    let overlaps(m: Match) = m.Index <= cursor && cursor <= m.Index + m.Length 
-    let found: Match list = [ for m in ms do if overlaps m then yield m ]
-    match found with 
-    | [] -> 
-        dprintfn "No identifier at %d in line %s" cursor lineContent
-        None
-    | m::_ -> 
-        Some(m.Index + m.Length)
-
-// Figure out the active parameter by counting ',' characters
+/// Figure out the active parameter by counting ',' characters
 let private countCommas(lineContent: string, endOfMethodName: int, cursor: int): int = 
     let mutable count = 0
     for i in endOfMethodName .. (min (cursor-1) lineContent.Length) do 
@@ -83,10 +45,10 @@ let private countCommas(lineContent: string, endOfMethodName: int, cursor: int):
             count <- count + 1
     count
 
-// Check if `candidate` contains all the characters of `find`, in-order, case-insensitive
-// Matches can be discontinuous if the letters of `find` match the first letters of words in `candidate`
-// For example, fb matches FooBar, but it doesn't match Foobar
-// (exposed for testing)
+/// Check if `candidate` contains all the characters of `find`, in-order, case-insensitive
+/// Matches can be discontinuous if the letters of `find` match the first letters of words in `candidate`
+/// For example, fb matches FooBar, but it doesn't match Foobar
+/// (exposed for testing)
 let matchesTitleCase(find: string, candidate: string): bool = 
     let mutable i = 0
     let lowerEquals(x, y) = 
@@ -108,11 +70,11 @@ let matchesTitleCase(find: string, candidate: string): bool =
         matched <- matched && (matchNextChar(f) || matchStartOfNextWord(f))
     matched
 
-// Check if an F# symbol matches a query typed by the user
+/// Check if an F# symbol matches a query typed by the user
 let private matchesQuery(query: string, candidate: string): bool = 
     matchesTitleCase(query, candidate)
 
-// Find the name of the namespace, type or module that contains `s`
+/// Find the name of the namespace, type or module that contains `s`
 let private containerName(s: FSharpSymbol): string option = 
     if s.FullName = s.DisplayName then 
         None
@@ -121,7 +83,7 @@ let private containerName(s: FSharpSymbol): string option =
     else 
         Some(s.FullName)
 
-// Find the first overload in `method` that is compatible with `activeParameter`
+/// Find the first overload in `method` that is compatible with `activeParameter`
 // TODO actually consider types
 let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGroupItem[]): int option = 
     let mutable result = -1 
@@ -130,7 +92,7 @@ let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGr
             result <- i 
     if result = -1 then None else Some result
 
-// Find all symbols in a parsed AST
+/// Find all symbols in a parsed AST
 let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
     [ for d in parse.GetNavigationItems().Declarations do 
         yield d.Declaration, None
@@ -142,14 +104,14 @@ type Server(client: ILanguageClient) =
     let checker = FSharpChecker.Create()
     let projects = ProjectManager(client, checker)
 
-    // Get a file from docs, or read it from disk
+    /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option = 
         match docs.GetText(file) with 
         | Some text -> Some(text)
         | None when file.Exists -> Some(File.ReadAllText(file.FullName))
         | None -> None
 
-    // Read a specific line from a file
+    /// Read a specific line from a file
     let lineContent(file: FileInfo, targetLine: int): string = 
         let text = getOrRead(file) |> Option.defaultValue ""
         let reader = new StringReader(text)
@@ -163,7 +125,7 @@ type Server(client: ILanguageClient) =
         else 
             reader.ReadLine()
 
-    // Parse a file 
+    /// Parse a file 
     let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> = 
         async {
             match projects.FindProjectOptions(file), getOrRead(file) with 
@@ -183,7 +145,7 @@ type Server(client: ILanguageClient) =
                     with e -> 
                         return Error(e.Message)
         }
-    // Typecheck a file, ignoring caches
+    /// Typecheck a file, ignoring caches
     let forceCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.Get(file) with 
@@ -199,7 +161,7 @@ type Server(client: ILanguageClient) =
                 | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
                 | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
         }
-    // Typecheck a file
+    /// Typecheck a file
     let checkOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.GetVersion(file) with 
@@ -216,9 +178,9 @@ type Server(client: ILanguageClient) =
                 | _ -> 
                     return! forceCheckOpenFile(file)
         }
-    // Typecheck a file quickly and a little less accurately
-    // If the file has never been checked before, this is the same as `checkOpenFile`
-    // If the file has been checked before, the previous check is returned, even if it's out-of-date
+    /// Typecheck a file quickly and a little less accurately
+    /// If the file has never been checked before, this is the same as `checkOpenFile`
+    /// If the file has been checked before, the previous check is returned, even if it's out-of-date
     let quickCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.Get(file) with 
@@ -233,14 +195,14 @@ type Server(client: ILanguageClient) =
                     return! forceCheckOpenFile(file)
         }
 
-    // When did we last check each file on disk?
+    /// When did we last check each file on disk?
     let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
     // TODO there might be a thread safety issue here---is this getting called from a separate thread?
     do checker.BeforeBackgroundFileCheck.Add(fun(fileName, _) -> 
         let file = FileInfo(fileName)
         lastCheckedOnDisk.[file.FullName] <- file.LastWriteTime)
 
-    // Figure out what files will be implicitly recompiled if we recompile `goal`
+    /// Figure out what files will be implicitly recompiled if we recompile `goal`
     let needsRecompile(goal: FileInfo): List<FileInfo> = 
         match projects.FindProjectOptions(goal) with 
         | Ok(projectOptions) -> 
@@ -261,12 +223,12 @@ type Server(client: ILanguageClient) =
             modified@[goal]
         | Error(_) -> []
 
-    // We keep track of files that have been invalidated by user edits,
-    // and check them when the user stops doing things for 1 second
+    /// We keep track of files that have been invalidated by user edits,
+    /// and check them when the user stops doing things for 1 second
     let needsBackgroundCheck = System.Collections.Concurrent.ConcurrentDictionary<string, FileInfo>()
-    // We need to be able to cancel this process if the user requests something in the middle of a backround check
+    /// We need to be able to cancel this process if the user requests something in the middle of a backround check
     let mutable cancelBackgroundCheck = new CancellationTokenSource()
-    // Check a file and send diagnostics to the client
+    /// Check a file and send diagnostics to the client
     let publishErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>) = 
         let errors = 
             match check with
@@ -279,7 +241,7 @@ type Server(client: ILanguageClient) =
             publishErrors(file, check)
             needsBackgroundCheck.TryRemove(file.FullName) |> ignore
         }
-    // Request that all URIs in `needsBackgroundCheck` be checked when the user stops doing things for 1 second
+    /// Request that all URIs in `needsBackgroundCheck` be checked when the user stops doing things for 1 second
     let requestBackgroundCheck(): unit = 
         cancelBackgroundCheck.Cancel()
         cancelBackgroundCheck <- new CancellationTokenSource()
@@ -288,41 +250,38 @@ type Server(client: ILanguageClient) =
             for file in needsBackgroundCheck.Values do 
                 do! doCheck(file)
         }, cancelBackgroundCheck.Token)
-    // Request that `uri` be checked when the user stops doing things for 1 second
+    /// Request that `uri` be checked when the user stops doing things for 1 second
     let checkInBackground(file: FileInfo): unit = 
         if needsBackgroundCheck.TryAdd(file.FullName, file) then 
             let name = FileInfo(file.FullName).Name
             dprintfn "Invalidated %s" name
         requestBackgroundCheck()
         
-    // Find the symbol at a position
+    /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
             let file = FileInfo(textDocument.uri.LocalPath)
             let! c = checkOpenFile(file)
-            match c with 
-            | Error(errors) -> 
+            let line = lineContent(file, position.line)
+            let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character - 1)
+            match c, maybeId with 
+            | Error(errors), _ -> 
                 dprintfn "Check failed, ignored %d errors" (List.length errors)
                 return None
-            | Ok(parseResult, checkResult) -> 
-                let line = lineContent(file, position.line)
-                match findEndOfIdentifierUnderCursor(line, position.character) with 
-                | None -> 
-                    dprintfn "No identifier at %d in line '%s'" position.character line 
-                    return None
-                | Some(endOfIdentifier) -> 
-                    dprintfn "Looking for symbol at %d in %s" (endOfIdentifier - 1) line
-                    let names = findNamesUnderCursor(line, endOfIdentifier - 1)
-                    let dotName = String.concat "." names
-                    dprintfn "Looking at symbol %s" dotName
-                    let! maybeSymbol = checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names)
-                    if maybeSymbol.IsNone then
-                        dprintfn "%s in line '%s' is not a symbol use" dotName line
-                    return maybeSymbol
+            | _, None -> 
+                dprintfn "No identifier at %d in line '%s'" position.character line 
+                return None
+            | Ok(parseResult, checkResult), Some(id, endOfIdentifier, _) -> 
+                dprintfn "Looking at symbol %s" id
+                let names = List.ofArray(id.Split('.'))
+                let! maybeSymbol = checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names)
+                if maybeSymbol.IsNone then
+                    dprintfn "%s in line '%s' is not a symbol use" id line
+                return maybeSymbol
         }
 
-    // Find the exact location of a symbol within a fully-qualified name
-    // For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`
+    /// Find the exact location of a symbol within a fully-qualified name.
+    /// For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`.
     let refineRenameRange(s: FSharpSymbol, file: FileInfo, range: Range.range): Range = 
         let uri = Uri("file://" + file.FullName)
         let line = range.End.Line - 1
@@ -338,7 +297,7 @@ type Server(client: ILanguageClient) =
                 start={line=line; character=find}
                 ``end``={line=line; character=find + s.DisplayName.Length}
             }
-    // Rename one usage of a symbol
+    /// Rename one usage of a symbol
     let renameTo(newName: string, file: FileInfo, usages: FSharpSymbolUse seq): TextDocumentEdit = 
         let uri = Uri("file://" + file.FullName)
         let version = docs.GetVersion(file) |> Option.defaultValue 0
@@ -348,8 +307,8 @@ type Server(client: ILanguageClient) =
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
-    // Quickly check if a file *might* contain a symbol matching query
     let symbolPattern = Regex(@"\w+")
+    /// Quickly check if a file *might* contain a symbol matching query
     let maybeMatchesQuery(query: string, file: FileInfo): string option = 
         match getOrRead(file) with 
         | None -> None 
@@ -371,7 +330,7 @@ type Server(client: ILanguageClient) =
             else 
                 None
 
-    // Find all uses of a symbol, across all open projects
+    /// Find all uses of a symbol, across all open projects
     let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
         async {
             // If the symbol is private or internal, we only need to scan 1 file or project
@@ -454,18 +413,18 @@ type Server(client: ILanguageClient) =
             return List.ofSeq(all)
         }
 
-    // Tell the user if we run out of memory
-    // TODO add a setting to increase max memory
+    /// Tell the user if we run out of memory
+    /// TODO add a setting to increase max memory
     let maxMemoryWarning() = 
         let message = sprintf "Reached max memory %d MB" checker.MaxMemory
         client.ShowMessage({``type``=MessageType.Warning; message=message})
     let _ = checker.MaxMemoryReached.Add(maxMemoryWarning)
 
-    // Remember the last completion list for ResolveCompletionItem
+    /// Remember the last completion list for ResolveCompletionItem
     let mutable lastCompletion: FSharpDeclarationListInfo option = None 
 
-    // Defer initialization operations until Initialized() is called,
-    // so that the client-side code int client/extension.ts starts running immediately
+    /// Defer initialization operations until Initialized() is called,
+    /// so that the client-side code int client/extension.ts starts running immediately
     let mutable deferredInitialize = async { () }
 
     interface ILanguageServer with 
@@ -581,7 +540,7 @@ type Server(client: ILanguageClient) =
                     return None
                 | Ok(parseResult, checkResult) -> 
                     let line = lineContent(file, p.position.line)
-                    let partialName: PartialLongName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
+                    let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                     let nameParts = partialName.QualifyingIdents@[partialName.PartialIdent]
                     dprintfn "Autocompleting %s" (String.concat "." nameParts)
                     let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
@@ -593,14 +552,19 @@ type Server(client: ILanguageClient) =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file)
-                match c with 
-                | Error errors -> 
+                let line = lineContent(file, p.position.line)
+                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character - 1)
+                match c, maybeId with 
+                | Error(errors), _ -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
-                | Ok(parseResult, checkResult) -> 
-                    let line = lineContent(file, p.position.line)
-                    let names = findNamesUnderCursor(line, p.position.character)
-                    let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, names, FSharpTokenTag.Identifier)
+                | _, None -> 
+                    dprintfn "No identifier at %s(%d, %d)" file.FullName p.position.line p.position.character
+                    return None
+                | Ok(parseResult, checkResult), Some(id, _, _) -> 
+                    dprintfn "Hover over %s" id
+                    let ids = List.ofArray(id.Split('.'))
+                    let! tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, ids, FSharpTokenTag.Identifier)
                     return Some(asHover(tips))
             }
         // Add documentation to a completion item
@@ -631,15 +595,20 @@ type Server(client: ILanguageClient) =
                         dprintfn "No method call in line %s" line 
                         return None
                     | Some endOfMethodName -> 
-                        let names = findNamesUnderCursor(line, endOfMethodName - 1)
-                        dprintfn "Looking for overloads of %s" (String.concat "." names)
-                        let! overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
-                        let signature(i: FSharpMethodGroupItem) = asSignatureInformation(overloads.MethodName, i)
-                        let sigs = Array.map signature overloads.Methods |> List.ofArray
-                        let activeParameter = countCommas(line, endOfMethodName, p.position.character)
-                        let activeDeclaration = findCompatibleOverload(activeParameter, overloads.Methods)
-                        dprintfn "Found %d overloads" overloads.Methods.Length
-                        return Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
+                        match QuickParse.GetCompleteIdentifierIsland false line (endOfMethodName - 1) with 
+                        | None -> 
+                            dprintfn "No identifier before column %d in %s" (endOfMethodName - 1) line
+                            return None 
+                        | Some(id, _, _) ->
+                            dprintfn "Looking for overloads of %s" id
+                            let names = List.ofArray(id.Split('.'))
+                            let! overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
+                            let signature(i: FSharpMethodGroupItem) = asSignatureInformation(overloads.MethodName, i)
+                            let sigs = Array.map signature overloads.Methods |> List.ofArray
+                            let activeParameter = countCommas(line, endOfMethodName, p.position.character)
+                            let activeDeclaration = findCompatibleOverload(activeParameter, overloads.Methods)
+                            dprintfn "Found %d overloads" overloads.Methods.Length
+                            return Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
             }
         member this.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> = 
             async {

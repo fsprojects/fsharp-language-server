@@ -73,7 +73,7 @@ let parseDiagnosticSeverity(i: int): DiagnosticSeverity =
 let parseMarkupKind(s: string): MarkupKind = 
     match s with 
     | "plaintext" -> MarkupKind.PlainText
-    | "markdown" -> MarkupKind.PlainText 
+    | "markdown" -> MarkupKind.Markdown 
     | _ -> raise(Exception(sprintf "%s is not a known MarkupKind" s))
 
 let private readOptions = 

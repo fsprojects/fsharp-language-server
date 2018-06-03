@@ -349,7 +349,7 @@ let ``parse maximal ResolveCompletionItem request`` () =
         "label": "foo",
         "kind": 1,
         "detail": "foo(): string",
-        "documentation": "Foo returns foo",
+        "documentation": {"kind":"markdown", "value":"Foo returns foo"},
         "sortText": "1/foo",
         "filterText": "foo",
         "insertText": "foo()",
@@ -381,7 +381,7 @@ let ``parse maximal ResolveCompletionItem request`` () =
             label = "foo"
             kind = Some CompletionItemKind.Text
             detail = Some "foo(): string" 
-            documentation = Some "Foo returns foo" 
+            documentation = Some({kind=MarkupKind.Markdown; value="Foo returns foo"})
             sortText = Some "1/foo" 
             filterText = Some "foo" 
             insertText = Some "foo()" 

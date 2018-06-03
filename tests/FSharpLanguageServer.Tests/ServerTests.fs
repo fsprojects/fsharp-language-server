@@ -160,38 +160,29 @@ let ``report a type error when a file is saved``() =
 let ``reference other file in same project``() = 
     let (client, server) = createServerAndReadFile("Reference.fs")
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Assert.Fail(sprintf "No type error in %A" messages)
+    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then 
+        Assert.Fail(sprintf "No type error in %A" messages)
 
 [<Test>]
 let ``reference another project``() = 
     let (client, server) = createServerAndReadFile("ReferenceDependsOn.fs")
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Assert.Fail(sprintf "No type error in %A" messages)
+    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then 
+        Assert.Fail(sprintf "No type error in %A" messages)
 
 [<Test>]
 let ``reference indirect dependency``() = 
     let (client, server) = createServerAndReadFile("ReferenceIndirectDep.fs")
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then Assert.Fail(sprintf "No type error in %A" messages)
+    if not (List.exists (fun (m:string) -> m.Contains("This expression was expected to have type")) messages) then 
+        Assert.Fail(sprintf "No type error in %A" messages)
 
 [<Test>]
 let ``skip file not in project file``() = 
     let (client, server) = createServerAndReadFile("NotInFsproj.fs")
     let messages = diagnosticMessages(client)
-    if not (List.exists (fun (m:string) -> m.Contains("No .fsproj or .fsx file")) messages) then Assert.Fail(sprintf "No 'Not in project' error in %A" messages)
-
-[<Test>]
-let ``test findNamesUnderCursor``() = 
-    let names = findNamesUnderCursor("foo", 2)
-    Assert.AreEqual(["foo"], names)
-    let names = findNamesUnderCursor("foo.bar", 6)
-    Assert.AreEqual(["foo"; "bar"], names)
-    let names = findNamesUnderCursor("let x = foo.bar", 14)
-    Assert.AreEqual(["foo"; "bar"], names)
-    let names = findNamesUnderCursor("let x = foo.bar", 10)
-    Assert.AreEqual(["foo"], names)
-    let names = findNamesUnderCursor("let x = ``foo bar``.bar", 22)
-    Assert.AreEqual(["foo bar"; "bar"], names)
+    if not (List.exists (fun (m:string) -> m.Contains("No .fsproj or .fsx file")) messages) then 
+        Assert.Fail(sprintf "No 'Not in project' error in %A" messages)
 
 [<Test>]
 let ``hover over function``() = 
@@ -212,7 +203,7 @@ let ``complete List members``() =
     let (client, server) = createServerAndReadFile("Completions.fs")
     match server.Completion(textDocumentPosition "Completions.fs" 2 10) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No completions")
-    | Some completions -> 
+    | Some(completions) -> 
         if List.isEmpty completions.items then Assert.Fail("Completion list is empty")
         let labels = List.map (fun (i:CompletionItem) -> i.label) completions.items 
         if not (List.contains "map" labels) then Assert.Fail(sprintf "List.map is not in %A" labels)
