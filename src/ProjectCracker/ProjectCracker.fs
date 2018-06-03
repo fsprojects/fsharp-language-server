@@ -16,17 +16,17 @@ open Microsoft.Build.Execution
 // Roslyn cracks .csproj files: https://github.com/dotnet/roslyn/blob/master/src/Workspaces/MSBuildTest/MSBuildWorkspaceTests.cs
 
 type CrackedProject = {
-    // ?.fsproj file that was cracked
+    /// ?.fsproj file that was cracked
     fsproj: FileInfo 
-    // ?.dll file built by this .fsproj file
-    // Dependent projects will reference this dll in fscArgs, like "-r:?.dll"
+    /// ?.dll file built by this .fsproj file
+    /// Dependent projects will reference this dll in fscArgs, like "-r:?.dll"
     target: FileInfo
-    // List of source files
-    // These are fsc args, but presented separately because that's how FSharpProjectOptions wants them
+    /// List of source files.
+    /// These are fsc args, but presented separately because that's how FSharpProjectOptions wants them.
     sources: FileInfo list
-    // .fsproj files on references projects 
+    /// .fsproj files on references projects 
     projectReferences: FileInfo list 
-    // .dlls
+    /// .dlls
     packageReferences: FileInfo list 
 }
 
@@ -37,7 +37,7 @@ let private files(fsproj: FileInfo, items: ProjectItemInstance seq) =
         let normalizePath = Path.GetFullPath(absolutePath)
         yield FileInfo(normalizePath) ]
 
-// Crack an .fsproj file by running the "Compile" target and asking MSBuild what to do
+/// Crack an .fsproj file by running the "Compile" target and asking MSBuild what to do
 let crack(fsproj: FileInfo): Result<CrackedProject, string> = 
     // Create an msbuild instance
     let options = new AnalyzerManagerOptions()
@@ -64,9 +64,9 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
         })
     with e -> Error(e.Message)
 
-// Get the baseline options for an .fsx script
-// In theory this should be done by FSharpChecker.GetProjectOptionsFromScript,
-// but it appears to be broken on dotnet core: https://github.com/fsharp/FSharp.Compiler.Service/issues/847
+/// Get the baseline options for an .fsx script
+/// In theory this should be done by FSharpChecker.GetProjectOptionsFromScript,
+/// but it appears to be broken on dotnet core: https://github.com/fsharp/FSharp.Compiler.Service/issues/847
 let scriptBase: Lazy<CrackedProject> = 
     lazy 
         match crack(FileInfo("/Users/georgefraser/Documents/fsharp-language-server/client/PseudoScript.fsproj")) with 

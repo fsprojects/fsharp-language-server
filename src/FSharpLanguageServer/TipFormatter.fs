@@ -83,7 +83,7 @@ let private find(xmlFile: FileInfo, memberName: string): CachedMember option =
         | false, _ -> None 
         | _, m -> Some(m)
 
-// Render complete documentation, including parameter and return information, for a member that has no overloads
+/// Render complete documentation, including parameter and return information, for a member that has no overloads
 let docComment(doc: FSharpXmlDoc): string option =
     match doc with
     | FSharpXmlDoc.None -> None
@@ -115,7 +115,7 @@ let docSummaryOnly(doc: FSharpXmlDoc): string option =
         | None -> None 
         | Some(m) -> m.summary
 
-// Render documentation for an overloaded member
+/// Render documentation for an overloaded member
 let private overloadComment(docs: FSharpXmlDoc list): string option = 
     let summaries = [
         for doc in docs do 
@@ -141,7 +141,7 @@ let private markup(s: string): MarkupContent =
         value=s
     }
 
-// Add documentation information to the inline help of autocomplete
+/// Add documentation information to the inline help of autocomplete
 let resolveDocs(item: CompletionItem, candidate: FSharpDeclarationListItem): Async<CompletionItem> = 
     async {
         let! FSharpToolTipText(xs) = candidate.DescriptionTextAsync

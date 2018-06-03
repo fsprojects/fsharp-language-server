@@ -35,9 +35,9 @@ module DocumentStoreUtils =
 open DocumentStoreUtils
 
 type DocumentStore() = 
-    // All open documents, organized by absolute path
+    /// All open documents, organized by absolute path
     let activeDocuments = new Dictionary<string, Version>()
-    // Replace a section of an open file
+    /// Replace a section of an open file
     let patch(doc: VersionedTextDocumentIdentifier, range: Range, text: string): unit = 
         let file = FileInfo(doc.uri.LocalPath)
         let existing = activeDocuments.[file.FullName]
@@ -45,7 +45,7 @@ type DocumentStore() =
         existing.text.Remove(startOffset, endOffset - startOffset) |> ignore
         existing.text.Insert(startOffset, text) |> ignore
         existing.version <- doc.version
-    // Replace the entire contents of an open file
+    /// Replace the entire contents of an open file
     let replace(doc: VersionedTextDocumentIdentifier, text: string): unit = 
         let file = FileInfo(doc.uri.LocalPath)
         let existing = activeDocuments.[file.FullName]

@@ -17,7 +17,7 @@ type private ProjectOptions =
 | FsxOptions of FSharpProjectOptions * FSharpErrorInfo list 
 | BadOptions of string * DateTime
 
-// Maintains caches of parsed versions of .fsprojOrFsx files
+/// Maintains caches of parsed versions of .fsprojOrFsx files
 type ProjectManager(client: ILanguageClient, checker: FSharpChecker) = 
     // Index mapping .fs source files to .fsprojOrFsx project files that reference them
     let projectFileBySourceFile = new Dictionary<String, FileInfo>()
@@ -52,7 +52,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         for s in sources do 
             projectFileBySourceFile.[s] <- key
 
-    // All transitive deps of an .fsproj file, including itself
+    /// All transitive deps of an .fsproj file, including itself
     let transitiveDeps(projectFile: FileInfo) = 
         let touched = new HashSet<String>()
         let result = new System.Collections.Generic.List<FSharpProjectOptions>()
@@ -67,7 +67,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         walk(projectFile.FullName)
         List.ofSeq(result)
 
-    // When was this .fsx, .fsproj or corresponding project.assets.json file modified?
+    /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) = 
         let assets = FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
@@ -76,7 +76,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         else 
             fsprojOrFsx.LastWriteTime
 
-    // Has this .fsproj or .fsx file or any of its transitive dependencies been modified?
+    /// Has this .fsproj or .fsx file or any of its transitive dependencies been modified?
     let rec needsUpdate(fsprojOrFsx: FileInfo) = 
         match analyzedByProjectFile.TryGetValue(fsprojOrFsx.FullName) with 
         | false, _ -> true 
@@ -88,14 +88,14 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         | _, BadOptions(_, checkedTime) -> 
             lastModified(fsprojOrFsx) > checkedTime
 
-    // What projects need to be updated?
+    /// What projects need to be updated?
     let changedProjects() = 
         [for fileName in analyzedByProjectFile.Keys do 
             let file = FileInfo(fileName)
             if needsUpdate(file) then 
                 yield file]
 
-    // Analyze a script file and add it to the cache
+    /// Analyze a script file and add it to the cache
     let analyzeFsx(fsx: FileInfo) = 
         dprintfn "Creating project options for script %s" fsx.Name
         let source = File.ReadAllText(fsx.FullName)
@@ -116,10 +116,9 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         printOptions(options)
         addToCache(fsx, FsxOptions(options, errors))
 
-    // Analyze multiple projects, with a progress bar
     let ensureAll(fs: FileInfo list) =
         use progress = new ProgressBar(fs.Length, sprintf "Analyze %d projects" fs.Length, client, fs.Length <= 1)
-        // Analyze a project and add it to the cache
+        /// Analyze a project and add it to the cache
         let rec analyzeFsproj(fsproj: FileInfo) = 
             dprintfn "Analyzing %s" fsproj.Name
             progress.Increment(fsproj)
@@ -207,8 +206,8 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             | FsxOptions(_, errs) -> Error(Conversions.asDiagnostics(errs))
             | BadOptions(message, _) -> Error([Conversions.errorAtTop(message)])
         else Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
-    // All open projects, in dependency order
-    // Ancestor projects come before projects that depend on them
+    /// All open projects, in dependency order
+    /// Ancestor projects come before projects that depend on them
     member this.OpenProjects: FSharpProjectOptions list = 
         let touched = new HashSet<String>()
         let result = new System.Collections.Generic.List<FSharpProjectOptions>()
@@ -223,10 +222,10 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         for key in analyzedByProjectFile.Keys do 
             walk(key)
         List.ofSeq(result)
-    // All transitive dependencies of `projectFile`, in dependency order
+    //// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
         transitiveDeps(projectFile)
-    // Is `targetSourceFile` visible from `fromSourceFile`?
+    /// Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) = 
         match this.FindProjectOptions(fromSourceFile) with 
         | Error(_) -> false 
