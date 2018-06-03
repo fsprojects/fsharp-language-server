@@ -3,7 +3,7 @@ module LSP.ParserTests
 open Types
 open System
 open Parser
-open LSP.Json
+open FSharp.Data
 open NUnit.Framework
 
 [<SetUp>]

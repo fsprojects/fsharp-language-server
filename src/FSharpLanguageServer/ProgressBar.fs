@@ -4,7 +4,7 @@ open System
 open System.IO
 open LSP
 open LSP.Types
-open LSP.Json
+open FSharp.Data
 
 /// When we check a long series of files, create a progress bar
 type ProgressBar(nFiles: int, title: string, client: ILanguageClient, ?hide: bool) = 

@@ -2,7 +2,7 @@ module LSP.JsonTests
 
 open System
 open System.Text.RegularExpressions
-open LSP.Json
+open FSharp.Data
 open LSP.Json.Ser
 open NUnit.Framework
 
@@ -127,37 +127,66 @@ let ``serialize an interface with a custom writer`` () =
     let found = serializerFactory<MyFoo> options example
     Assert.AreEqual("\"foo\"", found)
 
+type SimpleTypes = {
+    b: bool 
+    i: int 
+    c: char 
+    s: string 
+    webUri: Uri  
+    fileUri: Uri 
+}
+
 [<Test>]
 let ``deserialize simple types`` () = 
+    let sample = """
+    {
+        "b": true,
+        "i": 1,
+        "c": "x",
+        "s": "foo",
+        "webUri": "https://github.com",
+        "fileUri": "file:///d%3A/foo.txt"
+    }"""
     let options = defaultJsonReadOptions
-    let found = deserializerFactory<bool> options (JsonValue.Parse "true")
-    Assert.AreEqual(true, found)
-    let found = deserializerFactory<int> options (JsonValue.Parse "1")
-    Assert.AreEqual(1, found)
-    let found = deserializerFactory<char> options (JsonValue.Parse "\"x\"")
-    Assert.AreEqual('x', found)
-    let found = deserializerFactory<string> options (JsonValue.Parse "\"foo\"")
-    Assert.AreEqual("foo", found)
-    let found = deserializerFactory<Uri> options (JsonValue.Parse "\"https://github.com\"")
-    Assert.AreEqual(Uri("https://github.com"), found)
-    let found = deserializerFactory<Uri> options (JsonValue.Parse "\"file:///d%3A/foo.txt\"")
-    Assert.AreEqual(Uri("file:///d:/foo.txt"), found)
+    let found = deserializerFactory<SimpleTypes> options (JsonValue.Parse sample)
+    Assert.AreEqual(true, found.b)
+    Assert.AreEqual(1, found.i)
+    Assert.AreEqual('x', found.c)
+    Assert.AreEqual("foo", found.s)
+    Assert.AreEqual(Uri("https://github.com"), found.webUri)
+    Assert.AreEqual(Uri("file:///d:/foo.txt"), found.fileUri)
 
-type TestSimpleRead = {
+type NestedField = {
     oneField: int
+}
+
+type ComplexTypes = {
+    nested: NestedField
+    intList: int list 
+    stringAsInt: int 
+    intOptionPresent: int option 
+    intOptionAbsent: int option 
 }
 
 [<Test>]
 let ``deserialize complex types`` () = 
+    let sample = """
+    {
+        "nested": {
+            "oneField": 1
+        },
+        "intList": [1],
+        "stringAsInt": "1",
+        "intOptionPresent": 1,
+        "intOptionAbsent": null
+    }"""
     let options = defaultJsonReadOptions
-    let found = deserializerFactory<TestSimpleRead> options (JsonValue.Parse """{"oneField":1}""")
-    Assert.AreEqual({oneField=1}, found)
-    let found = deserializerFactory<int list> options (JsonValue.Parse """[1]""")
-    Assert.AreEqual([1], found)
-    let found = deserializerFactory<int option> options (JsonValue.Parse """1""")
-    Assert.AreEqual(Some 1, found)
-    let found = deserializerFactory<int option> options (JsonValue.Parse """null""")
-    Assert.AreEqual(None, found)
+    let found = deserializerFactory<ComplexTypes> options (JsonValue.Parse sample)
+    Assert.AreEqual({oneField=1}, found.nested)
+    Assert.AreEqual(1, found.stringAsInt)
+    Assert.AreEqual([1], found.intList)
+    Assert.AreEqual(Some 1, found.intOptionPresent)
+    Assert.AreEqual(None, found.intOptionAbsent)
 
 type TestOptionalRead = {
     optionField: int option
@@ -191,8 +220,12 @@ let deserializeTestEnum(i: int) =
     | 1 -> One  
     | 2 -> Two
 
+type ContainsEnum = {
+    e: TestEnum
+}
+
 [<Test>]
 let ``deserialize enum`` () = 
     let options = { defaultJsonReadOptions with customReaders = [deserializeTestEnum]}
-    let found = deserializerFactory<TestEnum> options (JsonValue.Parse """1""")
-    Assert.AreEqual(One, found)
+    let found = deserializerFactory<ContainsEnum> options (JsonValue.Parse """{"e":1}""")
+    Assert.AreEqual(One, found.e)

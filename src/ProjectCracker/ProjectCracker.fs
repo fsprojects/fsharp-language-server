@@ -5,7 +5,7 @@ open System
 open System.IO
 open Buildalyzer
 open System.Xml
-open LSP.Json
+open FSharp.Data
 open LSP.Json.Ser
 open Microsoft.Build.Framework
 open Microsoft.Build.Logging

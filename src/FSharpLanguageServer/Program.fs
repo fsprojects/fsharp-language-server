@@ -9,8 +9,8 @@ open System.Text.RegularExpressions
 open System.Threading
 open LSP
 open LSP.Types
-open LSP.Json
-open LSP.Json.JsonExtensions
+open FSharp.Data
+open FSharp.Data.JsonExtensions
 open Conversions
 
 let private TODO() = raise (Exception "TODO")

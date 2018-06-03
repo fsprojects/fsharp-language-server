@@ -6,8 +6,8 @@ open System.IO
 open System.Collections.Generic
 open System.Net
 open System.Xml
-open LSP.Json
-open LSP.Json.JsonExtensions
+open FSharp.Data
+open FSharp.Data.JsonExtensions
 open LSP.Types
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open ProjectCracker

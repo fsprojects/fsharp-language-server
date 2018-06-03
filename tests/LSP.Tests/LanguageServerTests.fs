@@ -3,7 +3,7 @@ module LSP.LanguageServerTests
 open System
 open System.IO 
 open System.Text
-open LSP.Json
+open FSharp.Data
 open LSP.Types
 open NUnit.Framework
 

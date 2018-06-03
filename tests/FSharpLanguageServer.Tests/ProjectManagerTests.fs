@@ -8,7 +8,7 @@ open System
 open System.IO
 open NUnit.Framework
 open LSP.Types 
-open LSP.Json
+open FSharp.Data
 
 type MockClient() = 
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()

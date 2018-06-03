@@ -2,8 +2,8 @@ module LSP.Parser
 
 open LSP.Log
 open System
-open LSP.Json
-open LSP.Json.JsonExtensions
+open FSharp.Data
+open FSharp.Data.JsonExtensions
 open LSP.Json.Ser
 open Types
 

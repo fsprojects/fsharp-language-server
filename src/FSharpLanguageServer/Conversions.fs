@@ -5,7 +5,7 @@ open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
 open LSP.Types
-open LSP.Json
+open FSharp.Data
 
 // Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpErrorInfo): Range = 

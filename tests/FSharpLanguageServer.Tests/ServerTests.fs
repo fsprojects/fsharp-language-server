@@ -11,7 +11,7 @@ open NUnit.Framework
 open LSP.Types
 open LSP
 open LSP.Log
-open LSP.Json
+open FSharp.Data
 
 [<SetUp>]
 let setup() = 

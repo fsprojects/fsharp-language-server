@@ -6,7 +6,7 @@ open System.Threading
 open System.Threading.Tasks
 open System.IO
 open System.Text
-open LSP.Json
+open FSharp.Data
 open Types 
 open LSP.Json.Ser
 open JsonExtensions
