@@ -82,7 +82,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         | false, _ -> true 
         | _, FsprojOptions(_, options) -> 
             let deps = [for _, r in options.ReferencedProjects do yield FileInfo(r.ProjectFileName)]
-            fsprojOrFsx.LastWriteTime > options.LoadTime || List.exists needsUpdate deps
+            lastModified(fsprojOrFsx) > options.LoadTime || List.exists needsUpdate deps
         | _, FsxOptions(options, _) -> 
             lastModified(fsprojOrFsx) > options.LoadTime
         | _, BadOptions(_, checkedTime) -> 
@@ -105,6 +105,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             for p in defaults.packageReferences do 
                     yield "-r:" + p.FullName
             for o in inferred.OtherOptions do 
+                // TODO is this still needed with assumeDotNetFramework=true?
                 // If a dll is included by default, skip it
                 let matchesName(f: FileInfo) = o.EndsWith(f.Name)
                 let alreadyIncluded = List.exists matchesName defaults.packageReferences
