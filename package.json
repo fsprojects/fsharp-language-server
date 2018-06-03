@@ -1,76 +1,78 @@
 {
-	"name": "fsharp-language-server",
-	"description": "F# Language Support using FSharp Compiler Services",
-	"author": "George Fraser",
-	"license": "MIT",
-	"version": "0.0.1",
-	"publisher": "georgewfraser",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/georgewfraser/fsharp-language-server"
-	},
-	"engines": {
-		"vscode": "^1.21.0"
-	},
-	"categories": [
-		"Programming Languages",
-		"Linters"
-	],
-	"activationEvents": [
-		"onLanguage:fsharp"
-	],
-	"main": "./out/client/extension",
-	"files": [
-		"./client/PseudoScript.fsproj",
-		"./client/PseudoScriptSource.fs",
-		"./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/osx.10.11-x64/publish",
-		"./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/win10-x64/publish"
-	],
-	"contributes": {
-		"languages": [
-			{
-				"id": "fsharp",
-				"aliases": [
-					"F#",
-					"FSharp"
-				],
-				"extensions": [
-					".fs",
-					".fsi"
-				]
-			}
-		],
-		"configuration": {
-			"type": "object",
-			"title": "FSharp configuration",
-			"properties": {
-				"fsharp.trace.server": {
-					"scope": "window",
-					"type": "string",
-					"enum": [
-						"off",
-						"messages",
-						"verbose"
-					],
-					"default": "off",
-					"description": "Traces the communication between VSCode and the language server."
-				}
-			}
-		}
-	},
-	"scripts": {
-		"vscode:prepublish": "npm run compile",
-		"compile": "tsc -p ./",
-		"watch": "tsc -watch -p ./",
-		"postinstall": "node ./node_modules/vscode/bin/install",
-		"test": "npm run compile && node ./node_modules/vscode/bin/test"
-	},
-	"dependencies": {
-		"vscode-languageclient": "^4.1.4"
-	},
-	"devDependencies": {
-		"@types/node": "^8.10.17",
-		"typescript": "^2.6.1",
-		"vscode": "^1.1.18"
-	}
+    "name": "fsharp-language-server",
+    "description": "F# Language Support using FSharp Compiler Services",
+    "author": "George Fraser",
+    "license": "MIT",
+    "icon": "Icon512.png",
+    "version": "0.1.1",
+    "preview": true,
+    "publisher": "georgewfraser",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/georgewfraser/fsharp-language-server"
+    },
+    "engines": {
+        "vscode": "^1.21.0"
+    },
+    "categories": [
+        "Programming Languages",
+        "Linters"
+    ],
+    "activationEvents": [
+        "onLanguage:fsharp"
+    ],
+    "main": "./out/client/extension",
+    "files": [
+        "./client/PseudoScript.fsproj",
+        "./client/PseudoScriptSource.fs",
+        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/osx.10.11-x64/publish",
+        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/win10-x64/publish"
+    ],
+    "contributes": {
+        "languages": [
+            {
+                "id": "fsharp",
+                "aliases": [
+                    "F#",
+                    "FSharp"
+                ],
+                "extensions": [
+                    ".fs",
+                    ".fsi"
+                ]
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "FSharp configuration",
+            "properties": {
+                "fsharp.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VSCode and the language server."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "postinstall": "node ./node_modules/vscode/bin/install",
+        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^4.1.4"
+    },
+    "devDependencies": {
+        "@types/node": "^8.10.17",
+        "typescript": "^2.6.1",
+        "vscode": "^1.1.18"
+    }
 }
