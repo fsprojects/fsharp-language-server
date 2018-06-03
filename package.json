@@ -1,5 +1,6 @@
 {
     "name": "fsharp-language-server",
+    "displayName": "F# Language Server",
     "description": "F# Language Support using FSharp Compiler Services",
     "author": "George Fraser",
     "license": "MIT",
