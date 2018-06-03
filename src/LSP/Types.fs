@@ -541,7 +541,8 @@ type CompletionList = {
 }
 
 type MarkedString = 
-| HighlightedString of value: string * language: string 
+| HighlightedString of value: string * language: string
+// TODO this is very misnamed, this is actually markdown 
 | PlainString of string
 
 let writeMarkedString(s: MarkedString): JsonValue = 

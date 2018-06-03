@@ -84,7 +84,7 @@ let private find(xmlFile: FileInfo, memberName: string): CachedMember option =
         | _, m -> Some(m)
 
 // Render complete documentation, including parameter and return information, for a member that has no overloads
-let private docComment(doc: FSharpXmlDoc): string option =
+let docComment(doc: FSharpXmlDoc): string option =
     match doc with
     | FSharpXmlDoc.None -> None
     | FSharpXmlDoc.Text(s) -> Some(s)
@@ -94,16 +94,26 @@ let private docComment(doc: FSharpXmlDoc): string option =
         | None -> None 
         | Some(m) -> 
             let lines = [
-                if m.summary.IsSome then 
+                if m.summary.IsSome && m.summary.Value.Length > 0 then 
                     yield m.summary.Value
                 for name, desc in m.parameters do 
                     yield sprintf "**%s** %s" name desc 
-                if m.returns.IsSome then 
+                if m.returns.IsSome && m.returns.Value.Length > 0 then 
                     yield sprintf "**returns** %s" m.returns.Value
                 for name, desc in m.exceptions do 
                     yield sprintf "**exception** `%s` %s" name desc ]
             let comment = String.concat "\n\n" lines
             Some(comment)
+
+let docSummaryOnly(doc: FSharpXmlDoc): string option = 
+    match doc with
+    | FSharpXmlDoc.None -> None
+    | FSharpXmlDoc.Text(s) -> Some(s)
+    | FSharpXmlDoc.XmlDocFileSignature(dllPath, memberName) ->
+        let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
+        match find(xmlFile, memberName) with 
+        | None -> None 
+        | Some(m) -> m.summary
 
 // Render documentation for an overloaded member
 let private overloadComment(docs: FSharpXmlDoc list): string option = 

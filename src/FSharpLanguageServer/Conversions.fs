@@ -61,16 +61,29 @@ let asDiagnostics(errors: FSharpErrorInfo seq): Diagnostic list =
 
 // Convert an F# `FSharpToolTipElement` to an LSP `Hover`
 let asHover(FSharpToolTipText tips): Hover = 
-    let convert = 
+    let elements = 
         [ for t in tips do
             match t with 
+            | FSharpToolTipElement.CompositionError(e) -> dprintfn "Error rendering tooltip: %s" e
             | FSharpToolTipElement.None -> () 
             | FSharpToolTipElement.Group elements -> 
-                for e in elements do 
+                yield! elements ]
+    let contents = 
+        match elements with 
+        | [] -> []
+        | [one] -> 
+            [   yield HighlightedString(one.MainDescription, "fsharp") 
+                match TipFormatter.docComment(one.XmlDoc) with 
+                | None -> ()
+                | Some(markdown) -> yield PlainString(markdown) ]
+        | many -> 
+            let last = List.last(many)
+            [   for e in many do 
                     yield HighlightedString(e.MainDescription, "fsharp")
-            | FSharpToolTipElement.CompositionError err -> 
-                dprintfn "Error computing hover: %s" err]
-    {contents=convert; range=None}
+                match TipFormatter.docSummaryOnly(last.XmlDoc) with 
+                | None -> ()
+                | Some(markdown) -> yield PlainString(markdown) ]
+    {contents=contents; range=None}
 
 // Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
 let private asCompletionItemKind(k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
