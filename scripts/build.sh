@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Installs locally
-# You will need java, maven, vsce, and visual studio code to run this script
+# Builds the plugin as build.vsix
+# You will need dotnet core and vsce to run this script
 set -e
 
 # Needed once

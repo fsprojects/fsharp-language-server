@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Build the test projects and run all tests
+
 echo 'Building sample projects, there will be errors...'
 dotnet build sample/MainProject/MainProject.fsproj
 dotnet build sample/HasLocalDll/HasLocalDll.fsproj
