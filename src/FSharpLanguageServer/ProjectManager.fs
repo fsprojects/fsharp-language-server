@@ -133,7 +133,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
                 let options = {
                     ExtraProjectInfo = None 
                     IsIncompleteTypeCheckEnvironment = false 
-                    LoadTime = fsproj.LastWriteTime
+                    LoadTime = lastModified(fsproj)
                     OriginalLoadReferences = []
                     OtherOptions = 
                         [|
