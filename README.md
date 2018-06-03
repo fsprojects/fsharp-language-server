@@ -33,9 +33,8 @@ This project is an implementation of the [language server protocol](https://micr
 ## Code structure
 The language server protocol (LSP) is very similar to the API defined by the F# compiler service (FCS); most of the implementation is devoted to translating between the types used by FCS and the JSON representation of LSP.
 
-- src/LSP.Json: Forked from FSharp.Data to work around https://github.com/Microsoft/visualfsharp/issues/3303
 - src/LSP: Server-side implementation of [language server protocol](https://microsoft.github.io/language-server-protocol/specification)
-- src/ProjectCracker: Figures out [F# compiler options](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/compiler-options) by reading .fsproj and project.assets.json files
+- src/ProjectCracker: Figures out [F# compiler options](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/compiler-options) using [Buildalyzer](https://github.com/daveaglick/Buildalyzer) and the MSBuild API.
 - src/FSharpLanguageServer: F# language server
 - tests/LSP.Tests
 - tests/ProjectCracker.Tests
