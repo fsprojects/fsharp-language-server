@@ -70,6 +70,12 @@ let parseDiagnosticSeverity(i: int): DiagnosticSeverity =
     | 4 -> DiagnosticSeverity.Hint
     | _ -> raise(Exception(sprintf "%d is not a known DiagnosticSeverity" i))
 
+let parseMarkupKind(s: string): MarkupKind = 
+    match s with 
+    | "plaintext" -> MarkupKind.PlainText
+    | "markdown" -> MarkupKind.PlainText 
+    | _ -> raise(Exception(sprintf "%s is not a known MarkupKind" s))
+
 let private readOptions = 
     { defaultJsonReadOptions 
         with customReaders = [  parseTextDocumentSaveReason
@@ -77,7 +83,8 @@ let private readOptions =
                                 parseTrace
                                 parseCompletionItemKind
                                 parseInsertTextFormat
-                                parseDiagnosticSeverity ] }
+                                parseDiagnosticSeverity
+                                parseMarkupKind ] }
 
 let private deserializeRawMessage = JsonValue.Parse >> deserializerFactory<RawMessage> readOptions
 

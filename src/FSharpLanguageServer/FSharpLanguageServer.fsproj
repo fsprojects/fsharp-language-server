@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Compile Include="ProgressBar.fs" />
+    <Compile Include="TipFormatter.fs" />
     <Compile Include="Conversions.fs" />
     <Compile Include="ProjectManager.fs" />
     <Compile Include="Program.fs" />
@@ -15,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="FSharp.Compiler.Service" Version="22.0.3" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.8.4" />
   </ItemGroup>
 
   <ItemGroup>

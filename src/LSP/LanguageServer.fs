@@ -25,7 +25,8 @@ let private jsonWriteOptions =
               writeDocumentHighlightKind;
               writeSymbolKind;
               writeRegisterCapability;
-              writeMessageType ] }
+              writeMessageType;
+              writeMarkupKind ] }
 
 let private serializeInitializeResult = serializerFactory<InitializeResult> jsonWriteOptions
 let private serializeTextEditList = serializerFactory<TextEdit list> jsonWriteOptions

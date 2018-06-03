@@ -72,12 +72,6 @@ let asHover(FSharpToolTipText tips): Hover =
                 dprintfn "Error computing hover: %s" err]
     {contents=convert; range=None}
 
-// Convert an F# `FSharpToolTipText` to text
-let asDocumentation(FSharpToolTipText tips): string option = 
-    match tips with 
-    | [FSharpToolTipElement.Group [e]] -> Some e.MainDescription
-    | _ -> None // When there are zero or multiple overloads, don't display docs
-
 // Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
 let private asCompletionItemKind(k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
     match k with 

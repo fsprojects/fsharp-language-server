@@ -612,7 +612,8 @@ type Server(client: ILanguageClient) =
                     for candidate in lastCompletion.Value.Items do 
                         if candidate.FullName = p.data?FullName.AsString() then 
                             dprintfn "Resolve description for %s" candidate.FullName
-                            result <- {p with documentation=asDocumentation(candidate.DescriptionText)}
+                            let! resolved = TipFormatter.resolveDocs(p, candidate)
+                            result <- resolved
                 return result
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 

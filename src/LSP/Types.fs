@@ -261,11 +261,26 @@ let writeCompletionItemKind(i: CompletionItemKind) =
     | CompletionItemKind.File -> 17
     | CompletionItemKind.Reference -> 18
 
+[<RequireQualifiedAccess>]
+type MarkupKind = 
+| PlainText 
+| Markdown
+
+let writeMarkupKind(m: MarkupKind): string = 
+    match m with 
+    | MarkupKind.PlainText -> "plaintext"
+    | MarkupKind.Markdown -> "markdown"
+
+type MarkupContent = {
+    kind: MarkupKind 
+    value: string
+}
+
 type CompletionItem = {
     label: string 
     kind: CompletionItemKind option
     detail: string option
-    documentation: string option
+    documentation: MarkupContent option
     sortText: string option
     filterText: string option
     insertText: string option
