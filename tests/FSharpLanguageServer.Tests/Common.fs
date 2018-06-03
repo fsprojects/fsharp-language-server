@@ -3,7 +3,7 @@ module FSharpLanguageServer.Tests.Common
 open System
 open System.IO
 
-let private findProjectRoot (start: DirectoryInfo): DirectoryInfo = 
+let private findProjectRoot(start: DirectoryInfo): DirectoryInfo = 
     seq {
         let mutable dir = start 
         while dir <> dir.Root do 
@@ -12,4 +12,6 @@ let private findProjectRoot (start: DirectoryInfo): DirectoryInfo =
             dir <- dir.Parent
     } |> Seq.head
 let private testDirectory = DirectoryInfo(Directory.GetCurrentDirectory())
-let projectRoot = findProjectRoot testDirectory
+
+/// The root of the project folder
+let projectRoot = findProjectRoot(testDirectory)
