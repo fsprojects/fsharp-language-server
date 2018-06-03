@@ -531,7 +531,7 @@ type Server(client: ILanguageClient) =
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                dprintfn "Autocompleting at %s(%d,%d)" file.Name p.position.line p.position.character
+                dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
                 let! c = quickCheckOpenFile(file)
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 

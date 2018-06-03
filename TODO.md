@@ -14,12 +14,11 @@
 # Cleanup
 
 # Bugs
-- Autocompleting in strings
+- Autocompleting in strings and comments
 
 # Optimizations
-- Use .sln files to decide what .fsproj files to load
 - Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
 - Only rebuild .fsproj files that depend on the saved one
 
 # Features
-- Docstrings on autocomplete and hover
+- When build fails, create default options with incomplete context

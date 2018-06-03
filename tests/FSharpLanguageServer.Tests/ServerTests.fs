@@ -208,6 +208,14 @@ let ``complete List members``() =
         let labels = List.map (fun (i:CompletionItem) -> i.label) completions.items 
         if not (List.contains "map" labels) then Assert.Fail(sprintf "List.map is not in %A" labels)
 
+// [<Test>] TODO
+let ``dont complete inside a string``() = 
+    let (client, server) = createServerAndReadFile("CompleteInString.fs")
+    match server.Completion(textDocumentPosition "CompleteInString.fs" 3 15) |> Async.RunSynchronously with 
+    | None -> ()
+    | Some(completions) -> 
+        Assert.Fail(sprintf "Should not have completed in string: %A" completions)
+
 [<Test>]
 let ``signature help``() = 
     let (client, server) = createServerAndReadFile("SignatureHelp.fs")
