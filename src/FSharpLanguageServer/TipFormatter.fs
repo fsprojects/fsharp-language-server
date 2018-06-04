@@ -35,7 +35,8 @@ let private convertSpecialTagsToMarkdown(node: HtmlNode) =
         let ref = see.GetAttributeValue("cref", see.InnerText)
         let fqn = Array.last(ref.Split(':'))
         let name = Array.last(fqn.Split('.'))
-        parent.ReplaceChild(HtmlNode.CreateNode("`" + name + "`"), see) |> ignore
+        let quote = HtmlNode.CreateNode("`" + name + "`")
+        parent.ReplaceChild(quote, see) |> ignore
 
 let private cref(node: HtmlNode) =
     let attr = node.GetAttributeValue("cref", "")
@@ -95,7 +96,7 @@ let docComment(doc: FSharpXmlDoc): string option =
         | Some(m) -> 
             let lines = [
                 if m.summary.IsSome && m.summary.Value.Length > 0 then 
-                    yield m.summary.Value
+                    yield m.summary.Value.Trim()
                 for name, desc in m.parameters do 
                     yield sprintf "**%s** %s" name desc 
                 if m.returns.IsSome && m.returns.Value.Length > 0 then 
@@ -113,7 +114,7 @@ let docSummaryOnly(doc: FSharpXmlDoc): string option =
         let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with 
         | None -> None 
-        | Some(m) -> m.summary
+        | Some(m) -> m.summary |> Option.map (fun(s) -> s.Trim())
 
 /// Render documentation for an overloaded member
 let private overloadComment(docs: FSharpXmlDoc list): string option = 
