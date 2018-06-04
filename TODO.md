@@ -20,6 +20,8 @@
 # Optimizations
 - Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
 - Only rebuild .fsproj files that depend on the saved one
+- Only re-analyze .fsx when # directives are changed
 
 # Features
 - When build fails, create default options with incomplete context
+- Run-test code lens
