@@ -2,8 +2,9 @@ module FSharpLanguageServer.TipFormatter
 
 open System
 open System.IO
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open System.Text.RegularExpressions
 open System.Collections.Generic
+open Microsoft.FSharp.Compiler.SourceCodeServices
 open LSP.Types
 open LSP.Log
 open HtmlAgilityPack
@@ -28,15 +29,43 @@ type private CachedFile = {
 
 let private cache = Dictionary<string, CachedFile>()
 
+let private convertTag(node: HtmlNode, tag: string, mapper: HtmlNode -> HtmlNode) = 
+    let nodes = List.ofSeq(node.Descendants(tag)) 
+    for n in nodes do 
+        let parent = n.ParentNode
+        let r = mapper(n)
+        parent.ReplaceChild(r, n) |> ignore 
+
+let private lastWord(text: string): string = 
+    let wordPattern = Regex(@"[a-zA-Z]\w*")
+    let words = [for m in wordPattern.Matches(text) do yield m.Value]
+    let maybeLast = List.tryLast(words)
+    Option.defaultValue "" maybeLast
+
+let private convertSee(n: HtmlNode): HtmlNode = 
+    let ref = n.GetAttributeValue("cref", n.InnerText)
+    let name = lastWord(ref)
+    HtmlNode.CreateNode("`" + name + "`")
+
+let private convertNameToCode(n: HtmlNode): HtmlNode = 
+    let name = n.GetAttributeValue("name", n.InnerText)
+    HtmlNode.CreateNode("`" + name + "`")
+
+let private convertInnerTextToCode(n: HtmlNode): HtmlNode = 
+    let text = n.InnerText
+    HtmlNode.CreateNode("`" + text + "`")
+
+let private convertPara(n: HtmlNode): HtmlNode = 
+    HtmlNode.CreateNode("\n\n")
+
+/// Convert special tags listed in https://docs.microsoft.com/en-us/dotnet/csharp/codedoc to markdown
 let private convertSpecialTagsToMarkdown(node: HtmlNode) = 
-    let sees = List.ofSeq(node.Descendants("see"))
-    for see in sees do 
-        let parent = see.ParentNode 
-        let ref = see.GetAttributeValue("cref", see.InnerText)
-        let fqn = Array.last(ref.Split(':'))
-        let name = Array.last(fqn.Split('.'))
-        let quote = HtmlNode.CreateNode("`" + name + "`")
-        parent.ReplaceChild(quote, see) |> ignore
+    convertTag(node, "see", convertSee)
+    convertTag(node, "paramref", convertNameToCode)
+    convertTag(node, "typeparamref", convertNameToCode)
+    convertTag(node, "c", convertInnerTextToCode)
+    convertTag(node, "code", convertInnerTextToCode)
+    convertTag(node, "para", convertPara)
 
 let private cref(node: HtmlNode) =
     let attr = node.GetAttributeValue("cref", "")
@@ -75,6 +104,7 @@ let private ensure(xmlFile: FileInfo) =
                     loadTime = xmlFile.LastWriteTime
                 }) |> ignore
 
+/// Find the documentation for `memberName` inside of `xmlFile`
 let private find(xmlFile: FileInfo, memberName: string): CachedMember option = 
     ensure(xmlFile)
     match cache.TryGetValue(xmlFile.FullName) with 
@@ -106,6 +136,7 @@ let docComment(doc: FSharpXmlDoc): string option =
             let comment = String.concat "\n\n" lines
             Some(comment)
 
+/// Render just the summary documentation
 let docSummaryOnly(doc: FSharpXmlDoc): string option = 
     match doc with
     | FSharpXmlDoc.None -> None
