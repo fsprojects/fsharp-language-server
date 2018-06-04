@@ -3,13 +3,14 @@ module ProjectCracker
 open LSP.Log
 open System
 open System.IO
-open Buildalyzer
 open System.Xml
+open System.Reflection
 open FSharp.Data
 open LSP.Json.Ser
 open Microsoft.Build.Framework
 open Microsoft.Build.Logging
 open Microsoft.Build.Execution
+open Buildalyzer
 
 // TODO investigate how MS solves this problem:
 // Omnisharp-roslyn cracks .csproj files: https://github.com/OmniSharp/omnisharp-roslyn/blob/master/tests/OmniSharp.MSBuild.Tests/ProjectFileInfoTests.cs
@@ -69,6 +70,12 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
 /// but it appears to be broken on dotnet core: https://github.com/fsharp/FSharp.Compiler.Service/issues/847
 let scriptBase: Lazy<CrackedProject> = 
     lazy 
-        match crack(FileInfo("/Users/georgefraser/Documents/fsharp-language-server/client/PseudoScript.fsproj")) with 
+        let extensionExe = FileInfo(Assembly.GetExecutingAssembly().Location)
+        dprintfn "Looking for PsuedoScript.fsproj relative to %s" extensionExe.FullName
+        let extensionRoot = extensionExe.Directory.Parent.Parent.Parent.Parent.Parent.Parent.Parent
+        let pseudoScript = FileInfo(Path.Combine [|extensionRoot.FullName; "client"; "PseudoScript.fsproj"|])
+        if not pseudoScript.Exists then 
+            dprintfn "%s does not exist" pseudoScript.FullName
+        match crack(pseudoScript) with 
         | Ok(options) -> options 
         | Error(message) -> raise(Exception(sprintf "Failed to load PseudoScript.fsproj: %s" message))
