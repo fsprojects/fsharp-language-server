@@ -7,7 +7,7 @@ open System
 open LSP.Types
 open FSharp.Data
 
-// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
+/// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpErrorInfo): Range = 
     {
         // Got error "The field, constructor or member 'StartLine' is not defined"
@@ -15,13 +15,13 @@ let private errorAsRange(err: FSharpErrorInfo): Range =
         ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
     }
 
-// Convert an F# Compiler Services 'FSharpErrorSeverity' to an LSP 'DiagnosticSeverity'
+/// Convert an F# Compiler Services 'FSharpErrorSeverity' to an LSP 'DiagnosticSeverity'
 let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
     match s with 
     | FSharpErrorSeverity.Warning -> DiagnosticSeverity.Warning 
     | FSharpErrorSeverity.Error -> DiagnosticSeverity.Error 
 
-// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Diagnostic'
+/// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Diagnostic'
 let asDiagnostic(err: FSharpErrorInfo): Diagnostic = 
     {
         range = errorAsRange(err)
@@ -31,14 +31,14 @@ let asDiagnostic(err: FSharpErrorInfo): Diagnostic =
         message = err.Message
     }
     
-// Some compiler errors have no location in the file and should be displayed at the top of the file
+/// Some compiler errors have no location in the file and should be displayed at the top of the file
 let private hasNoLocation(err: FSharpErrorInfo): bool = 
     err.StartLineAlternate-1 = 0 && 
     err.StartColumn = 0 &&
     err.EndLineAlternate-1 = 0 &&
     err.EndColumn = 0
 
-// A special error message that shows at the top of the file
+/// A special error message that shows at the top of the file
 let errorAtTop(message: string): Diagnostic =
     {
         range = { start = {line=0; character=0}; ``end`` = {line=0; character=1} }
@@ -48,7 +48,7 @@ let errorAtTop(message: string): Diagnostic =
         message = message
     }
 
-// Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
+/// Convert a list of F# Compiler Services 'FSharpErrorInfo' to LSP 'Diagnostic'
 let asDiagnostics(errors: FSharpErrorInfo seq): Diagnostic list =
     [ 
         for err in errors do 
@@ -59,7 +59,7 @@ let asDiagnostics(errors: FSharpErrorInfo seq): Diagnostic list =
     ]
 
 
-// Convert an F# `FSharpToolTipElement` to an LSP `Hover`
+/// Convert an F# `FSharpToolTipElement` to an LSP `Hover`
 let asHover(FSharpToolTipText tips): Hover = 
     let elements = 
         [ for t in tips do
@@ -85,7 +85,7 @@ let asHover(FSharpToolTipText tips): Hover =
                 | Some(markdown) -> yield PlainString(markdown) ]
     {contents=contents; range=None}
 
-// Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
+/// Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
 let private asCompletionItemKind(k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
     match k with 
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Field -> Some(CompletionItemKind.Field)
@@ -95,7 +95,7 @@ let private asCompletionItemKind(k: Microsoft.FSharp.Compiler.SourceCodeServices
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Argument -> Some(CompletionItemKind.Variable)
     | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Other -> None
 
-// Convert an F# `FSharpDeclarationListItem` to an LSP `CompletionItem`
+/// Convert an F# `FSharpDeclarationListItem` to an LSP `CompletionItem`
 let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem = 
     { defaultCompletionItem with 
         label = i.Name 
@@ -105,21 +105,21 @@ let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem =
         data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
     }
 
-// Convert an F# `FSharpDeclarationListInfo` to an LSP `CompletionList`
-// Used in rendering autocomplete lists
+/// Convert an F# `FSharpDeclarationListInfo` to an LSP `CompletionList`
+/// Used in rendering autocomplete lists
 let asCompletionList(ds: FSharpDeclarationListInfo): CompletionList = 
     let items = [for i in ds.Items do yield asCompletionItem(i)]
     {isIncomplete=List.isEmpty(items); items=items}
 
-// Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
+/// Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
 let private asParameterInformation(p: FSharpMethodGroupItemParameter): ParameterInformation = 
     {
         label = p.ParameterName
         documentation = Some p.Display
     }
 
-// Convert an F# method name + `FSharpMethodGroupItem` to an LSP `SignatureInformation`
-// Used in providing signature help after autocompleting
+/// Convert an F# method name + `FSharpMethodGroupItem` to an LSP `SignatureInformation`
+/// Used in providing signature help after autocompleting
 let asSignatureInformation(methodName: string, s: FSharpMethodGroupItem): SignatureInformation = 
     let doc = match s.Description with 
                 | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription 
@@ -135,28 +135,28 @@ let asSignatureInformation(methodName: string, s: FSharpMethodGroupItem): Signat
     }
 
 
-// Convert an F# `Range.pos` to an LSP `Position`
+/// Convert an F# `Range.pos` to an LSP `Position`
 let private asPosition(p: Range.pos): Position = 
     {
         line=p.Line-1
         character=p.Column
     }
 
-// Convert an F# `Range.range` to an LSP `Range`
+/// Convert an F# `Range.range` to an LSP `Range`
 let asRange(r: Range.range): Range = 
     {
         start=asPosition r.Start
         ``end``=asPosition r.End
     }
 
-// Convert an F# `Range.range` to an LSP `Location`
+/// Convert an F# `Range.range` to an LSP `Location`
 let private asLocation(l: Range.range): Location = 
     { 
         uri=Uri("file://" + l.FileName)
         range = asRange l 
     }
 
-// Get the lcation where `s` was declared
+/// Get the lcation where `s` was declared
 let declarationLocation(s: FSharpSymbol): Location option = 
     match s.DeclarationLocation with 
     | None -> 
@@ -165,12 +165,12 @@ let declarationLocation(s: FSharpSymbol): Location option =
     | Some l ->
         Some(asLocation(l))
 
-// Get the location where `s` was used
+/// Get the location where `s` was used
 let useLocation(s: FSharpSymbolUse): Location = 
     asLocation(s.RangeAlternate)
 
-// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
-// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
+/// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
+/// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
 let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind = 
     match k with 
     | NamespaceDecl -> SymbolKind.Namespace
@@ -183,9 +183,9 @@ let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind =
     | FieldDecl -> SymbolKind.Field
     | OtherDecl -> SymbolKind.Variable
 
-// Convert an F# `FSharpNavigationDeclarationItem` to an LSP `SymbolInformation`
-// `FSharpNavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
-// `container` is present when `d` is part of a module or type
+/// Convert an F# `FSharpNavigationDeclarationItem` to an LSP `SymbolInformation`
+/// `FSharpNavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
+/// `container` is present when `d` is part of a module or type
 let asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
     let declarationName(d: FSharpNavigationDeclarationItem) = d.Name
     {
