@@ -33,13 +33,17 @@ This project is an implementation of the [language server protocol](https://micr
 ## Code structure
 The language server protocol (LSP) is very similar to the API defined by the F# compiler service (FCS); most of the implementation is devoted to translating between the types used by FCS and the JSON representation of LSP.
 
+- client/extension.ts: Client-side VSCode launcher
+- client/PseudoScript.*: Pseudo-project used to figure out default dependencies for .fsx files
+- sample: Example projects used by tests
+- scripts: Scripts for building and testing
 - src/LSP: Server-side implementation of [language server protocol](https://microsoft.github.io/language-server-protocol/specification)
 - src/ProjectCracker: Figures out [F# compiler options](https://docs.microsoft.com/en-us/dotnet/fsharp/language-reference/compiler-options) using [Buildalyzer](https://github.com/daveaglick/Buildalyzer) and the MSBuild API.
 - src/FSharpLanguageServer: F# language server
 - tests/LSP.Tests
 - tests/ProjectCracker.Tests
 - tests/FSharpLanguageServer.Tests
-- sample: Example projects used by tests
+- videos: Animated GIFs on this page
 
 ## How is this project different than [Ionide](https://github.com/ionide)?
 Ionide is a suite of F# plugins for VSCode; F# language server is analagous to the [FSAC](https://github.com/fsharp/FsAutoComplete) component. While FSAC is based on a custom JSON protocol; F#LS is based on the [language server protocol](https://microsoft.github.io/language-server-protocol/specification) standard. 
