@@ -85,22 +85,37 @@ let asHover(FSharpToolTipText tips): Hover =
                 | Some(markdown) -> yield PlainString(markdown) ]
     {contents=contents; range=None}
 
-/// Convert an F# `CompletionItemKind` to an LSP `CompletionItemKind`
-let private asCompletionItemKind(k: Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind): CompletionItemKind option = 
+/// Convert an F# `FSharpGlyph` to an LSP `CompletionItemKind`
+let private asCompletionItemKind(k: FSharpGlyph): CompletionItemKind = 
     match k with 
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Field -> Some(CompletionItemKind.Field)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Property -> Some(CompletionItemKind.Property)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Method isExtension -> Some(CompletionItemKind.Method)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Event -> None
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Argument -> Some(CompletionItemKind.Variable)
-    | Microsoft.FSharp.Compiler.SourceCodeServices.CompletionItemKind.Other -> None
+    | FSharpGlyph.Class -> CompletionItemKind.Class
+    | FSharpGlyph.Constant -> CompletionItemKind.Constant
+    | FSharpGlyph.Delegate -> CompletionItemKind.Property // ?
+    | FSharpGlyph.Enum -> CompletionItemKind.Enum
+    | FSharpGlyph.EnumMember -> CompletionItemKind.EnumMember
+    | FSharpGlyph.Event -> CompletionItemKind.Event
+    | FSharpGlyph.Exception -> CompletionItemKind.Class // ?
+    | FSharpGlyph.Field -> CompletionItemKind.Field
+    | FSharpGlyph.Interface -> CompletionItemKind.Interface
+    | FSharpGlyph.Method -> CompletionItemKind.Method
+    | FSharpGlyph.OverridenMethod -> CompletionItemKind.Method
+    | FSharpGlyph.Module -> CompletionItemKind.Module
+    | FSharpGlyph.NameSpace -> CompletionItemKind.Module // ?
+    | FSharpGlyph.Property -> CompletionItemKind.Property
+    | FSharpGlyph.Struct -> CompletionItemKind.Struct
+    | FSharpGlyph.Typedef -> CompletionItemKind.Interface // ?
+    | FSharpGlyph.Type -> CompletionItemKind.Class // ?
+    | FSharpGlyph.Union -> CompletionItemKind.Enum // ?
+    | FSharpGlyph.Variable -> CompletionItemKind.Variable
+    | FSharpGlyph.ExtensionMethod -> CompletionItemKind.Method
+    | FSharpGlyph.Error -> CompletionItemKind.Class  // ?
 
 /// Convert an F# `FSharpDeclarationListItem` to an LSP `CompletionItem`
 let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem = 
     { defaultCompletionItem with 
         label = i.Name 
-        kind = asCompletionItemKind i.Kind
-        detail = Some i.FullName
+        kind = Some(asCompletionItemKind(i.Glyph))
+        detail = Some(i.FullName)
         // Stash FullName in data so we can use it later in ResolveCompletionItem
         data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
     }

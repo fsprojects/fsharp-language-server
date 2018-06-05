@@ -239,6 +239,13 @@ type CompletionItemKind =
 | Color
 | File
 | Reference
+| Folder
+| EnumMember
+| Constant
+| Struct
+| Event
+| Operator
+| TypeParameter
 
 let writeCompletionItemKind(i: CompletionItemKind) = 
     match i with 
@@ -260,6 +267,13 @@ let writeCompletionItemKind(i: CompletionItemKind) =
     | CompletionItemKind.Color -> 16
     | CompletionItemKind.File -> 17
     | CompletionItemKind.Reference -> 18
+    | CompletionItemKind.Folder -> 19
+    | CompletionItemKind.EnumMember -> 20
+    | CompletionItemKind.Constant -> 21
+    | CompletionItemKind.Struct -> 22
+    | CompletionItemKind.Event -> 23
+    | CompletionItemKind.Operator -> 24
+    | CompletionItemKind.TypeParameter -> 25
 
 [<RequireQualifiedAccess>]
 type MarkupKind = 
