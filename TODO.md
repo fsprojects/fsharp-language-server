@@ -16,6 +16,7 @@
 # Bugs
 - Autocompleting in strings and comments
 - Don't autocomplete things with spaces
+- Crack FCS
 
 # Optimizations
 - Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
@@ -25,3 +26,4 @@
 # Features
 - When build fails, create default options with incomplete context
 - Run-test code lens
+- Source dep on C# project

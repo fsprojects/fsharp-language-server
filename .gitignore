@@ -5,4 +5,4 @@ packages/
 node_modules/
 .idea/
 build.vsix
-Scratch.*
+Scratch.fsx
