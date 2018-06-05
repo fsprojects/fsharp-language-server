@@ -6,3 +6,4 @@ node_modules/
 .idea/
 build.vsix
 Scratch.fsx
+Scratch.ts
