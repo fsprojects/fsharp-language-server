@@ -54,6 +54,13 @@ let parseCompletionItemKind(i: int): CompletionItemKind =
     | 16 -> CompletionItemKind.Color
     | 17 -> CompletionItemKind.File
     | 18 -> CompletionItemKind.Reference
+    | 19 -> CompletionItemKind.Folder
+    | 20 -> CompletionItemKind.EnumMember
+    | 21 -> CompletionItemKind.Constant
+    | 22 -> CompletionItemKind.Struct
+    | 23 -> CompletionItemKind.Event
+    | 24 -> CompletionItemKind.Operator
+    | 25 -> CompletionItemKind.TypeParameter
     | _ -> raise(Exception(sprintf "%d is not a known CompletionItemKind" i))
 
 let parseInsertTextFormat(i: int): InsertTextFormat = 
