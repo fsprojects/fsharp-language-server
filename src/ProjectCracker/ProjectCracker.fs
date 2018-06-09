@@ -16,8 +16,9 @@ open Microsoft.Build.Evaluation
 open Microsoft.Build.Utilities
 open Microsoft.Build.Framework
 open Microsoft.Build.Logging
+open Buildalyzer
 
-// TODO investigate how MS solves this problem:
+// Other points of reference:
 // Omnisharp-roslyn cracks .csproj files: https://github.com/OmniSharp/omnisharp-roslyn/blob/master/tests/OmniSharp.MSBuild.Tests/ProjectFileInfoTests.cs
 // Roslyn cracks .csproj files: https://github.com/dotnet/roslyn/blob/master/src/Workspaces/MSBuildTest/MSBuildWorkspaceTests.cs
 
@@ -254,32 +255,12 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         projects=projects
     }
 
-type TempEnv(key: string, value: string) =
-    let before = Environment.GetEnvironmentVariable(key)
-    do Environment.SetEnvironmentVariable(key, value)
-    interface IDisposable with 
-        member this.Dispose() = 
-            Environment.SetEnvironmentVariable(key, before)
-
-// Run `msbuild restore` and return the msbuild API representation of the project
-let private restore(fsproj: FileInfo): Execution.ProjectInstance = 
-    // let projectCrackerDll = FileInfo(Assembly.GetExecutingAssembly().Location)
-    // let toolsPath = projectCrackerDll.DirectoryName
-    // let msBuildExePath = Path.Combine(toolsPath, "MSBuild.dll")
-    let toolsPath = "/usr/local/share/dotnet/sdk/2.1.200" // TODO get this dynamically or use Buildalyzer
-    let msBuildExePath = Path.Combine(toolsPath, "MSBuild.dll")
-    if not(File.Exists(msBuildExePath)) then 
-        raise(Exception(sprintf "%s does not exist" msBuildExePath))
-    else 
-        dprintfn "Using %s" msBuildExePath
-    use env = new TempEnv("MSBUILD_EXE_PATH", msBuildExePath)
-    let projectCollection = new ProjectCollection()
-    let project = projectCollection.LoadProject(fsproj.FullName)
-    let instance = project.CreateProjectInstance()
-    let log = ConsoleLogger(LoggerVerbosity.Normal, (fun m -> dprintfn "%s" m), null, null)
-    // TODO more optimizations from Buildalyzer / Scratch
-    // instance.Build("Restore", [log :> ILogger]) |> ignore
-    instance
+let private load(fsproj: FileInfo): Project = 
+    let options = new AnalyzerManagerOptions()
+    options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
+    options.CleanBeforeCompile <- false
+    let manager = AnalyzerManager(options)
+    manager.GetProject(fsproj.FullName).Load()
 
 /// Crack an .fsproj file by:
 /// - Running the "Restore" target and reading 
@@ -294,16 +275,16 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
         let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)
         let dllName = baseName + ".dll"
         // msbuild produces paths like src/LSP/bin/Debug/netcoreapp2.0/LSP.dll
+        // TODO this seems fragile
         let target = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
         // Get source info from .fsproj
-        let project = restore(fsproj)
+        let project = load(fsproj)
         let sources = 
             [ for i in project.GetItems("Compile") do 
                 let relativePath = i.EvaluatedInclude
                 let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
                 let normalizePath = Path.GetFullPath(absolutePath)
                 yield FileInfo(normalizePath) ]
-        // TODO project.assets.json specifies bin/placeholder/{project}.dll as dll, is this bad for performance?
         Ok({
             fsproj=fsproj
             target=target

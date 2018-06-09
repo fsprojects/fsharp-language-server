@@ -8,11 +8,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Build" Version="15.7.179" />
-    <PackageReference Include="Microsoft.Build.Framework" Version="15.7.179" />
-    <PackageReference Include="Microsoft.Build.Runtime" Version="15.7.179" />
-    <PackageReference Include="Microsoft.Build.Tasks.Core" Version="15.7.179" />
-    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="15.7.179" />
+    <PackageReference Include="Buildalyzer" Version="0.4.0" />
   </ItemGroup>
   
   <ItemGroup>
