@@ -53,6 +53,12 @@ type private ProjectAssets = {
     projects: FileInfo list
 }
 
+type private Dep = {
+    name: string
+    version: string
+    autoReferenced: bool
+}
+
 let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
     dprintfn "Parsing %s" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
@@ -97,100 +103,140 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 found <- Some(short, long)
         found.Value
     dprintfn "Chose framework %s / %s" shortFramework longFramework
-    // Find all transitive dependencies of the project 
-    // by starting with `$.projects.frameworks[?].dependencies`
-    // and recursively walking the map described by `$.targets`
-    // ["FSharp.Core/4.3.4"; ...]
-    let transitiveDependencies = 
-        // Choose a version of a dependency by scanning targets
-        let chooseVersion(dependencyName: string): string = 
-            let mutable found: string option = None 
-            for dependencyVersion, _ in root?targets.[longFramework].Properties do 
-                if dependencyVersion.StartsWith(dependencyName + "/") && found.IsNone then 
-                    found <- Some(dependencyVersion)
-            found.Value
-        // Get the direct dependencies of `dependencyName` by looking at `targets[dependencyName/version].dependencies`
-        let nextDependencies(dependencyName: string) = 
-            let version = chooseVersion(dependencyName) 
-            match root?targets.[longFramework].[version].TryGetProperty("dependencies") with 
-            | None -> []
-            | Some(ds) -> [for d, _ in ds.Properties do yield d]
-        // ["FSharp.Core"; ...]
-        let packages = 
-            [ for name, value in root?project?frameworks.[shortFramework]?dependencies.Properties do 
-                if value?target.AsString() = "Package" then 
-                    yield name ]
-        let projects = 
-            [ for name, value in root?libraries.Properties do 
-                if value?``type``.AsString() = "project" then 
-                    yield Array.head(name.Split('/')) ]
-        // ["FSharp.Core"; ...]
-        let transitiveDependencies = HashSet<string>()
-        // Walk transitive dependencies of `d`, adding them to `transitiveDependencies`
-        let rec walk(d: string) = 
-            if transitiveDependencies.Add(d) then 
-                for d in nextDependencies(d) do 
-                    walk(d)
-        // Start with the root dependencies
-        for d in packages do 
-            walk(d)
-        for d in projects do 
-            walk(d)
-        // ["FSharp.Core/4.3.4"; ...]
-        [for d in transitiveDependencies do yield chooseVersion(d)]
-    dprintfn "Transitive dependencies are %A" transitiveDependencies
-    // Look up each transitive dependency in $.libraries
-    let libraries = 
-        // Get info from $.libraries for each dependency
-        [ for d in transitiveDependencies do
-            match root?libraries.TryGetProperty(d) with 
+    // Choose a version of a dependency by scanning targets
+    let chooseVersion(dependencyName: string): string = 
+        let prefix = dependencyName + "/"
+        let mutable found: string option = None 
+        for dependencyVersion, _ in root?targets.[longFramework].Properties do 
+            if dependencyVersion.StartsWith(prefix) && found.IsNone then 
+                let version = dependencyVersion.Substring(prefix.Length)
+                found <- Some(version)
+        match found with 
+        | Some(d) -> d
+        | None -> 
+            let keys = Array.map fst root?targets.[longFramework].Properties
+            raise(Exception(sprintf "No version of %s found in %A" dependencyName keys))
+    // All transitive dependencies of the project 
+    // "FSharp.Core/4.3.4" => {FSharp.Core, 4.3.4, false}
+    let transitiveDependencies = Dictionary<string, Dep>()
+    // Find transitive dependencies by scanning the targets section
+    // "targets": {
+    //     ".NETStandard,Version=v2.0": {
+    //         "NUnit/3.8.1": {
+    //             "type": "package",
+    //             "dependencies": {
+    //                 "NETStandard.Library": "1.6.0",
+    //                 "System.Runtime.Loader": "4.3.0",
+    //                 "System.Threading.Thread": "4.3.0"
+    //             },
+    //             "compile": {
+    //                 "lib/netstandard1.6/nunit.framework.dll": {}
+    //             },
+    //             "runtime": {
+    //                 "lib/netstandard1.6/nunit.framework.dll": {}
+    //             }
+    //         },
+    //     }
+    // }
+    let rec findTransitiveDeps(dep: Dep) = 
+        let nameVersion = dep.name + "/" + dep.version
+        if root?targets.[longFramework].TryGetProperty(nameVersion).IsNone then 
+            dprintfn "Couldn't find %s in targets" nameVersion
+        elif transitiveDependencies.TryAdd(nameVersion, dep) then 
+            match root?targets.[longFramework].[nameVersion].TryGetProperty("dependencies") with 
+            | None -> ()
+            | Some(next) -> 
+                for name, version in next.Properties do 
+                    let dep = {name=name; version=version.AsString(); autoReferenced=false}
+                    findTransitiveDeps(dep)
+    // Find root dependencies by scanning the project section
+    // "project": {
+    //     "version": "1.0.0",
+    //     "restore": { ... },
+    //     "frameworks": {
+    //         "netstandard2.0": {
+    //             "dependencies": {
+    //                 "FSharp.Core": {
+    //                     "target": "Package",
+    //                     "version": "[4.3.*, )"
+    //                 },
+    //                 "NETStandard.Library": {
+    //                     "suppressParent": "All",
+    //                     "target": "Package",
+    //                     "version": "[2.0.1, )",
+    //                     "autoReferenced": true
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    for name, dep in root?project?frameworks.[shortFramework]?dependencies.Properties do 
+        let version = chooseVersion(name) 
+        let autoReferenced = dep.TryGetProperty("autoReferenced") = Some(JsonValue.Boolean(true))
+        let dep = {name=name; version=version; autoReferenced=autoReferenced}
+        findTransitiveDeps(dep)
+    // Find projects in libraries section
+    for name, value in root?libraries.Properties do 
+        if value?``type``.AsString() = "project" then 
+            let [|name; version|] = name.Split('/')
+            let dep = {name=name; version=version; autoReferenced=false}
+            findTransitiveDeps(dep)
+    dprintfn "Transitive dependencies are %A" (List.ofSeq(transitiveDependencies.Keys))
+    // ["/Users/georgefraser/.nuget/packages/", ...]
+    let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
+    // Search package folders for a .dll
+    let absoluteDll(relativeToPackageFolder: string): string option = 
+        let mutable found: string option = None
+        for packageFolder in packageFolders do 
+            let candidate = Path.Combine(packageFolder, relativeToPackageFolder)
+            if File.Exists(candidate) && found.IsNone then 
+                found <- Some(candidate)
+        if found.IsNone then 
+            dprintfn "Couldn't find %s in %A" relativeToPackageFolder packageFolders 
+        found
+    // Find .dll files for each dependency
+    // "targets": {
+    //     ".NETCoreApp,Version=v2.0": {
+    //         "FSharp.Core/4.3.4": {
+    //             "type": "package",
+    //             "compile": {
+    //                 "lib/netstandard1.6/FSharp.Core.dll": {}
+    //             },
+    //             "runtime": {
+    //                 "lib/netstandard1.6/FSharp.Core.dll": {}
+    //             },
+    //             "resource": { ... }
+    //             }
+    //         }
+    //     }
+    // }
+    // "libraries": {
+    //     "FSharp.Core/4.3.4": {
+    //         "sha512": "u2UeaUl1pt/Lktdpzq3AsaRmOV1mOiQaSbZgYqQQYuqBSjnILWemetff4xMZIAZi0241jlIkcrJQsU5PlLwIJA==",
+    //         "type": "package",
+    //         "path": "fsharp.core/4.3.4",
+    //         "files": [ ... ]
+    //     },
+    // }
+    let findDlls(dep: Dep) = 
+        let nameVersion = dep.name + "/" + dep.version
+        let lib = root?libraries.[nameVersion]
+        let prefix = lib?path.AsString()
+        // For autoReferenced=true dependencies, we will include all dlls
+        if dep.autoReferenced then 
+            [ for json in lib?files.AsArray() do 
+                let f = json.AsString()
+                if f.EndsWith(".dll") then
+                    let relative = Path.Combine(prefix, f)
+                    match absoluteDll(relative) with 
+                    | None -> ()
+                    | Some(f) -> yield f ]
+        // Otherwise, we'll look at the list of "compile" .dlls in "targets"
+        else 
+            let target = root?targets.[longFramework].[nameVersion]
+            match target.TryGetProperty("compile") with 
             | None -> 
-                dprintfn "%s does not exist in libraries" d
-            | Some(lib) -> 
-                if lib?``type``.AsString() = "package" then
-                    yield d, lib ]
-    // Find all package dlls
-    let packageDlls = 
-        // ["/Users/georgefraser/.nuget/packages/", ...]
-        let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
-        // Search package folders for a .dll
-        let absoluteDll(relativeToPackageFolder: string): string option = 
-            let mutable found: string option = None
-            for packageFolder in packageFolders do 
-                let candidate = Path.Combine(packageFolder, relativeToPackageFolder)
-                if File.Exists(candidate) && found.IsNone then 
-                    found <- Some(candidate)
-            if found.IsNone then 
-                dprintfn "Couldn't find %s in %A" relativeToPackageFolder packageFolders 
-            found
-        // "targets": {
-        //     ".NETCoreApp,Version=v2.0": {
-        //         "FSharp.Core/4.3.4": {
-        //             "type": "package",
-        //                 "compile": {
-        //                     "lib/netstandard1.6/FSharp.Core.dll": {}
-        //                 },
-        //                 "runtime": {
-        //                     "lib/netstandard1.6/FSharp.Core.dll": {}
-        //                 },
-        //                 "resource": { ... }
-        //             }
-        //         }
-        //     }
-        // }
-        // "libraries": {
-        //     "FSharp.Core/4.3.4": {
-        //         "sha512": "u2UeaUl1pt/Lktdpzq3AsaRmOV1mOiQaSbZgYqQQYuqBSjnILWemetff4xMZIAZi0241jlIkcrJQsU5PlLwIJA==",
-        //         "type": "package",
-        //         "path": "fsharp.core/4.3.4",
-        //         "files": [ ... ]
-        //     },
-        // }
-        let findPackageDlls(dependencyWithVersion: string, library: JsonValue): string list = 
-            let prefix = library?path.AsString()
-            match root?targets.[longFramework].[dependencyWithVersion].TryGetProperty("compile") with 
-            | None -> 
-                dprintfn "%s has no compile-time dependencies" dependencyWithVersion
+                dprintfn "%s has no compile-time dependencies" nameVersion
                 []
             | Some(map) -> 
                 [ for dll, _ in map.Properties do 
@@ -198,18 +244,18 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     match absoluteDll(rel) with 
                     | None -> ()
                     | Some(abs) -> yield abs ]
-        List.collect findPackageDlls libraries
-    // Resolve conflicts by getting name and version from each DLL,
-    // choosing the highest version
+    // Find all package dlls
+    let packageDlls = [for d in transitiveDependencies.Values do yield! findDlls(d)]
+    // Resolve conflicts by getting name and version from each DLL, choosing the highest version
     let packageDllsWithoutConflicts =
-        let packageDllsWithName = 
+        let dllNameVersion = 
             [ for d in packageDlls do 
                 match readAssembly(FileInfo(d)) with 
                 | Error(e) -> dprintfn "Failed loading %s with error %s" d e
                 | Ok(name, version) -> yield d, name, version ]
         let aName(dll, name, version) = name
         let aVersion(dll, name, version) = version
-        let byName = List.groupBy aName packageDllsWithName
+        let byName = List.groupBy aName dllNameVersion
         [ for name, versions in byName do 
             match versions with 
             | [(file, _, _)] -> yield file
@@ -220,21 +266,6 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // Find all transitive project dependencies by examining libraries
     // Values with "type": "project" are projects
     // All transitive projects will already be included in project.assets.json 
-    // "targets": {
-    //     ".NETCoreApp,Version=v2.0": {
-    //         "LSP/1.0.0": {
-    //             "type": "project",
-    //             "framework": ".NETCoreApp,Version=v2.0",
-    //             "dependencies": { ... },
-    //             "compile": {
-    //                 "bin/placeholder/LSP.dll": {}
-    //             },
-    //             "runtime": {
-    //                 "bin/placeholder/LSP.dll": {}
-    //             }
-    //         },
-    //     }
-    // }
     // "libraries": {
     //     "LSP/1.0.0": {
     //         "type": "project",

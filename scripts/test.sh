@@ -2,8 +2,9 @@
 # Build the test projects and run all tests
 
 echo 'Building sample projects, there will be errors...'
-dotnet build sample/MainProject/MainProject.fsproj
-dotnet build sample/HasLocalDll/HasLocalDll.fsproj
+dotnet restore sample/MainProject/MainProject.fsproj
+dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
+dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
 
 echo 'Running tests...'
 set -e

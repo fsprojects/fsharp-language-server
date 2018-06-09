@@ -86,3 +86,8 @@ let cracker(fsproj: FileInfo): string list =
 let ``find package references in FSharpLanguageServer``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "src"; "FSharpLanguageServer"; "FSharpLanguageServer.fsproj"|] |> FileInfo 
     CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
+        
+[<Test>]
+let ``find package references in FSharpKoans``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "FSharpKoans.Core"; "FSharpKoans.Core.fsproj"|] |> FileInfo 
+    CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
