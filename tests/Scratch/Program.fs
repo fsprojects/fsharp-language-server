@@ -11,34 +11,40 @@ open Microsoft.Build.Logging
 
 [<EntryPoint>]
 let main(argv: array<string>): int = 
-    let projectPath = "/Users/georgefraser/Documents/FSharp.Compiler.Service/fcs/FSharp.Compiler.Service/FSharp.Compiler.Service.fsproj"
-    let solutionDir = Path.GetDirectoryName(projectPath)
+    let projectPath = "/Users/georgefraser/Documents/fsharp-language-server/sample/MainProject/MainProject.fsproj"
+    // let projectPath = "/Users/georgefraser/Documents/FSharp.Compiler.Service/fcs/FSharp.Compiler.Service/FSharp.Compiler.Service.fsproj"
+    // let solutionDir = Path.GetDirectoryName(projectPath)
+    // let toolsPath = " /Library/Frameworks/Mono.framework/Versions/5.10.1/lib/mono/msbuild/15.0/bin"
     let toolsPath = "/usr/local/share/dotnet/sdk/2.1.200"
-    let solutionDir = Path.GetDirectoryName(projectPath);
-    let extensionsPath = toolsPath
-    let sdksPath = Path.Combine(toolsPath, "Sdks")
-    let roslynTargetsPath = Path.Combine(toolsPath, "Roslyn")
     let msBuildExePath = Path.Combine(toolsPath, "MSBuild.dll")
-    let globalProperties = Dictionary<string, string>()
-    globalProperties.Add("SolutionDir", solutionDir)
-    globalProperties.Add("MSBuildExtensionsPath", extensionsPath)
-    globalProperties.Add("MSBuildSDKsPath", sdksPath)
-    globalProperties.Add("RoslynTargetsPath", roslynTargetsPath)
-    Environment.SetEnvironmentVariable("MSBuildExtensionsPath", extensionsPath)
-    Environment.SetEnvironmentVariable("MSBuildSDKsPath", sdksPath)
-    Environment.SetEnvironmentVariable("MSBuildExtensionsPath", extensionsPath)
-    Environment.SetEnvironmentVariable("MSBuildExtensionsPath32", extensionsPath)
-    Environment.SetEnvironmentVariable("MSBuildExtensionsPath64", extensionsPath)
-    Environment.SetEnvironmentVariable("MSBuildSDKsPath", sdksPath)
+    // let msBuildExePath = "/Users/georgefraser/Documents/fsharp-language-server/tests/Scratch/bin/Debug/netcoreapp2.0/MSBuild.dll"
+    // let extensionsPath = toolsPath
+    // let sdksPath = Path.Combine(toolsPath, "Sdks")
+    // let roslynTargetsPath = Path.Combine(toolsPath, "Roslyn")
+    // let globalProperties = Dictionary<string, string>()
+    // globalProperties.Add("DesignTimeBuild", "true")
+    // globalProperties.Add("BuildProjectReferences", "false")
+    // globalProperties.Add("SkipCompilerExecution", "true")
+    // globalProperties.Add("ProvideCommandLineArgs", "true")
+    // globalProperties.Add("SolutionDir", solutionDir)
+    // globalProperties.Add("MSBuildExtensionsPath", extensionsPath)
+    // globalProperties.Add("MSBuildSDKsPath", sdksPath)
+    // globalProperties.Add("RoslynTargetsPath", roslynTargetsPath)
+    // Environment.SetEnvironmentVariable("MSBuildExtensionsPath", extensionsPath)
+    // Environment.SetEnvironmentVariable("MSBuildSDKsPath", sdksPath)
+    // Environment.SetEnvironmentVariable("MSBuildExtensionsPath32", extensionsPath)
+    // Environment.SetEnvironmentVariable("MSBuildExtensionsPath64", extensionsPath)
+    // Environment.SetEnvironmentVariable("MSBuildSDKsPath", sdksPath)
     Environment.SetEnvironmentVariable("MSBUILD_EXE_PATH", msBuildExePath)
-    let projectCollection = new ProjectCollection(globalProperties)
-    projectCollection.AddToolset(new Toolset(ToolLocationHelper.CurrentToolsVersion, toolsPath, projectCollection, ""))
+    let projectCollection = new ProjectCollection()
+    // projectCollection.RemoveAllToolsets()
+    // projectCollection.AddToolset(new Toolset(ToolLocationHelper.CurrentToolsVersion, toolsPath, projectCollection, ""))
     let project = projectCollection.LoadProject(projectPath)
     let instance = project.CreateProjectInstance()
-    instance.Build("Compile", [ConsoleLogger() :> ILogger]) |> ignore
+    // instance.Build("Compile", [ConsoleLogger() :> ILogger]) |> ignore
     // Dump all items
     let mutable t = "" 
-    for i in project.Items do 
+    for i in instance.Items do 
         if i.ItemType <> t then 
             printfn "%s" i.ItemType 
             t <- i.ItemType 

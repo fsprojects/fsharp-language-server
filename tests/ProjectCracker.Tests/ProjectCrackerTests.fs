@@ -2,9 +2,16 @@ module ProjectCrackerTests
 
 open ProjectCracker
 open ProjectCrackerTestsCommon
+open LSP.Log
 open System
 open System.IO
 open System.Text.RegularExpressions
+open Microsoft.Build
+open Microsoft.Build.Evaluation
+open Microsoft.Build.Utilities
+open Microsoft.Build.Framework
+open Microsoft.Build.Logging
+open Buildalyzer
 open NUnit.Framework
 
 [<SetUp>]
@@ -33,8 +40,49 @@ let ``crack a project file``() =
         Assert.AreEqual("MainProject.dll", cracked.target.Name)
 
 [<Test>]
+let ``find compile sources``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "IndirectDep"; "IndirectDep.fsproj"|] |> FileInfo 
+    match ProjectCracker.crack(fsproj) with 
+    | Error(e) -> Assert.Fail(e)
+    | Ok(cracked) -> 
+        CollectionAssert.AreEquivalent(["IndirectLibrary.fs"], [for f in cracked.sources do yield f.Name])
+
+[<Test>]
 let ``crack script defaults``() = 
     let cracked = ProjectCracker.scriptBase.Value 
     let packages = [for f in cracked.packageReferences do yield f.Name]
     if not(List.contains "FSharp.Core.dll" packages) then 
         Assert.Fail(sprintf "No FSharp.Core.dll in %A" cracked.packageReferences)
+
+// Check that project.assets.json-based ProjectCracker finds same .dlls as MSBuild
+
+let msbuild(fsproj: FileInfo): string list = 
+    // Create an msbuild instance
+    let options = new AnalyzerManagerOptions()
+    options.LogWriter <- !diagnosticsLog
+    let manager = new AnalyzerManager(options)
+    // Compile the project
+    let analyzer = manager.GetProject(fsproj.FullName)
+    let compile = analyzer.Compile()
+    // Get package references from build
+    let packageReferences = compile.GetItems("ReferencePath")
+    [ for i in packageReferences do 
+        let relativePath = i.EvaluatedInclude
+        // Exclude project references
+        if not(relativePath.Contains("bin/Debug/netcoreapp2.0")) then
+            let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
+            yield Path.GetFullPath(absolutePath) ]
+    
+let cracker(fsproj: FileInfo): string list = 
+    match ProjectCracker.crack(fsproj) with
+    | Error(e) -> 
+        Assert.Fail(e)
+        []
+    | Ok(cracked) -> 
+        [ for f in cracked.packageReferences do 
+            yield f.FullName ]
+        
+[<Test>]
+let ``find package references in FSharpLanguageServer``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "src"; "FSharpLanguageServer"; "FSharpLanguageServer.fsproj"|] |> FileInfo 
+    CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
