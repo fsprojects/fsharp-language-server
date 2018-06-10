@@ -383,14 +383,22 @@ type Server(client: ILanguageClient) =
             let visibleNames = String.concat ", " [for _, f in visible do yield f.Name]
             dprintfn "Symbol %s is visible from %s" symbol.FullName visibleNames
             // Check source files for possible symbol references using string matching
+            let searchFor = 
+                // Attributes are referenced without the `Attribute` suffix
+                // searchFor is just used to cut down the number of files we need to check,
+                // so it's OK to be a little fast-and-sloppy
+                if symbol.DisplayName.EndsWith("Attribute") then 
+                    symbol.DisplayName.Substring(0, symbol.DisplayName.Length - "Attribute".Length)
+                else 
+                    symbol.DisplayName
             let candidates = [
                 for projectOptions, sourceFile in visible do 
-                    match exactlyMatches(symbol.DisplayName, sourceFile) with 
+                    match exactlyMatches(searchFor, sourceFile) with 
                     | None -> ()
                     | Some(sourceText) -> yield projectOptions, sourceFile, sourceText
             ]
             let candidateNames = String.concat ", " [for _, file, _ in candidates do yield file.Name]
-            dprintfn "Name %s appears in %s" symbol.DisplayName candidateNames
+            dprintfn "Name %s appears in %s" searchFor candidateNames
             // Check each candidate file
             use progress = new ProgressBar(candidates.Length, sprintf "Search %d files" candidates.Length, client)
             let all = System.Collections.Generic.List<FSharpSymbolUse>()

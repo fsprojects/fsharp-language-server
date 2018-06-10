@@ -17,7 +17,6 @@
 - Autocompleting in strings and comments
 - Don't autocomplete things with spaces
 - Crack FCS
-- Find-all-references KoanAttribute doesn't find [<Koan>] because name doesn't match
 - Reload options when .fsx is saved
 
 # Optimizations
@@ -26,6 +25,7 @@
 - Only re-analyze .fsx when # directives are changed
 - Analyze project.assets.json lazily
 - Only use stale typecheck when 1 line has been changed
+- Foo.| should use the fast path
 
 # Features
 - When build fails, create default options with incomplete context
