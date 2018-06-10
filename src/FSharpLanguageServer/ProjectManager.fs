@@ -149,6 +149,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
                                 yield "-r:" + r.FullName
                         |]
                     ProjectFileName = fsproj.FullName 
+                    ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
                     ReferencedProjects = 
                         [|
                             for r in cracked.projectReferences do 
