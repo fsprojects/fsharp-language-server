@@ -17,7 +17,6 @@
 - Autocompleting in strings and comments
 - Don't autocomplete things with spaces
 - Crack FCS
-- value?dynamicProperty.| doesn't auto-complete
 - Find-all-references KoanAttribute doesn't find [<Koan>] because name doesn't match
 - Reload options when .fsx is saved
 

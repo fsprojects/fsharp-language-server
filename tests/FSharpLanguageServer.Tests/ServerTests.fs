@@ -198,15 +198,25 @@ let ``hover over qualified name``() =
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
 
+let labels(items: CompletionItem list) = 
+    [for i in items do yield i.label]
+
 [<Test>]
 let ``complete List members``() = 
     let client, server = createServerAndReadFile("Completions.fs")
-    match server.Completion(textDocumentPosition("Completions.fs", 2, 10)) |> Async.RunSynchronously with 
+    match server.Completion(textDocumentPosition("Completions.fs", 4, 10)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No completions")
     | Some(completions) -> 
-        if List.isEmpty completions.items then Assert.Fail("Completion list is empty")
-        let labels = List.map (fun(i:CompletionItem) -> i.label) completions.items 
-        if not (List.contains "map" labels) then Assert.Fail(sprintf "List.map is not in %A" labels)
+        CollectionAssert.Contains(labels(completions.items), "map")
+
+[<Test>]
+let ``complete result of call``() = 
+    let client, server = createServerAndReadFile("Completions.fs")
+    server.DidChangeTextDocument(edit("Completions.fs", 7, 16, "", ".")) |> Async.RunSynchronously
+    match server.Completion(textDocumentPosition("Completions.fs", 7, 17)) |> Async.RunSynchronously with 
+    | None -> Assert.Fail("No completions")
+    | Some(completions) -> 
+        CollectionAssert.Contains(labels(completions.items), "IsSome")
 
 // [<Test>] TODO
 let ``dont complete inside a string``() = 

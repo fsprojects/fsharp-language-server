@@ -532,21 +532,29 @@ type Server(client: ILanguageClient) =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
-                let! c = quickCheckOpenFile(file)
+                let line = lineContent(file, p.position.line)
+                let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
+                let! c = 
+                    // When a partial identifier is not present, stale completions are very inaccurate
+                    // For example Some(1).? will complete top-level names rather than the members of Option
+                    // Therefore, we will always re-check the file, even if it takes a while
+                    if partialName.PartialIdent = "" then 
+                        dprintfn "No partial name, re-checking file..."
+                        checkOpenFile(file)
+                    // When a partial identifier is present, stale completions are quite accurate
+                    else
+                        dprintfn "Partial name %A" partialName
+                        quickCheckOpenFile(file)
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
-                    let line = lineContent(file, p.position.line)
-                    let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
-                    let nameParts = partialName.QualifyingIdents@[partialName.PartialIdent]
-                    dprintfn "Autocompleting %s" (String.concat "." nameParts)
-                    let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
-                    lastCompletion <- Some declarations 
-                    dprintfn "Found %d completions" declarations.Items.Length
-                    return Some(asCompletionList(declarations))
+                        let! declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
+                        lastCompletion <- Some declarations 
+                        dprintfn "Found %d completions" declarations.Items.Length
+                        return Some(asCompletionList(declarations))
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
