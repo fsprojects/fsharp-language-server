@@ -301,6 +301,8 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
     try 
         // Get package info from project.assets.json
         let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
+        if not(projectAssetsJson.Exists) then
+            raise(Exception(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName))
         let assets = parseProjectAssets(projectAssetsJson)
         // Figure out name of output .dll
         let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)

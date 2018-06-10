@@ -91,3 +91,10 @@ let ``find package references in FSharpLanguageServer``() =
 let ``find package references in FSharpKoans``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "FSharpKoans.Core"; "FSharpKoans.Core.fsproj"|] |> FileInfo 
     CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
+
+[<Test>]
+let ``error for unbuilt project``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "NotBuilt.fsproj"|] |> FileInfo 
+    match ProjectCracker.crack(fsproj) with 
+    | Ok(_) -> Assert.Fail("Should have failed to crack unbuilt project")
+    | Error(e) -> StringAssert.Contains("project.assets.json does not exist", e)
