@@ -442,7 +442,7 @@ type Server(client: ILanguageClient) =
                 | Some root -> 
                     dprintfn "Add workspace root %s" root.LocalPath
                     deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath)) 
-                | _ -> ()
+                | _ -> dprintfn "No root URI in initialization message %A" p
                 return { 
                     capabilities = 
                         { defaultServerCapabilities with 
