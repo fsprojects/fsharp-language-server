@@ -62,7 +62,7 @@ function createProgressListeners(client: LanguageClient) {
 		progress: Progress<{message?: string}>
 		resolve: (nothing: {}) => void
 		
-		startCheckFiles(start: StartProgress) {
+		startProgress(start: StartProgress) {
 			// TODO implement user cancellation
 			// TODO Change 15 to ProgressLocation.Notification
 			window.withProgress({title: start.title, location: 15}, progress => new Promise((resolve, _reject) => {
@@ -77,7 +77,7 @@ function createProgressListeners(client: LanguageClient) {
 			return Math.floor(this.countChecked / (this.nFiles + 1) * 100);
 		}
 
-		checkFile(fileName: string) {
+		incrementProgress(fileName: string) {
 			if (this.progress != null) {
 				let oldPercent = this.percentComplete();
 				this.countChecked++;
@@ -87,7 +87,7 @@ function createProgressListeners(client: LanguageClient) {
 			}
 		}
 
-		endCheckFiles() {
+		endProgress() {
 			this.countChecked = 0
 			this.nFiles = 0
 			this.progress = null
@@ -96,13 +96,13 @@ function createProgressListeners(client: LanguageClient) {
 	}
 	// Use custom notifications to drive progressListener
 	client.onNotification(new NotificationType('fsharp/startProgress'), (start: StartProgress) => {
-		progressListener.startCheckFiles(start);
+		progressListener.startProgress(start);
 	});
 	client.onNotification(new NotificationType('fsharp/incrementProgress'), (fileName: string) => {
-		progressListener.checkFile(fileName);
+		progressListener.incrementProgress(fileName);
 	});
 	client.onNotification(new NotificationType('fsharp/endProgress'), () => {
-		progressListener.endCheckFiles();
+		progressListener.endProgress();
 	});
 }
 
