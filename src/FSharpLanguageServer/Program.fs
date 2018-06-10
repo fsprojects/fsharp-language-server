@@ -546,7 +546,7 @@ type Server(client: ILanguageClient) =
                     // When a partial identifier is not present, stale completions are very inaccurate
                     // For example Some(1).? will complete top-level names rather than the members of Option
                     // Therefore, we will always re-check the file, even if it takes a while
-                    if partialName.PartialIdent = "" then 
+                    if partialName.QualifyingIdents.IsEmpty && partialName.PartialIdent = "" then 
                         dprintfn "No partial name, re-checking file..."
                         checkOpenFile(file)
                     // When a partial identifier is present, stale completions are quite accurate

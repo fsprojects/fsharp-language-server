@@ -24,8 +24,6 @@
 - Only rebuild .fsproj files that depend on the saved one
 - Only re-analyze .fsx when # directives are changed
 - Analyze project.assets.json lazily
-- Only use stale typecheck when 1 line has been changed
-- Foo.| should use the fast path
 
 # Features
 - When build fails, create default options with incomplete context
