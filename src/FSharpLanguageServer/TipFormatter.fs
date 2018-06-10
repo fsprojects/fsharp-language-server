@@ -161,7 +161,7 @@ let private overloadComment(docs: FSharpXmlDoc list): string option =
                 | Some(m) -> 
                     match m.summary with 
                     | None -> () 
-                    | Some(message) -> yield message ]
+                    | Some(message) -> yield message.Trim() ]
     let first = List.tryHead summaries 
     match first with 
     | None -> None
