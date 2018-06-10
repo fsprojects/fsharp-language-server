@@ -35,6 +35,9 @@ type CrackedProject = {
     projectReferences: FileInfo list 
     /// .dlls
     packageReferences: FileInfo list 
+    /// An error was encountered while cracking the project
+    /// This message should be displayed at the top of every file
+    error: string option
 }
 
 /// Read the assembly name and version from a .dll using System.Reflection.Metadata
@@ -297,19 +300,12 @@ let private load(fsproj: FileInfo): Project =
 /// - Running the "Restore" target and reading 
 /// - Reading .fsproj using the MSBuild API
 /// - Reading libraries from project.assets.json
-let crack(fsproj: FileInfo): Result<CrackedProject, string> = 
+let crack(fsproj: FileInfo): CrackedProject = 
+    // Figure out name of output .dll
+    let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)
+    let dllName = baseName + ".dll"
+    let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
     try 
-        // Get package info from project.assets.json
-        let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
-        if not(projectAssetsJson.Exists) then
-            raise(Exception(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName))
-        let assets = parseProjectAssets(projectAssetsJson)
-        // Figure out name of output .dll
-        let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)
-        let dllName = baseName + ".dll"
-        // msbuild produces paths like src/LSP/bin/Debug/netcoreapp2.0/LSP.dll
-        // TODO this seems fragile
-        let target = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
         // Get source info from .fsproj
         let project = load(fsproj)
         let sources = 
@@ -318,34 +314,56 @@ let crack(fsproj: FileInfo): Result<CrackedProject, string> =
                 let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
                 let normalizePath = Path.GetFullPath(absolutePath)
                 yield FileInfo(normalizePath) ]
-        Ok({
-            fsproj=fsproj
-            target=target
-            sources=sources
-            projectReferences=assets.projects
-            packageReferences=assets.packages
-        })
-    with e -> Error(e.Message)
-
-let private pseudoProject = lazy(
-    let start = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
-    dprintfn "Looking for PsuedoScript.fsproj relative to %s" start.FullName
-    let rec walk(dir: DirectoryInfo) = 
-        let candidate = FileInfo(Path.Combine [|dir.FullName; "client"; "PseudoScript.fsproj"|])
-        if candidate.Exists then 
-            candidate 
-        elif dir = dir.Root then
-            raise(Exception(sprintf "Couldn't find PseudoProject.fsproj in any parent directory of %A" start))
+        // Get package info from project.assets.json
+        let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
+        if not(projectAssetsJson.Exists) then
+            {
+                fsproj=fsproj 
+                target=placeholderTarget 
+                sources=sources
+                projectReferences=[]
+                packageReferences=[]
+                error=Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
+            }
         else
-            walk(dir.Parent)
-    walk(start)
-)
+            let assets = parseProjectAssets(projectAssetsJson)
+            // msbuild produces paths like src/LSP/bin/Debug/netcoreapp2.0/LSP.dll
+            // TODO this seems fragile
+            let target = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
+            {
+                fsproj=fsproj
+                target=target
+                sources=sources
+                projectReferences=assets.projects
+                packageReferences=assets.packages
+                error=None
+            }
+    with e -> 
+        {
+            fsproj=fsproj
+            target=placeholderTarget
+            sources=[]
+            projectReferences=[]
+            packageReferences=[]
+            error=Some(e.Message)
+        }
 
 /// Get the baseline options for an .fsx script
 /// In theory this should be done by FSharpChecker.GetProjectOptionsFromScript,
 /// but it appears to be broken on dotnet core: https://github.com/fsharp/FSharp.Compiler.Service/issues/847
 let scriptBase: Lazy<CrackedProject> = 
     lazy 
-        match crack(pseudoProject.Value) with 
-        | Ok(options) -> options 
-        | Error(message) -> raise(Exception(sprintf "Failed to load PseudoScript.fsproj: %s" message))
+        // Find PseudoScript.fsproj
+        let start = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
+        dprintfn "Looking for PsuedoScript.fsproj relative to %s" start.FullName
+        let rec walk(dir: DirectoryInfo) = 
+            let candidate = FileInfo(Path.Combine [|dir.FullName; "client"; "PseudoScript.fsproj"|])
+            if candidate.Exists then 
+                candidate 
+            elif dir = dir.Root then
+                raise(Exception(sprintf "Couldn't find PseudoProject.fsproj in any parent directory of %A" start))
+            else
+                walk(dir.Parent)
+        let pseudoProject = walk(start)
+        // Crack PseudoScript.fsproj
+        crack(pseudoProject)

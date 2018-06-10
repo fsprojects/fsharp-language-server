@@ -15,7 +15,6 @@ open ProjectCracker
 type private ProjectOptions = 
 | FsprojOptions of CrackedProject * FSharpProjectOptions 
 | FsxOptions of FSharpProjectOptions * FSharpErrorInfo list 
-| BadOptions of string * DateTime
 
 /// Maintains caches of parsed versions of .fsprojOrFsx files
 type ProjectManager(client: ILanguageClient, checker: FSharpChecker) = 
@@ -85,8 +84,6 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             lastModified(fsprojOrFsx) > options.LoadTime || List.exists needsUpdate deps
         | _, FsxOptions(options, _) -> 
             lastModified(fsprojOrFsx) > options.LoadTime
-        | _, BadOptions(_, checkedTime) -> 
-            lastModified(fsprojOrFsx) > checkedTime
 
     /// What projects need to be updated?
     let changedProjects() = 
@@ -122,54 +119,52 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         let rec analyzeFsproj(fsproj: FileInfo) = 
             dprintfn "Analyzing %s" fsproj.Name
             progress.Increment(fsproj)
-            match ProjectCracker.crack(fsproj) with 
-            | Error(e) -> addToCache(fsproj, BadOptions(e, fsproj.LastWriteTime))
-            | Ok(cracked) -> 
-                // Ensure we've analyzed all dependencies
-                // We'll need their target dlls to form FSharpProjectOptions
-                for r in cracked.projectReferences do 
-                    ensureFsproj(r)
-                // Convert to FSharpProjectOptions
-                let options = {
-                    ExtraProjectInfo = None 
-                    IsIncompleteTypeCheckEnvironment = false 
-                    LoadTime = lastModified(fsproj)
-                    OriginalLoadReferences = []
-                    OtherOptions = 
-                        [|
-                            // Dotnet framework should be specified explicitly
-                            yield "--noframework"
-                            // Reference output of other projects
-                            for r in cracked.projectReferences do 
-                                match analyzedByProjectFile.[r.FullName] with 
-                                | FsprojOptions(cracked, _) -> yield "-r:" + cracked.target.FullName
-                                | _ -> ()
-                            // Reference packages
-                            for r in cracked.packageReferences do 
-                                yield "-r:" + r.FullName
-                        |]
-                    ProjectFileName = fsproj.FullName 
-                    ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
-                    ReferencedProjects = 
-                        [|
-                            for r in cracked.projectReferences do 
-                                match analyzedByProjectFile.[r.FullName] with 
-                                | FsprojOptions(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
-                                | _ -> ()
-                        |]
-                    SourceFiles = 
-                        [|
-                            for f in cracked.sources do 
-                                yield f.FullName
-                        |]
-                    Stamp = None 
-                    UnresolvedReferences = None 
-                    UseScriptResolutionRules = false
-                }
-                // Cache inferred options
-                addToCache(fsproj, FsprojOptions(cracked, options))
-                // Log what we inferred
-                printOptions(options)
+            let cracked = ProjectCracker.crack(fsproj)
+            // Ensure we've analyzed all dependencies
+            // We'll need their target dlls to form FSharpProjectOptions
+            for r in cracked.projectReferences do 
+                ensureFsproj(r)
+            // Convert to FSharpProjectOptions
+            let options = {
+                ExtraProjectInfo = None 
+                IsIncompleteTypeCheckEnvironment = false 
+                LoadTime = lastModified(fsproj)
+                OriginalLoadReferences = []
+                OtherOptions = 
+                    [|
+                        // Dotnet framework should be specified explicitly
+                        yield "--noframework"
+                        // Reference output of other projects
+                        for r in cracked.projectReferences do 
+                            match analyzedByProjectFile.[r.FullName] with 
+                            | FsprojOptions(cracked, _) -> yield "-r:" + cracked.target.FullName
+                            | _ -> ()
+                        // Reference packages
+                        for r in cracked.packageReferences do 
+                            yield "-r:" + r.FullName
+                    |]
+                ProjectFileName = fsproj.FullName 
+                ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
+                ReferencedProjects = 
+                    [|
+                        for r in cracked.projectReferences do 
+                            match analyzedByProjectFile.[r.FullName] with 
+                            | FsprojOptions(cracked, projectOptions) -> yield cracked.target.FullName, projectOptions
+                            | _ -> ()
+                    |]
+                SourceFiles = 
+                    [|
+                        for f in cracked.sources do 
+                            yield f.FullName
+                    |]
+                Stamp = None 
+                UnresolvedReferences = None 
+                UseScriptResolutionRules = false
+            }
+            // Cache inferred options
+            addToCache(fsproj, FsprojOptions(cracked, options))
+            // Log what we inferred
+            printOptions(options)
         and ensureFsproj(fsproj: FileInfo) = 
             // TODO detect loop by caching set of `currentlyAnalyzing` projects
             if needsUpdate(fsproj) then 
@@ -202,10 +197,12 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         if projectFileBySourceFile.ContainsKey(sourceFile.FullName) then 
             let projectFile = projectFileBySourceFile.[sourceFile.FullName] 
             match analyzedByProjectFile.[projectFile.FullName] with 
-            | FsprojOptions(_, options) 
+            | FsprojOptions(cracked, options) -> 
+                match cracked.error with 
+                | Some(message) -> Error([Conversions.errorAtTop(message)])
+                | None -> Ok(options)
             | FsxOptions(options, []) -> Ok(options)
             | FsxOptions(_, errs) -> Error(Conversions.asDiagnostics(errs))
-            | BadOptions(message, _) -> Error([Conversions.errorAtTop(message)])
         else Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
     /// All open projects, in dependency order
     /// Ancestor projects come before projects that depend on them
