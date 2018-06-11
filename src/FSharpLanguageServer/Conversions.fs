@@ -7,6 +7,8 @@ open System
 open LSP.Types
 open FSharp.Data
 
+module Ast = Microsoft.FSharp.Compiler.Ast
+
 /// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpErrorInfo): Range = 
     {
@@ -208,4 +210,15 @@ let asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNav
         kind=asSymbolKind d.Kind 
         location=asLocation d.Range 
         containerName=Option.map declarationName container
+    }
+
+let asRunTest(fqn: string list, test: Ast.SynBinding): CodeLens =
+    {
+        range=asRange(test.RangeOfBindingSansRhs)
+        command=Some({
+            title="Run Test"
+            command="fsharp.run.test"
+            arguments=[JsonValue.String(String.concat "." fqn)]
+        })
+        data=JsonValue.Null
     }

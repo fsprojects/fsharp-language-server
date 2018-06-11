@@ -47,7 +47,6 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
             match value with 
             | FsprojOptions(_, options) -> options.SourceFiles
             | FsxOptions(options, _) -> options.SourceFiles
-            | _ -> [||]
         for s in sources do 
             projectFileBySourceFile.[s] <- key
 

@@ -13,6 +13,8 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Conversions
 
+module Ast = Microsoft.FSharp.Compiler.Ast
+
 let private TODO() = raise (Exception "TODO")
 
 /// Look for a method call like foo.MyMethod() before the cursor
@@ -98,6 +100,60 @@ let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDecl
         yield d.Declaration, None
         for n in d.Nested do 
             yield n, Some(d.Declaration) ]
+
+/// Find functions annotated with [<Test>]
+let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.SynBinding) list = 
+    let isTestAttribute(a: Ast.SynAttribute): bool = 
+        let ids = a.TypeName.Lid
+        let string = String.concat "." [for i in ids do yield i.idText]
+        match string with 
+        // TODO check for open NUnit.Framework before accepting plain "Test"
+        | "Test" | "NUnit.Framework.Test" -> true
+        | _ -> dprintfn "%s is not [<Test>]" string; false
+    let isTestFunction(binding: Ast.SynBinding): bool = 
+        let attrs = match binding with Ast.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
+        List.exists isTestAttribute attrs
+    let name(binding: Ast.SynBinding): string list = 
+        match binding with 
+        | Ast.Binding(_, _, _, _, _, _, _, Ast.SynPat.LongIdent(Ast.LongIdentWithDots(ids, _), _, _, _, _, _), _, _, _, _) -> 
+            [for i in ids do yield i.idText]
+        | _ -> []
+    let rec bindings(ctx: string list, m: Ast.SynModuleDecl): (string list * Ast.SynBinding) seq = 
+        seq {
+            match m with 
+            | Ast.SynModuleDecl.NestedModule(outer, _, decls, _, _) -> 
+                let ids = match outer with Ast.ComponentInfo(_, _, _, ids, _, _, _, _) -> ids
+                let ctx = ctx@[for i in ids do yield i.idText]
+                for d in decls do 
+                    yield! bindings(ctx, d)
+            | Ast.SynModuleDecl.Let(_, bindings, _) -> 
+                for b in bindings do 
+                    yield ctx@name(b), b
+            | Ast.SynModuleDecl.Types(defs, _) -> 
+                for d in defs do 
+                    match d with 
+                    | Ast.TypeDefn(Ast.ComponentInfo(_, _, _, ids, _, _, _, _), _, members, _) -> 
+                        let ctx = ctx@[for i in ids do yield i.idText]
+                        for m in members do 
+                            match m with 
+                            | Ast.SynMemberDefn.Member(b, _) -> 
+                                yield ctx@name(b), b
+                            | Ast.SynMemberDefn.LetBindings(bindings, _, _, _) -> 
+                                for b in bindings do 
+                                    yield ctx@name(b), b
+                            | _ -> ()
+            | _ -> ()
+        }
+    let modules = 
+        match parse.ParseTree with 
+        | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> modules
+        | _ -> []
+    [ for m in modules do 
+        let decls = match m with Ast.SynModuleOrNamespace(_, _, _, decls, _, _, _, _) -> decls
+        for d in decls do 
+            for ctx, b in bindings([], d) do 
+                if isTestFunction(b) then 
+                    yield ctx, b ]
 
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
@@ -450,6 +506,7 @@ type Server(client: ILanguageClient) =
                             completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
                             signatureHelpProvider = Some({triggerCharacters=['('; ',']})
                             documentSymbolProvider = true
+                            codeLensProvider = Some({resolveProvider=false})
                             workspaceSymbolProvider = true
                             definitionProvider = true
                             referencesProvider = true
@@ -679,7 +736,18 @@ type Server(client: ILanguageClient) =
                 return List.ofSeq(all)
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
-        member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = TODO()
+        member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = 
+            async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let! maybeParse = parseFile(file)
+                match maybeParse with 
+                | Error e -> 
+                    dprintfn "%s" e 
+                    return []
+                | Ok parse ->
+                    let fns = testFunctions(parse)
+                    return List.map asRunTest fns
+            }
         member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = TODO()
         member this.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
         member this.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
