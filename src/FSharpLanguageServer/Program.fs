@@ -411,7 +411,7 @@ type Server(client: ILanguageClient) =
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
                     let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, sourceText, projectOptions)
                     match maybeCheck with 
-                    | FSharpCheckFileAnswer.Aborted -> ()
+                    | FSharpCheckFileAnswer.Aborted -> dprintfn "Aborted checking %s" sourceFile.Name
                     | FSharpCheckFileAnswer.Succeeded(check) -> 
                         let! uses = check.GetUsesOfSymbolInFile(symbol)
                         for u in uses do 
