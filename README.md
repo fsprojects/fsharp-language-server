@@ -62,4 +62,3 @@ Ionide is a suite of F# plugins for VSCode; F# language server is analagous to t
 The implementation is a thin wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/) and is heavily focused on performance. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
 
 ![Autocomplete warm](videos/LSP-vs-Ionide-Warm.gif)
-

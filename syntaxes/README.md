@@ -1,0 +1,1 @@
+From https://github.com/ionide/ionide-fsgrammar/tree/master/grammar and https://github.com/ionide/ionide-vscode-fsharp/blob/master/release/language-configuration.json

@@ -35,12 +35,32 @@
                 "id": "fsharp",
                 "aliases": [
                     "F#",
-                    "FSharp"
+                    "FSharp",
+                    "fsharp"
                 ],
                 "extensions": [
                     ".fs",
+                    ".fsx",
                     ".fsi"
-                ]
+                ],
+                "configuration": "./syntaxes/fsharp.configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "fsharp",
+                "scopeName": "source.fsharp",
+                "path": "./syntaxes/fsharp.json"
+            },
+            {
+                "language": "fsharp",
+                "scopeName": "source.fsharp.fsx",
+                "path": "./syntaxes/fsharp.fsx.json"
+            },
+            {
+                "language": "fsharp",
+                "scopeName": "source.fsharp.fsi",
+                "path": "./syntaxes/fsharp.fsi.json"
             }
         ],
         "configuration": {
