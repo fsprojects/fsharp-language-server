@@ -5,6 +5,7 @@ echo 'Building sample projects...'
 dotnet restore sample/MainProject/MainProject.fsproj
 dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
+dotnet restore sample/HasTests/HasTests.fsproj
 
 echo 'Running tests...'
 set -e

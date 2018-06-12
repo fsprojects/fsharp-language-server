@@ -5,7 +5,8 @@
 'use strict';
 
 import * as path from 'path';
-import { window, workspace, ExtensionContext, Progress } from 'vscode';
+import * as cp from 'child_process';
+import { window, workspace, ExtensionContext, Progress, commands } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
 
 export function activate(context: ExtensionContext) {
@@ -47,6 +48,28 @@ export function activate(context: ExtensionContext) {
 
 	// When the language client activates, register a progress-listener
 	client.onReady().then(() => createProgressListeners(client));
+
+	// Register test-runner
+	commands.registerCommand('fsharp.test.run', runTest);
+}
+
+const outputChannel = window.createOutputChannel('F# Tests');
+
+function runTest(projectPath: string, fullyQualifiedName: string): Promise<number> {
+	return new Promise((resolve, _reject) => {
+		// TODO make this command configurable
+		let cmd = 'dotnet'
+		let args = ['test', projectPath, '--filter', `FullyQualifiedName=${fullyQualifiedName}`]
+		let process = cp.spawn(cmd, args)
+		
+		outputChannel.clear()
+		outputChannel.show()
+		outputChannel.appendLine(`${cmd} ${args.join(' ')}...`)
+
+		process.stdout.on('data', chunk => outputChannel.append(chunk.toString()));
+		process.stderr.on('data', chunk => outputChannel.append(chunk.toString()));
+		process.on('close', (code, _signal) => resolve(code))
+	})
 }
 
 interface StartProgress {

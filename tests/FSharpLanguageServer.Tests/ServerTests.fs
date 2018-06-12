@@ -76,10 +76,10 @@ let initializeServer(server: ILanguageServer, sampleRootPath: string, fileName: 
     server.DidOpenTextDocument(openFile(file)) |> Async.RunSynchronously
 
 // TODO eliminate MainProject assumption
-let createServerAndReadFile(name: string): MockClient * ILanguageServer = 
+let createServerAndReadFile(project: string, file: string): MockClient * ILanguageServer = 
     let client, server = createServer()
-    let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|]
-    initializeServer(server, sampleRootPath, name)
+    let sampleRootPath = Path.Combine [|projectRoot.FullName; "sample"; project|]
+    initializeServer(server, sampleRootPath, file)
     (client, server)
 
 [<Test>]
@@ -92,7 +92,7 @@ let ``open a script file without errors``() =
 
 [<Test>]
 let ``report a type error when a file is opened``() = 
-    let client, server = createServerAndReadFile("WrongType.fs")
+    let client, server = createServerAndReadFile("MainProject", "WrongType.fs")
     if client.Diagnostics.Count = 0 then Assert.Fail("No diagnostics")
     let messages = diagnosticMessages(client)
     if not (List.exists (fun(m:string) -> m.Contains("This expression was expected to have type")) messages) then Assert.Fail(sprintf "No type error in %A" messages)
@@ -148,7 +148,7 @@ let textDocumentPosition(file: string, line: int, character: int): TextDocumentP
 
 [<Test>]
 let ``report a type error when a file is saved``() = 
-    let client, server = createServerAndReadFile("CreateTypeError.fs")
+    let client, server = createServerAndReadFile("MainProject", "CreateTypeError.fs")
     client.Diagnostics.Clear()
     server.DidChangeTextDocument(edit("CreateTypeError.fs", 4, 18, "1", "\"1\"")) |> Async.RunSynchronously
     server.DidSaveTextDocument(save("CreateTypeError.fs")) |> Async.RunSynchronously
@@ -158,42 +158,42 @@ let ``report a type error when a file is saved``() =
 
 [<Test>]
 let ``reference other file in same project``() = 
-    let client, server = createServerAndReadFile("Reference.fs")
+    let client, server = createServerAndReadFile("MainProject", "Reference.fs")
     let messages = diagnosticMessages(client)
     if not (List.exists (fun(m:string) -> m.Contains("This expression was expected to have type")) messages) then 
         Assert.Fail(sprintf "No type error in %A" messages)
 
 [<Test>]
 let ``reference another project``() = 
-    let client, server = createServerAndReadFile("ReferenceDependsOn.fs")
+    let client, server = createServerAndReadFile("MainProject", "ReferenceDependsOn.fs")
     let messages = diagnosticMessages(client)
     if not (List.exists (fun(m:string) -> m.Contains("This expression was expected to have type")) messages) then 
         Assert.Fail(sprintf "No type error in %A" messages)
 
 [<Test>]
 let ``reference indirect dependency``() = 
-    let client, server = createServerAndReadFile("ReferenceIndirectDep.fs")
+    let client, server = createServerAndReadFile("MainProject", "ReferenceIndirectDep.fs")
     let messages = diagnosticMessages(client)
     if not (List.exists (fun(m:string) -> m.Contains("This expression was expected to have type")) messages) then 
         Assert.Fail(sprintf "No type error in %A" messages)
 
 [<Test>]
 let ``skip file not in project file``() = 
-    let client, server = createServerAndReadFile("NotInFsproj.fs")
+    let client, server = createServerAndReadFile("MainProject", "NotInFsproj.fs")
     let messages = diagnosticMessages(client)
     if not (List.exists (fun(m:string) -> m.Contains("No .fsproj or .fsx file")) messages) then 
         Assert.Fail(sprintf "No 'Not in project' error in %A" messages)
 
 [<Test>]
 let ``hover over function``() = 
-    let client, server = createServerAndReadFile("Hover.fs")
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
     match server.Hover(textDocumentPosition("Hover.fs", 6, 23)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
 
 [<Test>]
 let ``hover over qualified name``() = 
-    let client, server = createServerAndReadFile("Hover.fs")
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
     match server.Hover(textDocumentPosition("Hover.fs", 12, 38)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
@@ -203,7 +203,7 @@ let labels(items: CompletionItem list) =
 
 [<Test>]
 let ``complete List members``() = 
-    let client, server = createServerAndReadFile("Completions.fs")
+    let client, server = createServerAndReadFile("MainProject", "Completions.fs")
     match server.Completion(textDocumentPosition("Completions.fs", 4, 10)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No completions")
     | Some(completions) -> 
@@ -211,7 +211,7 @@ let ``complete List members``() =
 
 [<Test>]
 let ``complete result of call``() = 
-    let client, server = createServerAndReadFile("Completions.fs")
+    let client, server = createServerAndReadFile("MainProject", "Completions.fs")
     server.DidChangeTextDocument(edit("Completions.fs", 7, 16, "", ".")) |> Async.RunSynchronously
     match server.Completion(textDocumentPosition("Completions.fs", 7, 17)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No completions")
@@ -220,7 +220,7 @@ let ``complete result of call``() =
 
 // [<Test>] TODO
 let ``dont complete inside a string``() = 
-    let client, server = createServerAndReadFile("CompleteInString.fs")
+    let client, server = createServerAndReadFile("MainProject", "CompleteInString.fs")
     match server.Completion(textDocumentPosition("CompleteInString.fs", 3, 15)) |> Async.RunSynchronously with 
     | None -> ()
     | Some(completions) -> 
@@ -228,7 +228,7 @@ let ``dont complete inside a string``() =
 
 [<Test>]
 let ``signature help``() = 
-    let client, server = createServerAndReadFile("SignatureHelp.fs")
+    let client, server = createServerAndReadFile("MainProject", "SignatureHelp.fs")
     match server.SignatureHelp(textDocumentPosition("SignatureHelp.fs", 3, 47)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No signature help")
     | Some help -> 
@@ -268,22 +268,22 @@ let ``test findMethodCallBeforeCursor``() =
 
 [<Test>]
 let ``find document symbols``() = 
-    let client, server = createServerAndReadFile("Reference.fs")
-    let found = server.DocumentSymbols({textDocument=textDocument "Reference.fs"}) |> Async.RunSynchronously
+    let client, server = createServerAndReadFile("MainProject", "Reference.fs")
+    let found = server.DocumentSymbols({textDocument=textDocument("Reference.fs")}) |> Async.RunSynchronously
     let names = found |> List.map (fun f -> f.name)
     if not (List.contains "Reference" names) then Assert.Fail(sprintf "Reference is not in %A" names)
     if List.contains "ReferenceDependsOn" names then Assert.Fail("Document symbols includes dependency")
 
 [<Test>]
 let ``find interface inside module``() = 
-    let client, server = createServerAndReadFile("InterfaceInModule.fs")
-    let found = server.DocumentSymbols({textDocument=textDocument "InterfaceInModule.fs"}) |> Async.RunSynchronously
+    let client, server = createServerAndReadFile("MainProject", "InterfaceInModule.fs")
+    let found = server.DocumentSymbols({textDocument=textDocument("InterfaceInModule.fs")}) |> Async.RunSynchronously
     let names = found |> List.map (fun f -> f.name)
     if not (List.contains "IMyInterface" names) then Assert.Fail(sprintf "IMyInterface is not in %A" names)
 
 [<Test>]
 let ``find project symbols``() = 
-    let client, server = createServerAndReadFile("SignatureHelp.fs")
+    let client, server = createServerAndReadFile("MainProject", "SignatureHelp.fs")
     let found = server.WorkspaceSymbols({query = "signatureHelp"}) |> Async.RunSynchronously
     if List.isEmpty found then Assert.Fail("Should have found signatureHelp")
     let found = server.WorkspaceSymbols({query = "IndirectLibrary"}) |> Async.RunSynchronously
@@ -293,7 +293,7 @@ let ``find project symbols``() =
 
 [<Test>]
 let ``go to definition``() = 
-    let client, server = createServerAndReadFile("Reference.fs")
+    let client, server = createServerAndReadFile("MainProject", "Reference.fs")
     match server.GotoDefinition(textDocumentPosition("Reference.fs", 3, 31)) |> Async.RunSynchronously with 
     | [] -> Assert.Fail("No symbol definition")
     | [single] -> ()
@@ -301,10 +301,10 @@ let ``go to definition``() =
 
 [<Test>]
 let ``find references``() = 
-    let client, server = createServerAndReadFile("DeclareSymbol.fs")
+    let client, server = createServerAndReadFile("MainProject", "DeclareSymbol.fs")
     let p = 
         {
-            textDocument = textDocument "DeclareSymbol.fs"
+            textDocument = textDocument("DeclareSymbol.fs")
             position = { line=3-1; character=6-1 }
             context = { includeDeclaration=true }
         }
@@ -315,9 +315,9 @@ let ``find references``() =
 
 [<Test>]
 let ``rename across files``() = 
-    let client, server = createServerAndReadFile("RenameTarget.fs")
+    let client, server = createServerAndReadFile("MainProject", "RenameTarget.fs")
     let p = {
-        textDocument=textDocument "RenameTarget.fs"
+        textDocument=textDocument("RenameTarget.fs")
         position=position(3, 11)
         newName = "renamedSymbol" 
     }
@@ -336,3 +336,10 @@ let ``match title case queries``() =
     Assert.True(matchesTitleCase("fb", "AnyPrefixFooBar"))
     Assert.True(matchesTitleCase("fb", "UPPERFooBar"))
     Assert.False(matchesTitleCase("fb", "Foobar"))
+
+[<Test>]
+let ``create Run Test code lens``() = 
+    let client, server = createServerAndReadFile("HasTests", "MyTests.fs")
+    let lenses = server.CodeLens({ textDocument = textDocument("MyTests.fs") }) |> Async.RunSynchronously
+    let lines = [for l in lenses do yield l.range.start.line]
+    CollectionAssert.Contains(lines, 6, "Should have found a code lens on line 6")

@@ -149,9 +149,10 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
         | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> modules
         | _ -> []
     [ for m in modules do 
-        let decls = match m with Ast.SynModuleOrNamespace(_, _, _, decls, _, _, _, _) -> decls
+        let ids, decls = match m with Ast.SynModuleOrNamespace(ids, _, _, decls, _, _, _, _) -> ids, decls
+        let name = [for i in ids do yield i.idText]
         for d in decls do 
-            for ctx, b in bindings([], d) do 
+            for ctx, b in bindings(name, d) do 
                 if isTestFunction(b) then 
                     yield ctx, b ]
 
@@ -739,14 +740,19 @@ type Server(client: ILanguageClient) =
         member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                let! maybeParse = parseFile(file)
-                match maybeParse with 
-                | Error e -> 
-                    dprintfn "%s" e 
-                    return []
-                | Ok parse ->
+                match projects.FindProjectOptions(file), getOrRead(file) with 
+                | Ok(projectOptions), Some(sourceText) -> 
+                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                    let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                     let fns = testFunctions(parse)
-                    return List.map asRunTest fns
+                    let fsproj = FileInfo(projectOptions.ProjectFileName)
+                    return [for id, bindings in fns do yield asRunTest(fsproj, id, bindings)]
+                | Error(e), _ -> 
+                    dprintfn "Failed to create code lens because project options failed to load: %A" e
+                    return []
+                | _, None -> 
+                    dprintfn "Failed to create code lens because file %s does not exist" file.FullName
+                    return []
             }
         member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = TODO()
         member this.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()

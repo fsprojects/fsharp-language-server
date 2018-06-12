@@ -4,6 +4,7 @@ open LSP.Log
 open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
+open System.IO
 open LSP.Types
 open FSharp.Data
 
@@ -212,13 +213,13 @@ let asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNav
         containerName=Option.map declarationName container
     }
 
-let asRunTest(fqn: string list, test: Ast.SynBinding): CodeLens =
+let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBinding): CodeLens =
     {
         range=asRange(test.RangeOfBindingSansRhs)
         command=Some({
             title="Run Test"
-            command="fsharp.run.test"
-            arguments=[JsonValue.String(String.concat "." fqn)]
+            command="fsharp.test.run"
+            arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)]
         })
         data=JsonValue.Null
     }
