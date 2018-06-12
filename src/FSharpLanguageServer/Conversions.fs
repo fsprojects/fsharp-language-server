@@ -216,10 +216,8 @@ let asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNav
 let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBinding): CodeLens =
     {
         range=asRange(test.RangeOfBindingSansRhs)
-        command=Some({
-            title="Run Test"
-            command="fsharp.test.run"
-            arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)]
-        })
+        command=Some({  title="Run Test"
+                        command="fsharp.test.run"
+                        arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
         data=JsonValue.Null
     }
