@@ -57,7 +57,7 @@ const outputChannel = window.createOutputChannel('F# Tests');
 
 function runTest(projectPath: string, fullyQualifiedName: string): Promise<number> {
 	return new Promise((resolve, _reject) => {
-		// TODO make this command configurable
+		// TODO replace this with the tasks API https://code.visualstudio.com/docs/extensionAPI/vscode-api#_tasks
 		let cmd = 'dotnet'
 		let args = ['test', projectPath, '--filter', `FullyQualifiedName=${fullyQualifiedName}`]
 		let process = cp.spawn(cmd, args)

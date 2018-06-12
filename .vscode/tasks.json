@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "FSharp Test",
+            "command": "dotnet",
+            "args": ["test", "/Users/georgefraser/Documents/fsharp-language-server/tests/ProjectCracker.Tests/ProjectCracker.Tests.fsproj", "--filter", "FullyQualifiedName=ProjectCrackerTests.crack script defaults"],
+            "type": "shell"
+        }
+    ]
+}
