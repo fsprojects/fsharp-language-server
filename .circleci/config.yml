@@ -21,11 +21,15 @@ jobs:
           command: dotnet restore sample/HasTests/HasTests.fsproj
               
       - run: 
-          name: LSP.Tests
+          name: Build all
+          command: dotnet build
+              
+      - run: 
+          name: Test LSP.Tests
           command: dotnet test tests/LSP.Tests
       - run: 
-          name: ProjectCracker.Tests
+          name: Test ProjectCracker.Tests
           command: dotnet test tests/ProjectCracker.Tests
       - run: 
-          name: FSharpLanguageServer.Tests
+          name: Test FSharpLanguageServer.Tests
           command: dotnet test tests/FSharpLanguageServer.Tests
