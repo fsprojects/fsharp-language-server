@@ -155,12 +155,12 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
             server.ExecuteCommand(p) |> thenNone
         | DidChangeWorkspaceFolders(p) ->
             server.DidChangeWorkspaceFolders(p) |> thenNone
+        | Shutdown ->
+            server.Shutdown() |> thenNone
     let processNotification(n: Notification) = 
         match n with 
         | Initialized ->
             server.Initialized()
-        | Shutdown ->
-            server.Shutdown()
         | DidChangeConfiguration(p) -> 
             server.DidChangeConfiguration(p)
         | DidOpenTextDocument(p) -> 
