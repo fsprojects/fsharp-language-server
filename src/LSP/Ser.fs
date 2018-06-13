@@ -7,10 +7,12 @@ open Microsoft.FSharp.Reflection.FSharpReflectionExtensions
 open System.Text.RegularExpressions
 open FSharp.Data
 
-let private escapeChars = Regex("[\n\r\"]", RegexOptions.Compiled)
+let private escapeChars = Regex("[\t\n\r\"\\\\]", RegexOptions.Compiled)
 let private replaceChars = 
     MatchEvaluator(fun m -> 
         match m.Value with 
+        | "\\" -> "\\\\"
+        | "\t" -> "\\t"
         | "\n" -> "\\n" 
         | "\r" -> "\\r" 
         | "\"" -> "\\\"" 
