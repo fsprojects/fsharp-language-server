@@ -69,7 +69,7 @@ let asHover(FSharpToolTipText tips): Hover =
             match t with 
             | FSharpToolTipElement.CompositionError(e) -> dprintfn "Error rendering tooltip: %s" e
             | FSharpToolTipElement.None -> () 
-            | FSharpToolTipElement.Group elements -> 
+            | FSharpToolTipElement.Group(elements) -> 
                 yield! elements ]
     let contents = 
         match elements with 
@@ -78,14 +78,22 @@ let asHover(FSharpToolTipText tips): Hover =
             [   yield HighlightedString(one.MainDescription, "fsharp") 
                 match TipFormatter.docComment(one.XmlDoc) with 
                 | None -> ()
-                | Some(markdown) -> yield PlainString(markdown) ]
+                | Some(markdown) -> yield PlainString(markdown + "\n\n")
+                match one.Remarks with 
+                | None | Some("") -> () 
+                | Some(remarks) -> 
+                    yield PlainString("*" + remarks + "*\n\n") ]
         | many -> 
             let last = List.last(many)
             [   for e in many do 
                     yield HighlightedString(e.MainDescription, "fsharp")
                 match TipFormatter.docSummaryOnly(last.XmlDoc) with 
                 | None -> ()
-                | Some(markdown) -> yield PlainString(markdown) ]
+                | Some(markdown) -> yield PlainString(markdown)
+                match last.Remarks with 
+                | None | Some("") -> () 
+                | Some(remarks) -> 
+                    yield PlainString("*" + remarks + "*\n\n") ]
     {contents=contents; range=None}
 
 /// Convert an F# `FSharpGlyph` to an LSP `CompletionItemKind`
