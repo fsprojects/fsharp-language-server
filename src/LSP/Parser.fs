@@ -123,7 +123,6 @@ let parseDidChangeWatchedFilesParams = deserializerFactory<DidChangeWatchedFiles
 let parseNotification(method: string, maybeBody: JsonValue option): Notification = 
     match method, maybeBody with 
     | "initialized", _ -> Initialized
-    | "shutdown", _ -> Shutdown 
     | "exit", _ -> raise(Exception"exit message should terminated stream before reaching this point") 
     | "workspace/didChangeConfiguration", Some json -> DidChangeConfiguration (parseDidChangeConfigurationParams json)
     | "textDocument/didOpen", Some json -> DidOpenTextDocument (parseDidOpenTextDocumentParams json)
@@ -264,6 +263,7 @@ let parseDidChangeWorkspaceFoldersParams = deserializerFactory<DidChangeWorkspac
 let parseRequest(method: string, json: JsonValue): Request = 
     match method with 
     | "initialize" -> Initialize(parseInitialize json)
+    | "shutdown" -> Shutdown 
     | "textDocument/willSaveWaitUntil" -> WillSaveWaitUntilTextDocument(parseWillSaveTextDocumentParams json)
     | "textDocument/completion" -> Completion(parseTextDocumentPositionParams json)
     | "textDocument/hover" -> Hover(parseTextDocumentPositionParams json)

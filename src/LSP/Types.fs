@@ -111,7 +111,6 @@ type DidChangeWatchedFilesParams = {
     
 type Notification = 
 | Initialized
-| Shutdown 
 | DidChangeConfiguration of DidChangeConfigurationParams
 | DidOpenTextDocument of DidOpenTextDocumentParams
 | DidChangeTextDocument of DidChangeTextDocumentParams
@@ -408,6 +407,7 @@ type ExecuteCommandParams = {
 
 type Request = 
 | Initialize of InitializeParams
+| Shutdown
 | WillSaveWaitUntilTextDocument of WillSaveTextDocumentParams
 | Completion of TextDocumentPositionParams
 | Hover of TextDocumentPositionParams
