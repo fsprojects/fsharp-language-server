@@ -6,6 +6,7 @@ open LSP.Log
 open System
 open System.IO
 open System.Text.RegularExpressions
+open System.Diagnostics
 open Microsoft.Build
 open Microsoft.Build.Evaluation
 open Microsoft.Build.Utilities
@@ -52,22 +53,51 @@ let ``crack script defaults``() =
 
 // Check that project.assets.json-based ProjectCracker finds same .dlls as MSBuild
 
+let clean(fsproj: FileInfo) = 
+    let args = sprintf "clean %s" fsproj.FullName
+    let info =
+        ProcessStartInfo(
+            UseShellExecute = false,
+            FileName = "dotnet",
+            Arguments = args
+        )
+    let p = Process.Start(info)
+    p.WaitForExit()
+
 let msbuild(fsproj: FileInfo): string list = 
-    // Create an msbuild instance
-    let options = new AnalyzerManagerOptions()
-    options.LogWriter <- !diagnosticsLog
-    let manager = new AnalyzerManager(options)
-    // Compile the project
-    let analyzer = manager.GetProject(fsproj.FullName)
-    let compile = analyzer.Compile()
-    // Get package references from build
-    let packageReferences = compile.GetItems("ReferencePath")
-    [ for i in packageReferences do 
-        let relativePath = i.EvaluatedInclude
-        // Exclude project references
-        if not(relativePath.Contains("bin/Debug/netcoreapp2.0")) then
-            let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
-            yield Path.GetFullPath(absolutePath) ]
+    // Clean project so `dotnet build` actually generates output
+    clean(fsproj)
+    // Invoke `dotnet build`
+    let args = sprintf "build %s -v d" fsproj.FullName
+    let info =
+        ProcessStartInfo(
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            FileName = "dotnet",
+            Arguments = args
+        )
+    let p = Process.Start(info)
+    // Collect all lines of stdout
+    let lines = System.Collections.Generic.List<string>()
+    p.OutputDataReceived.Add(fun args -> if args.Data <> null then lines.Add(args.Data))
+    p.ErrorDataReceived.Add(fun args -> if args.Data <> null then dprintfn "Build: %A" args.Data)
+    if not(p.Start()) then 
+        failwithf "Failed dotnet %s" args
+    p.BeginOutputReadLine()
+    p.BeginErrorReadLine()
+    p.WaitForExit()
+    // Search for lines that start with '-r:'
+    let references = System.Collections.Generic.List<string>()
+    for line in lines do 
+        if line.EndsWith("Task \"Fsc\"") then 
+            references.Clear()
+        if line.Trim().StartsWith("-r:") then 
+            references.Add(line.Trim().Substring("-r:".Length))
+    // Filter out project-to-project references, these are handled separately by ProjectCracker
+    [ for r in references do 
+        if not(r.Contains("bin/Debug/netcoreapp2.0")) then 
+            yield r ]
     
 let cracker(fsproj: FileInfo): string list = 
     let cracked = ProjectCracker.crack(fsproj)
