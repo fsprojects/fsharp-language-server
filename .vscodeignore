@@ -1,4 +1,6 @@
 .vscode/**
+client/obj/**
+client/bin/**
 sample/**
 scripts/**
 src/**

@@ -295,12 +295,12 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         projects=projects
     }
 
-let private load(fsproj: FileInfo): Project = 
+let private project(fsproj: FileInfo): ProjectAnalyzer = 
     let options = new AnalyzerManagerOptions()
     options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
     options.CleanBeforeCompile <- false
     let manager = AnalyzerManager(options)
-    manager.GetProject(fsproj.FullName).Load()
+    manager.GetProject(fsproj.FullName)
 
 /// Crack an .fsproj file by:
 /// - Running the "Restore" target and reading 
@@ -313,7 +313,7 @@ let crack(fsproj: FileInfo): CrackedProject =
     let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
     try 
         // Get source info from .fsproj
-        let project = load(fsproj)
+        let project = project(fsproj).Load()
         let sources = 
             [ for i in project.GetItems("Compile") do 
                 let relativePath = i.EvaluatedInclude
@@ -371,5 +371,7 @@ let scriptBase: Lazy<CrackedProject> =
             else
                 walk(dir.Parent)
         let pseudoProject = walk(start)
+        // Restore PseudoScript.fsproj to generate project.assets.json
+        project(pseudoProject).Compile() |> ignore
         // Crack PseudoScript.fsproj
         crack(pseudoProject)
