@@ -184,9 +184,12 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // Find projects in libraries section
     for name, value in root?libraries.Properties do 
         if value?``type``.AsString() = "project" then 
-            let [|name; version|] = name.Split('/')
-            let dep = {name=name; version=version; autoReferenced=false}
-            findTransitiveDeps(dep)
+            match name.Split('/') with
+            | [|name; version|] -> 
+                let dep = {name=name; version=version; autoReferenced=false}
+                findTransitiveDeps(dep)
+            | _ -> 
+                dprintfn "%s doesn't look like name/version" name
     dprintfn "Transitive dependencies are %A" (List.ofSeq(transitiveDependencies.Keys))
     // ["/Users/georgefraser/.nuget/packages/", ...]
     let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
