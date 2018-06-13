@@ -1,0 +1,31 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: microsoft/dotnet:2-sdk
+
+    steps:
+      - checkout
+      
+      - run:
+          name: Restore sample/MainProject
+          command: dotnet restore sample/MainProject/MainProject.fsproj
+      - run:
+          name: Restore sample/HasLocalDll
+          command: dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
+      - run:
+          name: Restore sample/FSharpKoans.Core
+          command: dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
+      - run:
+          name: Restore sample/HasTests
+          command: dotnet restore sample/HasTests/HasTests.fsproj
+              
+      - run: 
+          name: LSP.Tests
+          command: dotnet test tests/LSP.Tests
+      - run: 
+          name: ProjectCracker.Tests
+          command: dotnet test tests/ProjectCracker.Tests
+      - run: 
+          name: FSharpLanguageServer.Tests
+          command: dotnet test tests/FSharpLanguageServer.Tests
