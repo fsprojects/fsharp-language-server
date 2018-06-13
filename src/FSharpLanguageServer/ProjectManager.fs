@@ -219,7 +219,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         for key in analyzedByProjectFile.Keys do 
             walk(key)
         List.ofSeq(result)
-    //// All transitive dependencies of `projectFile`, in dependency order
+    /// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
         transitiveDeps(projectFile)
     /// Is `targetSourceFile` visible from `fromSourceFile`?

@@ -109,7 +109,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
         match string with 
         // TODO check for open NUnit.Framework before accepting plain "Test"
         | "Test" | "NUnit.Framework.Test" -> true
-        | _ -> dprintfn "%s is not [<Test>]" string; false
+        | _ -> false
     let isTestFunction(binding: Ast.SynBinding): bool = 
         let attrs = match binding with Ast.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
         List.exists isTestAttribute attrs
@@ -122,7 +122,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
         seq {
             match m with 
             | Ast.SynModuleDecl.NestedModule(outer, _, decls, _, _) -> 
-                let ids = match outer with Ast.ComponentInfo(_, _, _, ids, _, _, _, _) -> ids
+                let ids = match outer with Ast.ComponentInfo(_, _, _, ids, _, _, _, _) -> ids   
                 let ctx = ctx@[for i in ids do yield i.idText]
                 for d in decls do 
                     yield! bindings(ctx, d)

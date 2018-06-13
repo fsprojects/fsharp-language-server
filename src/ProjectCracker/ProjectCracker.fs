@@ -149,8 +149,11 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             match root?targets.[longFramework].[nameVersion].TryGetProperty("dependencies") with 
             | None -> ()
             | Some(next) -> 
-                for name, version in next.Properties do 
-                    let dep = {name=name; version=version.AsString(); autoReferenced=false}
+                for name, _ in next.Properties do 
+                    // The version in "dependencies" can be a range like [1.0, 2.0), 
+                    // so we will use the version from targets
+                    let version = chooseVersion(name)
+                    let dep = {name=name; version=version; autoReferenced=false}
                     findTransitiveDeps(dep)
     // Find root dependencies by scanning the project section
     // "project": {
