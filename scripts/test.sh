@@ -6,6 +6,7 @@ dotnet restore sample/MainProject/MainProject.fsproj
 dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
 dotnet restore sample/HasTests/HasTests.fsproj
+dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
 
 echo 'Running tests...'
 set -e

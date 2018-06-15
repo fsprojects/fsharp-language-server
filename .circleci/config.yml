@@ -19,6 +19,9 @@ jobs:
       - run:
           name: Restore sample/HasTests
           command: dotnet restore sample/HasTests/HasTests.fsproj
+      - run:
+          name: Restore sample/ReferenceCSharp
+          command: dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
               
       - run: 
           name: Build all
