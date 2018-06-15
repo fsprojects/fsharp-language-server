@@ -343,3 +343,9 @@ let ``create Run Test code lens``() =
     let lenses = server.CodeLens({ textDocument = textDocument("HasTests", "MyTests.fs") }) |> Async.RunSynchronously
     let lines = [for l in lenses do yield l.range.start.line]
     CollectionAssert.Contains(lines, 5, sprintf "No line 5 in %A" lenses)
+
+[<Test>]
+let ``report no type errors in CSharp reference``() = 
+    let client, server = createServerAndReadFile("ReferenceCSharp", "Library.fs")
+    let messages = diagnosticMessages(client)
+    CollectionAssert.IsEmpty(messages)

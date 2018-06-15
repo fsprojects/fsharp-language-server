@@ -31,8 +31,10 @@ type CrackedProject = {
     /// List of source files.
     /// These are fsc args, but presented separately because that's how FSharpProjectOptions wants them.
     sources: FileInfo list
-    /// .fsproj files on references projects 
+    /// .fsproj files 
     projectReferences: FileInfo list 
+    /// .dlls corresponding to non-F# projects
+    otherProjectReferences: FileInfo list
     /// .dlls
     packageReferences: FileInfo list 
     /// An error was encountered while cracking the project
@@ -302,6 +304,18 @@ let private project(fsproj: FileInfo): ProjectAnalyzer =
     let manager = AnalyzerManager(options)
     manager.GetProject(fsproj.FullName)
 
+let private projectTarget(csproj: FileInfo) = 
+    let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
+    let dllName = baseName + ".dll"
+    let placeholderTarget = FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
+    let projectAssetsJson = FileInfo(Path.Combine [|csproj.DirectoryName; "obj"; "project.assets.json"|])
+    if projectAssetsJson.Exists then 
+        let assets = parseProjectAssets(projectAssetsJson)
+        // TODO this seems fragile
+        FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
+    else 
+        placeholderTarget
+
 /// Crack an .fsproj file by:
 /// - Running the "Restore" target and reading 
 /// - Reading .fsproj using the MSBuild API
@@ -328,6 +342,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 target=placeholderTarget 
                 sources=sources
                 projectReferences=[]
+                otherProjectReferences=[]
                 packageReferences=[]
                 error=Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
             }
@@ -336,11 +351,15 @@ let crack(fsproj: FileInfo): CrackedProject =
             // msbuild produces paths like src/LSP/bin/Debug/netcoreapp2.0/LSP.dll
             // TODO this seems fragile
             let target = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
+            let isFsproj(f: FileInfo) = f.Name.EndsWith(".fsproj")
+            let fsProjects, csProjects = List.partition isFsproj assets.projects
+
             {
                 fsproj=fsproj
                 target=target
                 sources=sources
-                projectReferences=assets.projects
+                projectReferences=fsProjects
+                otherProjectReferences=[for csproj in csProjects do yield projectTarget(csproj)]
                 packageReferences=assets.packages
                 error=None
             }
@@ -350,6 +369,7 @@ let crack(fsproj: FileInfo): CrackedProject =
             target=placeholderTarget
             sources=[]
             projectReferences=[]
+            otherProjectReferences=[]
             packageReferences=[]
             error=Some(e.Message)
         }

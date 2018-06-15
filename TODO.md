@@ -18,6 +18,7 @@
 - Don't autocomplete things with spaces
 - Crack FCS
 - Reload options when .fsx is saved
+- Invalidate check results when referenced .dlls are modified
 
 # Optimizations
 - Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly

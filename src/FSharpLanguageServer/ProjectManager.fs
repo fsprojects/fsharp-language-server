@@ -293,6 +293,9 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
                             match analyzedByProjectFile.[r.FullName] with 
                             | FsprojOptions(cracked, _) -> yield "-r:" + cracked.target.FullName
                             | _ -> ()
+                        // Reference target .dll for .csproj proejcts
+                        for r in cracked.otherProjectReferences do 
+                            yield "-r:" + r.FullName
                         // Reference packages
                         for r in cracked.packageReferences do 
                             yield "-r:" + r.FullName
