@@ -44,6 +44,12 @@ let ``find compile sources``() =
     let cracked = ProjectCracker.crack(fsproj)
     CollectionAssert.AreEquivalent(["IndirectLibrary.fs"], [for f in cracked.sources do yield f.Name])
 
+[<Test>]
+let ``find CSharp reference``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp"; "ReferenceCSharp.fsproj"|] |> FileInfo 
+    let cracked = ProjectCracker.crack(fsproj)
+    CollectionAssert.AreEquivalent(["CSharpProject.dll"], [for f in cracked.otherProjectReferences do yield f.Name])
+
 // Check that project.assets.json-based ProjectCracker finds same .dlls as MSBuild
 
 let clean(fsproj: FileInfo) = 
