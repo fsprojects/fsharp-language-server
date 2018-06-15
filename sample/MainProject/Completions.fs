@@ -5,3 +5,9 @@ let private completeListModule() =
 
 let private completeParens() = 
     Some("foo")
+
+let private ``name with space``() = 
+    ""
+
+let private completeSpace() = 
+    na

@@ -218,6 +218,19 @@ let ``complete result of call``() =
     | Some(completions) -> 
         CollectionAssert.Contains(labels(completions.items), "IsSome")
 
+[<Test>]
+let ``complete name with space``() = 
+    let client, server = createServerAndReadFile("MainProject", "Completions.fs")
+    let completions = 
+        match server.Completion(textDocumentPosition("MainProject", "Completions.fs", 13, 7)) |> Async.RunSynchronously with 
+        | None -> []
+        | Some(completions) -> completions.items
+    let insertText = 
+        [ for c in completions do 
+            if c.label.Contains("name with space") then
+                yield c.insertText]
+    CollectionAssert.Contains(insertText, Some("``name with space``"))
+
 // [<Test>] TODO
 let ``dont complete inside a string``() = 
     let client, server = createServerAndReadFile("MainProject", "CompleteInString.fs")

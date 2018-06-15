@@ -125,6 +125,7 @@ let private asCompletionItemKind(k: FSharpGlyph): CompletionItemKind =
 let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem = 
     { defaultCompletionItem with 
         label = i.Name 
+        insertText = Some(i.NameInCode)
         kind = Some(asCompletionItemKind(i.Glyph))
         detail = Some(i.FullName)
         // Stash FullName in data so we can use it later in ResolveCompletionItem
