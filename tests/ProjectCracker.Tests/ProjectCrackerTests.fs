@@ -98,8 +98,8 @@ let cracker(fsproj: FileInfo): string list =
         yield f.FullName ]
         
 [<Test>]
-let ``find package references in FSharpLanguageServer``() = 
-    let fsproj = Path.Combine [|projectRoot.FullName; "src"; "FSharpLanguageServer"; "FSharpLanguageServer.fsproj"|] |> FileInfo 
+let ``find package references in EmptyProject``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "EmptyProject"; "EmptyProject.fsproj"|] |> FileInfo 
     CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
         
 [<Test>]
