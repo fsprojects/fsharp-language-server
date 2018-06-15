@@ -45,7 +45,6 @@ This project is an implementation of the [language server protocol](https://micr
 The language server protocol (LSP) is very similar to the API defined by the F# compiler service (FCS); most of the implementation is devoted to translating between the types used by FCS and the JSON representation of LSP.
 
 - client/extension.ts: Client-side VSCode launcher
-- client/PseudoScript.*: Pseudo-project used to figure out default dependencies for .fsx files
 - sample: Example projects used by tests
 - scripts: Scripts for building and testing
 - src/LSP: Server-side implementation of [language server protocol](https://microsoft.github.io/language-server-protocol/specification)

@@ -353,25 +353,3 @@ let crack(fsproj: FileInfo): CrackedProject =
             packageReferences=[]
             error=Some(e.Message)
         }
-
-/// Get the baseline options for an .fsx script
-/// In theory this should be done by FSharpChecker.GetProjectOptionsFromScript,
-/// but it appears to be broken on dotnet core: https://github.com/fsharp/FSharp.Compiler.Service/issues/847
-let scriptBase: Lazy<CrackedProject> = 
-    lazy 
-        // Find PseudoScript.fsproj
-        let start = FileInfo(Assembly.GetExecutingAssembly().Location).Directory
-        dprintfn "Looking for PsuedoScript.fsproj relative to %s" start.FullName
-        let rec walk(dir: DirectoryInfo) = 
-            let candidate = FileInfo(Path.Combine [|dir.FullName; "client"; "PseudoScript.fsproj"|])
-            if candidate.Exists then 
-                candidate 
-            elif dir = dir.Root then
-                raise(Exception(sprintf "Couldn't find PseudoProject.fsproj in any parent directory of %A" start))
-            else
-                walk(dir.Parent)
-        let pseudoProject = walk(start)
-        // Restore PseudoScript.fsproj to generate project.assets.json
-        project(pseudoProject).Compile() |> ignore
-        // Crack PseudoScript.fsproj
-        crack(pseudoProject)

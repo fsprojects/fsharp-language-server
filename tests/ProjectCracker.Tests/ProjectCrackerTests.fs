@@ -96,17 +96,6 @@ let cracker(fsproj: FileInfo): string list =
     let cracked = ProjectCracker.crack(fsproj)
     [ for f in cracked.packageReferences do 
         yield f.FullName ]
-
-[<Test>]
-let ``crack script defaults``() = 
-    // Delete project.assets.json
-    let fsproj = Path.Combine [|projectRoot.FullName; "client"; "PseudoScript.fsproj"|] |> FileInfo 
-    clean(fsproj)
-    let cracked = ProjectCracker.scriptBase.Value 
-    let packages = [for f in cracked.packageReferences do yield f.Name]
-    dprintfn "Packages %A" packages
-    if not(List.contains "FSharp.Core.dll" packages) then 
-        Assert.Fail(sprintf "No FSharp.Core.dll in %A" cracked.packageReferences)
         
 [<Test>]
 let ``find package references in FSharpLanguageServer``() = 

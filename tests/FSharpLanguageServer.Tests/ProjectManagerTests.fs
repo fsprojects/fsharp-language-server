@@ -74,3 +74,13 @@ let ``bad project file``() =
     let projects = ProjectManager(MockClient(), FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "BadProject"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot root)
+
+[<Test>]
+let ``get script options``() = 
+    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let script = Path.Combine [|projectRoot.FullName; "sample"; "Script"; "MainScript.fsx"|] |> FileInfo 
+    projects.NewProjectFile(script)
+    let options = match projects.FindProjectOptions(script) with Ok(options) -> options
+    let references = [for o in options.OtherOptions do if o.StartsWith("-r:") then yield FileInfo(o.Substring("-r:".Length)).Name]
+    CollectionAssert.Contains(references, "FSharp.Core.dll")
+    CollectionAssert.Contains(references, "System.Runtime.dll")
