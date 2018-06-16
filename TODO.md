@@ -28,3 +28,4 @@
 
 # Features
 - Allow emitting obj/FscArgs.txt as a project-cracker backup
+- fsharp.task.test problem-matchers

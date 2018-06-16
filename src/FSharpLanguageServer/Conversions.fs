@@ -226,7 +226,7 @@ let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBi
     {
         range=asRange(test.RangeOfBindingSansRhs)
         command=Some({  title="Run Test"
-                        command="fsharp.test.run"
+                        command="fsharp.command.test.run"
                         arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
         data=JsonValue.Null
     }
