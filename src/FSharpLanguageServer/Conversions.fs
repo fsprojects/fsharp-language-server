@@ -230,3 +230,12 @@ let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBi
                         arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
         data=JsonValue.Null
     }
+
+let asDebugTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBinding): CodeLens =
+    {
+        range=asRange(test.RangeOfBindingSansRhs)
+        command=Some({  title="Debug Test"
+                        command="fsharp.command.test.debug"
+                        arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
+        data=JsonValue.Null
+    }

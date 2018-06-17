@@ -746,7 +746,9 @@ type Server(client: ILanguageClient) =
                     let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                     let fns = testFunctions(parse)
                     let fsproj = FileInfo(projectOptions.ProjectFileName)
-                    return [for id, bindings in fns do yield asRunTest(fsproj, id, bindings)]
+                    return [ for id, bindings in fns do 
+                                yield asRunTest(fsproj, id, bindings)
+                                yield asDebugTest(fsproj, id, bindings) ]
                 | Error(e), _ -> 
                     dprintfn "Failed to create code lens because project options failed to load: %A" e
                     return []

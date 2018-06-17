@@ -49,7 +49,8 @@ export function activate(context: ExtensionContext) {
 	client.onReady().then(() => createProgressListeners(client));
 
 	// Register test-runner
-	commands.registerCommand('fsharp.command.test.run', runTest);
+	commands.registerCommand('fsharp.command.test.run', (path, name) => runTest(path, name, false));
+	commands.registerCommand('fsharp.command.test.debug', (path, name) => runTest(path, name, true));
 }
 
 interface FSharpTestTask extends TaskDefinition {
@@ -57,14 +58,19 @@ interface FSharpTestTask extends TaskDefinition {
 	fullyQualifiedName: string
 }
 
-function runTest(projectPath: string, fullyQualifiedName: string): Thenable<TaskExecution> {
+function runTest(projectPath: string, fullyQualifiedName: string, debug: boolean): Thenable<TaskExecution> {
 	let args = ['test', projectPath, '--filter', `FullyQualifiedName=${fullyQualifiedName}`]
 	let kind: FSharpTestTask = {
 		type: 'fsharp.task.test',
 		projectPath: projectPath,
 		fullyQualifiedName: fullyQualifiedName
 	}
-	let task = new Task(kind, workspace.getWorkspaceFolder(Uri.file(projectPath)), 'F# Test', 'F# Language Server', new ShellExecution('dotnet', args))
+	let shell = new ShellExecution('dotnet', args, {
+		env: {
+			'VSTEST_HOST_DEBUG': debug ? '1': '0'
+		}
+	})
+	let task = new Task(kind, workspace.getWorkspaceFolder(Uri.file(projectPath)), 'F# Test', 'F# Language Server', shell)
 	return tasks.executeTask(task)
 }
 

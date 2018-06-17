@@ -18,6 +18,7 @@
 - Crack FCS
 - Reload options when .fsx is saved
 - Invalidate check results when referenced .dlls are modified
+- Projects targeting netstandard2.0 show fake errors
 
 # Optimizations
 - Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
@@ -29,3 +30,4 @@
 # Features
 - Allow emitting obj/FscArgs.txt as a project-cracker backup
 - fsharp.task.test problem-matchers
+- Emit .trx files from tests, and use them to highlight failed tests
