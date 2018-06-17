@@ -1,5 +1,37 @@
 {
     "version": "2.0.0",
     "tasks": [
+        {
+            "label": "fstest",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "test",
+                "/Users/georgefraser/Documents/fsharp-language-server/tests/ProjectCracker.Tests/ProjectCracker.Tests.fsproj" ,
+                "--filter",
+                 "FullyQualifiedName=ProjectCrackerTests.test that fails"
+            ],
+            "problemMatcher": [
+                {
+                    "owner": "fsharp",
+                    "fileLocation": "absolute",
+                    "pattern": [
+                        {
+                            "regexp": "Failed +(.*)$"
+                        },
+                        {
+                            "regexp": "Error Message:$"
+                        },
+                        {
+                            "regexp": " +at .*? in (.*?):line (\\d+)$|Stack Trace: *$| *$| +(.*)$",
+                            "file": 1,
+                            "line": 2,
+                            "message": 3,
+                            "loop": true
+                        }
+                    ]
+                }
+            ]
+        }
     ]
 }

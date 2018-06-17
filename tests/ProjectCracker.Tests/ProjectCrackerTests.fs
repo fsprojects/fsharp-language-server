@@ -120,3 +120,7 @@ let ``error for unbuilt project``() =
     match cracked.error with 
     | None -> Assert.Fail("Should have failed to crack unbuilt project")
     | Some(e) -> StringAssert.Contains("project.assets.json does not exist", e)
+
+[<Test>]
+let ``test that fails``() = 
+    CollectionAssert.AreEquivalent([1, 2, 3], [2, 3, 4])
