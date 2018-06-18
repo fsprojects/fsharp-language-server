@@ -41,6 +41,9 @@ This project is an implementation of the [language server protocol](https://micr
 ### Show errors on save
 ![Show errors](videos/ShowErrors.mov.gif)
 
+### Run & Debug tests
+![Debug test](videos/DebugTest.mov.gif)
+
 ## Code structure
 The language server protocol (LSP) is very similar to the API defined by the F# compiler service (FCS); most of the implementation is devoted to translating between the types used by FCS and the JSON representation of LSP.
 
