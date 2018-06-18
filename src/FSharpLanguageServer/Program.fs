@@ -214,7 +214,9 @@ type Server(client: ILanguageClient) =
             | Error(errs), _ -> 
                 return Error(errs)
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
+                let timeCheck = Stopwatch.StartNew()
                 let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
+                dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                 match force with 
                 | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
                 | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
@@ -281,11 +283,6 @@ type Server(client: ILanguageClient) =
             modified@[goal]
         | Error(_) -> []
 
-    /// We keep track of files that have been invalidated by user edits,
-    /// and check them when the user stops doing things for 1 second
-    let needsBackgroundCheck = System.Collections.Concurrent.ConcurrentDictionary<string, FileInfo>()
-    /// We need to be able to cancel this process if the user requests something in the middle of a backround check
-    let mutable cancelBackgroundCheck = new CancellationTokenSource()
     /// Check a file and send diagnostics to the client
     let publishErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>): Async<unit> = 
         async {
@@ -298,7 +295,6 @@ type Server(client: ILanguageClient) =
                 let typeErrors = asDiagnostics(checkResult.Errors)
                 // Find unused opens
                 // TODO this should really be on an even slower-frequency update
-                // TODO this uses .GetAllUsesOfAllSymbolsInFile() underneath, inline
                 let timeUnusedOpens = Stopwatch.StartNew()
                 let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
                 let unusedOpenErrors = [for r in unusedOpenRanges do yield asInfoMessage("Unused open", r)]
@@ -317,23 +313,9 @@ type Server(client: ILanguageClient) =
         async {
             let! check = checkOpenFile(file)
             do! publishErrors(file, check)
-            needsBackgroundCheck.TryRemove(file.FullName) |> ignore
         }
-    /// Request that all URIs in `needsBackgroundCheck` be checked when the user stops doing things for 1 second
-    let requestBackgroundCheck(): unit = 
-        cancelBackgroundCheck.Cancel()
-        cancelBackgroundCheck <- new CancellationTokenSource()
-        Async.Start(async {
-            do! Async.Sleep(1000)
-            for file in needsBackgroundCheck.Values do 
-                do! doCheck(file)
-        }, cancelBackgroundCheck.Token)
     /// Request that `uri` be checked when the user stops doing things for 1 second
-    let checkInBackground(file: FileInfo): unit = 
-        if needsBackgroundCheck.TryAdd(file.FullName, file) then 
-            let name = FileInfo(file.FullName).Name
-            dprintfn "Invalidated %s" name
-        requestBackgroundCheck()
+    let backgroundCheck = DebounceCheck(doCheck, 1000)
         
     /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
@@ -559,18 +541,13 @@ type Server(client: ILanguageClient) =
                 let todo = needsRecompile(file)
                 use progress = new ProgressBar(todo.Length, sprintf "Check %d files" todo.Length, client, todo.Length <= 1)
                 use increment = checker.BeforeBackgroundFileCheck.Subscribe(fun (fileName, _) -> progress.Increment(FileInfo(fileName)))
-                // Cancel any background check that is in-progress
-                cancelBackgroundCheck.Cancel()
                 do! doCheck(file)
-                // In case we cancelled a background check
-                // If there is nothing in `needsBackgroundCheck`, this will do nothing
-                requestBackgroundCheck()
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Change(p)
-                checkInBackground(file)
+                backgroundCheck.CheckLater(file)
             }
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
@@ -585,7 +562,6 @@ type Server(client: ILanguageClient) =
                     progress.Increment(file)
                     let! check = forceCheckOpenFile(file)
                     do! publishErrors(file, check)
-                    needsBackgroundCheck.TryRemove(file.FullName) |> ignore
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
@@ -613,7 +589,7 @@ type Server(client: ILanguageClient) =
                 // In theory we could optimize this by only re-checking descendents of changed projects, 
                 // but in practice that will make little difference
                 for f in docs.OpenFiles() do 
-                    checkInBackground(f)
+                    backgroundCheck.CheckLater(f)
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {

@@ -1,3 +1,3 @@
 #load "LoadedByScript.fs"
 
-let y = LoadedByScript.x + 1
+let _y = LoadedByScript.x + 1
