@@ -7,7 +7,6 @@ open System
 open System.Diagnostics
 open System.IO
 open System.Text.RegularExpressions
-open System.Threading
 open LSP
 open LSP.Types
 open FSharp.Data
@@ -282,19 +281,19 @@ type Server(client: ILanguageClient) =
             // `goal` should always be on the list
             modified@[goal]
         | Error(_) -> []
-
-    /// Check a file and send diagnostics to the client
-    let publishErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>): Async<unit> = 
+    /// Send diagnostics to the client
+    let publishErrors(file: FileInfo, errors: Diagnostic list) = 
+        client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
+    /// Check a file
+    let getErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>): Async<Diagnostic list> = 
         async {
-            let publish(errors) = client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
             match check with
             | Error(errors) ->
-                publish(errors)
+                return errors
             | Ok(parseResult, checkResult) -> 
                 let parseErrors = asDiagnostics(parseResult.Errors)
                 let typeErrors = asDiagnostics(checkResult.Errors)
                 // Find unused opens
-                // TODO this should really be on an even slower-frequency update
                 let timeUnusedOpens = Stopwatch.StartNew()
                 let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
                 let unusedOpenErrors = [for r in unusedOpenRanges do yield asInfoMessage("Unused open", r)]
@@ -305,18 +304,17 @@ type Server(client: ILanguageClient) =
                 let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(uses, file.Name.EndsWith(".fsx"))
                 let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield asInfoMessage("Unused declaration", r)]
                 dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
-                // Combine all errors
-                let errors = parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
-                publish(errors)
+                // Combine
+                return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
         }
     let doCheck(file: FileInfo): Async<unit> = 
         async {
             let! check = checkOpenFile(file)
-            do! publishErrors(file, check)
+            let! errors = getErrors(file, check)
+            publishErrors(file, errors)
         }
     /// Request that `uri` be checked when the user stops doing things for 1 second
     let backgroundCheck = DebounceCheck(doCheck, 1000)
-        
     /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
@@ -561,14 +559,15 @@ type Server(client: ILanguageClient) =
                 for file in todo do 
                     progress.Increment(file)
                     let! check = forceCheckOpenFile(file)
-                    do! publishErrors(file, check)
+                    let! errors = getErrors(file, check)
+                    publishErrors(file, errors)
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Close(p)
                 // Only show errors for open files
-                do! publishErrors(file, Error([]))
+                publishErrors(file, [])
             }
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {
