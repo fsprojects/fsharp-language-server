@@ -4,6 +4,7 @@ open LSP.Log
 open Microsoft.FSharp.Compiler
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System
+open System.Diagnostics
 open System.IO
 open System.Text.RegularExpressions
 open System.Threading
@@ -286,16 +287,36 @@ type Server(client: ILanguageClient) =
     /// We need to be able to cancel this process if the user requests something in the middle of a backround check
     let mutable cancelBackgroundCheck = new CancellationTokenSource()
     /// Check a file and send diagnostics to the client
-    let publishErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>) = 
-        let errors = 
+    let publishErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>): Async<unit> = 
+        async {
+            let publish(errors) = client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
             match check with
-            | Error(errors) -> errors
-            | Ok(parseResult, checkResult) -> asDiagnostics(parseResult.Errors)@asDiagnostics(checkResult.Errors)
-        client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
+            | Error(errors) ->
+                publish(errors)
+            | Ok(parseResult, checkResult) -> 
+                let parseErrors = asDiagnostics(parseResult.Errors)
+                let typeErrors = asDiagnostics(checkResult.Errors)
+                // Find unused opens
+                // TODO this should really be on an even slower-frequency update
+                // TODO this uses .GetAllUsesOfAllSymbolsInFile() underneath, inline
+                let timeUnusedOpens = Stopwatch.StartNew()
+                let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
+                let unusedOpenErrors = [for r in unusedOpenRanges do yield asInfoMessage("Unused open", r)]
+                dprintfn "Found %d unused opens in %dms" unusedOpenErrors.Length timeUnusedOpens.ElapsedMilliseconds
+                // Find unused declarations
+                let timeUnusedDeclarations = Stopwatch.StartNew()
+                let! uses = checkResult.GetAllUsesOfAllSymbolsInFile()
+                let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(uses, file.Name.EndsWith(".fsx"))
+                let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield asInfoMessage("Unused declaration", r)]
+                dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
+                // Combine all errors
+                let errors = parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
+                publish(errors)
+        }
     let doCheck(file: FileInfo): Async<unit> = 
         async {
             let! check = checkOpenFile(file)
-            publishErrors(file, check)
+            do! publishErrors(file, check)
             needsBackgroundCheck.TryRemove(file.FullName) |> ignore
         }
     /// Request that all URIs in `needsBackgroundCheck` be checked when the user stops doing things for 1 second
@@ -563,7 +584,7 @@ type Server(client: ILanguageClient) =
                 for file in todo do 
                     progress.Increment(file)
                     let! check = forceCheckOpenFile(file)
-                    publishErrors(file, check)
+                    do! publishErrors(file, check)
                     needsBackgroundCheck.TryRemove(file.FullName) |> ignore
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
@@ -571,7 +592,7 @@ type Server(client: ILanguageClient) =
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Close(p)
                 // Only show errors for open files
-                publishErrors(file, Error([]))
+                do! publishErrors(file, Error([]))
             }
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {

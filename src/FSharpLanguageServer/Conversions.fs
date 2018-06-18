@@ -18,6 +18,27 @@ let private errorAsRange(err: FSharpErrorInfo): Range =
         ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
     }
 
+/// Convert an F# `Range.pos` to an LSP `Position`
+let private asPosition(p: Range.pos): Position = 
+    {
+        line=p.Line-1
+        character=p.Column
+    }
+
+/// Convert an F# `Range.range` to an LSP `Range`
+let asRange(r: Range.range): Range = 
+    {
+        start=asPosition r.Start
+        ``end``=asPosition r.End
+    }
+
+/// Convert an F# `Range.range` to an LSP `Location`
+let private asLocation(l: Range.range): Location = 
+    { 
+        uri=Uri("file://" + l.FileName)
+        range = asRange l 
+    }
+
 /// Convert an F# Compiler Services 'FSharpErrorSeverity' to an LSP 'DiagnosticSeverity'
 let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
     match s with 
@@ -28,10 +49,19 @@ let private asDiagnosticSeverity(s: FSharpErrorSeverity): DiagnosticSeverity =
 let asDiagnostic(err: FSharpErrorInfo): Diagnostic = 
     {
         range = errorAsRange(err)
-        severity = Some(asDiagnosticSeverity err.Severity)
+        severity = Some(asDiagnosticSeverity(err.Severity))
         code = Some(sprintf "%d: %s" err.ErrorNumber err.Subcategory)
         source = None
         message = err.Message
+    }
+
+let asInfoMessage(message: string, range: Range.range): Diagnostic = 
+    {
+        range = asRange(range)
+        severity = Some(DiagnosticSeverity.Information)
+        code = None 
+        source = None 
+        message = message
     }
     
 /// Some compiler errors have no location in the file and should be displayed at the top of the file
@@ -159,28 +189,6 @@ let asSignatureInformation(methodName: string, s: FSharpMethodGroupItem): Signat
         label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames) 
         documentation = doc 
         parameters = Array.map asParameterInformation s.Parameters |> List.ofArray
-    }
-
-
-/// Convert an F# `Range.pos` to an LSP `Position`
-let private asPosition(p: Range.pos): Position = 
-    {
-        line=p.Line-1
-        character=p.Column
-    }
-
-/// Convert an F# `Range.range` to an LSP `Range`
-let asRange(r: Range.range): Range = 
-    {
-        start=asPosition r.Start
-        ``end``=asPosition r.End
-    }
-
-/// Convert an F# `Range.range` to an LSP `Location`
-let private asLocation(l: Range.range): Location = 
-    { 
-        uri=Uri("file://" + l.FileName)
-        range = asRange l 
     }
 
 /// Get the lcation where `s` was declared
