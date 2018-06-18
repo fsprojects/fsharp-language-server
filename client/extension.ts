@@ -5,7 +5,8 @@
 'use strict';
 
 import * as path from 'path';
-import { window, workspace, ExtensionContext, Progress, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition } from 'vscode';
+import * as cp from 'child_process';
+import { window, workspace, ExtensionContext, Progress, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
 
 export function activate(context: ExtensionContext) {
@@ -49,8 +50,8 @@ export function activate(context: ExtensionContext) {
 	client.onReady().then(() => createProgressListeners(client));
 
 	// Register test-runner
-	commands.registerCommand('fsharp.command.test.run', (path, name) => runTest(path, name, false));
-	commands.registerCommand('fsharp.command.test.debug', (path, name) => runTest(path, name, true));
+	commands.registerCommand('fsharp.command.test.run', runTest);
+	commands.registerCommand('fsharp.command.test.debug', debugTest);
 }
 
 interface FSharpTestTask extends TaskDefinition {
@@ -58,20 +59,84 @@ interface FSharpTestTask extends TaskDefinition {
 	fullyQualifiedName: string
 }
 
-function runTest(projectPath: string, fullyQualifiedName: string, debug: boolean): Thenable<TaskExecution> {
+function runTest(projectPath: string, fullyQualifiedName: string): Thenable<TaskExecution> {
 	let args = ['test', projectPath, '--filter', `FullyQualifiedName=${fullyQualifiedName}`]
 	let kind: FSharpTestTask = {
 		type: 'fsharp.task.test',
 		projectPath: projectPath,
 		fullyQualifiedName: fullyQualifiedName
 	}
-	let shell = new ShellExecution('dotnet', args, {
-		env: {
-			'VSTEST_HOST_DEBUG': debug ? '1': '0'
-		}
-	})
-	let task = new Task(kind, workspace.getWorkspaceFolder(Uri.file(projectPath)), 'F# Test', 'F# Language Server', shell)
+	let shell = new ShellExecution('dotnet', args)
+	let workspaceFolder = workspace.getWorkspaceFolder(Uri.file(projectPath))
+	let task = new Task(kind, workspaceFolder, 'F# Test', 'F# Language Server', shell)
 	return tasks.executeTask(task)
+}
+
+const outputChannel = window.createOutputChannel('F# Debug Tests');
+
+function debugTest(projectPath: string, fullyQualifiedName: string): Promise<number> {
+	return new Promise((resolve, _reject) => {
+		// TODO replace this with the tasks API once stdout is available
+		// https://code.visualstudio.com/docs/extensionAPI/vscode-api#_tasks
+		// https://github.com/Microsoft/vscode/issues/45980
+		let cmd = 'dotnet'
+		let args = ['test', projectPath, '--filter', `FullyQualifiedName=${fullyQualifiedName}`]
+		let child = cp.spawn(cmd, args, {
+			env: {
+				...process.env,
+				'VSTEST_HOST_DEBUG': '1'
+			}
+		})
+		
+		outputChannel.clear()
+		outputChannel.show()
+		outputChannel.appendLine(`${cmd} ${args.join(' ')}...`)
+
+		var isWaitingForDebugger = false
+		function onStdoutLine(line: string) {
+			if (line.trim() == 'Waiting for debugger attach...') {
+				isWaitingForDebugger = true
+			}
+			if (isWaitingForDebugger) {
+				let pattern = /^Process Id: (\d+)/
+				let match = line.match(pattern)
+				if (match) {
+					let pid = Number.parseInt(match[1])
+					let workspaceFolder = workspace.getWorkspaceFolder(Uri.file(projectPath))
+					let config = {
+						"name": "F# Test",
+						"type": "coreclr",
+						"request": "attach",
+						"processId": pid
+					}
+					outputChannel.appendLine(`Attaching debugger to process ${pid}...`)
+					debug.startDebugging(workspaceFolder, config)
+					
+					isWaitingForDebugger = false
+				}
+			}
+		}
+
+		var stdoutBuffer = ''
+		function onStdoutChunk(chunk: string|Buffer) {
+			// Append to output channel
+			let string = chunk.toString()
+			outputChannel.append(string)
+			// Send each line to onStdoutLine
+			stdoutBuffer += string 
+			var newline = stdoutBuffer.indexOf('\n')
+			while (newline != -1) {
+				let line = stdoutBuffer.substring(0, newline)
+				onStdoutLine(line)
+				stdoutBuffer = stdoutBuffer.substring(newline + 1)
+				newline = stdoutBuffer.indexOf('\n')
+			}
+		}
+
+		child.stdout.on('data', onStdoutChunk);
+		child.stderr.on('data', chunk => outputChannel.append(chunk.toString()));
+		child.on('close', (code, _signal) => resolve(code))
+	})
 }
 
 interface StartProgress {
