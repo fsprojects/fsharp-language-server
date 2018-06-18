@@ -1,17 +1,6 @@
 # F# Language Server
 This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
 
-## Installation
-
-### VSCode
-[Install from the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.fsharp-language-server)
-
-### Vim
-**Help wanted**--should be straightforward with [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) or [vim-lsp](https://github.com/prabirshrestha/vim-lsp), a PR with instructions here would be appreciated.
-
-### Emacs
-**Help wanted**--should be straightforward with [emacs-lsp](https://github.com/emacs-lsp/lsp-mode), a PR with instructions here would be appreciated.
-
 ## Features
 
 ### Hover
@@ -57,6 +46,17 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 - tests/ProjectCracker.Tests
 - tests/FSharpLanguageServer.Tests
 - videos: Animated GIFs on this page
+
+## Installation
+
+### VSCode
+[Install from the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.fsharp-language-server)
+
+### Vim
+**Help wanted**--should be straightforward with [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) or [vim-lsp](https://github.com/prabirshrestha/vim-lsp), a PR with instructions here would be appreciated.
+
+### Emacs
+**Help wanted**--should be straightforward with [emacs-lsp](https://github.com/emacs-lsp/lsp-mode), a PR with instructions here would be appreciated.
 
 ## How is this project different than [Ionide](https://github.com/ionide)?
 Ionide is a suite of F# plugins for VSCode; F# language server is analagous to the [FSAC](https://github.com/fsharp/FsAutoComplete) component. While FSAC is based on a custom JSON protocol; F#LS is based on the [language server protocol](https://microsoft.github.io/language-server-protocol/specification) standard. 
