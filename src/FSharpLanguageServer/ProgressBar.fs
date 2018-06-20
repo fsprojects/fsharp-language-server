@@ -2,7 +2,6 @@ namespace FSharpLanguageServer
 
 open System
 open System.IO
-open LSP
 open LSP.Types
 open FSharp.Data
 

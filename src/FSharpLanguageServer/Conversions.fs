@@ -55,10 +55,11 @@ let asDiagnostic(err: FSharpErrorInfo): Diagnostic =
         message = err.Message
     }
 
-let asInfoMessage(message: string, range: Range.range): Diagnostic = 
+/// Create a Diagnostic
+let diagnostic(message: string, range: Range.range, severity: DiagnosticSeverity): Diagnostic = 
     {
         range = asRange(range)
-        severity = Some(DiagnosticSeverity.Information)
+        severity = Some(severity)
         code = None 
         source = None 
         message = message

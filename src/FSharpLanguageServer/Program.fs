@@ -76,15 +76,6 @@ let matchesTitleCase(find: string, candidate: string): bool =
 let private matchesQuery(query: string, candidate: string): bool = 
     matchesTitleCase(query, candidate)
 
-/// Find the name of the namespace, type or module that contains `s`
-let private containerName(s: FSharpSymbol): string option = 
-    if s.FullName = s.DisplayName then 
-        None
-    else if s.FullName.EndsWith("." + s.DisplayName) then 
-        Some(s.FullName.Substring(0, s.FullName.Length - s.DisplayName.Length - 1))
-    else 
-        Some(s.FullName)
-
 /// Find the first overload in `method` that is compatible with `activeParameter`
 // TODO actually consider types
 let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGroupItem[]): int option = 
@@ -186,7 +177,7 @@ type Server(client: ILanguageClient) =
     let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> = 
         async {
             match projects.FindProjectOptions(file), getOrRead(file) with 
-            | Error e, _ ->
+            | Error(_), _ ->
                 return Error(sprintf "Can't find symbols in %s because of error in project options" file.Name)
             | _, None -> 
                 return Error(sprintf "%s was closed" file.FullName)
@@ -242,12 +233,11 @@ type Server(client: ILanguageClient) =
     /// If the file has been checked before, the previous check is returned, even if it's out-of-date
     let quickCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
-            match projects.FindProjectOptions(file), docs.Get(file) with 
-            | Error(errs), _ -> return Error(errs)
-            | _, None -> return Error [errorAtTop (sprintf "No source file %A" file.FullName)]
-            | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
+            match projects.FindProjectOptions(file) with 
+            | Error(errs) -> return Error(errs)
+            | Ok(projectOptions) -> 
                 match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
-                | Some(parseResult, checkResult, version) -> 
+                | Some(parseResult, checkResult, _) -> 
                     // Return the cached check, even if it is out-of-date
                     return Ok(parseResult, checkResult)
                 | _ -> 
@@ -296,13 +286,13 @@ type Server(client: ILanguageClient) =
                 // Find unused opens
                 let timeUnusedOpens = Stopwatch.StartNew()
                 let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
-                let unusedOpenErrors = [for r in unusedOpenRanges do yield asInfoMessage("Unused open", r)]
+                let unusedOpenErrors = [for r in unusedOpenRanges do yield diagnostic("Unused open", r, DiagnosticSeverity.Information)]
                 dprintfn "Found %d unused opens in %dms" unusedOpenErrors.Length timeUnusedOpens.ElapsedMilliseconds
                 // Find unused declarations
                 let timeUnusedDeclarations = Stopwatch.StartNew()
                 let! uses = checkResult.GetAllUsesOfAllSymbolsInFile()
                 let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(uses, file.Name.EndsWith(".fsx"))
-                let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield asInfoMessage("Unused declaration", r)]
+                let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield diagnostic("Unused declaration", r, DiagnosticSeverity.Hint)]
                 dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
                 // Combine
                 return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
@@ -329,7 +319,7 @@ type Server(client: ILanguageClient) =
             | _, None -> 
                 dprintfn "No identifier at %d in line '%s'" position.character line 
                 return None
-            | Ok(parseResult, checkResult), Some(id, endOfIdentifier, _) -> 
+            | Ok(_, checkResult), Some(id, endOfIdentifier, _) -> 
                 dprintfn "Looking at symbol %s" id
                 let names = List.ofArray(id.Split('.'))
                 let! maybeSymbol = checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names)
@@ -341,7 +331,6 @@ type Server(client: ILanguageClient) =
     /// Find the exact location of a symbol within a fully-qualified name.
     /// For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`.
     let refineRenameRange(s: FSharpSymbol, file: FileInfo, range: Range.range): Range = 
-        let uri = Uri("file://" + file.FullName)
         let line = range.End.Line - 1
         let startColumn = if range.Start.Line - 1 < line then 0 else range.Start.Column
         let endColumn = range.End.Column
@@ -467,7 +456,9 @@ type Server(client: ILanguageClient) =
                     
                     // Check file
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
+                    let timeCheck = Stopwatch.StartNew()
                     let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, sourceText, projectOptions)
+                    dprintfn "Checked %s in %dms" sourceFile.Name timeCheck.ElapsedMilliseconds
                     match maybeCheck with 
                     | FSharpCheckFileAnswer.Aborted -> dprintfn "Aborted checking %s" sourceFile.Name
                     | FSharpCheckFileAnswer.Succeeded(check) -> 

@@ -19,6 +19,8 @@
 - Reload options when .fsx is saved
 - Invalidate check results when referenced .dlls are modified
 - Projects targeting netstandard2.0 show fake errors
+- Save upstream file not triggering re-lint
+- Unused-open is sometimes wrong??? See ProgressBar.fs
 
 # Optimizations
 - Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
