@@ -1,6 +1,8 @@
 # F# Language Server
 This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
 
+[![CircleCI](https://circleci.com/gh/georgewfraser/fsharp-language-server.svg?style=svg)](https://circleci.com/gh/georgewfraser/fsharp-language-server)
+
 ## Features
 
 ### Hover

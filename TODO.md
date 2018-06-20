@@ -28,6 +28,8 @@
 - Only re-analyze .fsx when # directives are changed
 - Only show progress bars once 1s has passed
 - Try erasing source after cursor to speed up incremental re-compilation
+- Use timer to decide when to use stale results? https://github.com/fsharp/FSharp.Compiler.Service/blob/62098efc35fe24f7e6824b89e47ff1eb031d55a5/vsintegration/src/FSharp.Editor/LanguageService/FSharpCheckerExtensions.fs
+- Check out get-project-options implementation in https://github.com/fsharp/FSharp.Compiler.Service/blob/62098efc35fe24f7e6824b89e47ff1eb031d55a5/vsintegration/src/FSharp.Editor/LanguageService/ProjectSitesAndFiles.fs
 
 # Features
 - Allow emitting obj/FscArgs.txt as a project-cracker backup
