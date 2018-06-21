@@ -56,8 +56,8 @@ let ``find an local dll``() =
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
     match projects.FindProjectOptions(file) with 
     | Error(m) -> Assert.Fail(sprintf "%A" m)
-    | Ok(parsed) -> 
-        let isLocalDll(s: string) = s.EndsWith("LocalDll.dll")
+    | Ok(parsed) ->
+        let isLocalDll(s: string) = s.EndsWith("IndirectDep.dll")
         if not (Seq.exists isLocalDll parsed.OtherOptions) then Assert.Fail(sprintf "%A" parsed.OtherOptions)
 
 [<Test>]
