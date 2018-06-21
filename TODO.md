@@ -35,3 +35,4 @@
 - Allow emitting obj/FscArgs.txt as a project-cracker backup
 - fsharp.task.test problem-matchers
 - Emit .trx files from tests, and use them to highlight failed tests
+- Show "you need to press play" popup the first time the user debugs something
