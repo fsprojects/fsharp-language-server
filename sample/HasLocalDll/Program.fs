@@ -1,3 +1,3 @@
 module HasLocalDll
 
-let test = 1
+let test = IndirectLibrary.myInt

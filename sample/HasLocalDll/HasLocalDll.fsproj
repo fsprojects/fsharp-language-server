@@ -6,9 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Reference Include="LocalDll">
-      <HintPath>LocalDll.dll</HintPath>
-    </Reference>
+    <Reference Include="../IndirectDep/bin/Debug/netcoreapp2.0/IndirectDep.dll" />
   </ItemGroup>
 
   <ItemGroup>
