@@ -1,8 +1,21 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <FSharpSourcesRoot>$(MSBuildProjectDirectory)\..\..\src</FSharpSourcesRoot>
+        <TargetFramework>netcoreapp2.0</TargetFramework>
     </PropertyGroup>
-    <Compile Include="$(FSharpSourcesRoot)/fsharp/QueueList.fs">
-        <Link>Utilities/QueueList.fs</Link>
-    </Compile>
+
+    <!-- Property definitions that get referenced by Compile directives -->
+    <PropertyGroup>
+        <FSharpSourcesRoot>$(MSBuildProjectDirectory)\..\..\src</FSharpSourcesRoot>
+        <FsYaccOutputFolder Condition="'$(TargetFramework)' != ''">$(TargetFramework)\</FsYaccOutputFolder>
+    </PropertyGroup>
+
+    <!-- Fancy compile directives that reference build properties -->
+    <ItemGroup>
+        <Compile Include="$(FSharpSourcesRoot)/fsharp/QueueList.fs">
+            <Link>Utilities/QueueList.fs</Link>
+        </Compile>
+        <Compile Include="$(FsYaccOutputFolder)pars.fs">
+            <Link>ParserAndUntypedAST/pars.fs</Link>
+        </Compile>
+    </ItemGroup>
 </Project>

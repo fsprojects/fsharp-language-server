@@ -50,6 +50,17 @@ let ``find CSharp reference``() =
     let cracked = ProjectCracker.crack(fsproj)
     CollectionAssert.AreEquivalent(["CSharpProject.dll"], [for f in cracked.otherProjectReferences do yield f.Name])
 
+[<Test>]
+let ``resolve template params``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "TemplateParams"; "TemplateParams.fsproj"|] |> FileInfo 
+    let cracked = ProjectCracker.crack(fsproj)
+    let expected = [
+        Path.Combine([|projectRoot.FullName; "src"; "fsharp"; "QueueList.fs"|]); 
+        Path.Combine([|projectRoot.FullName; "sample"; "TemplateParams"; "netcoreapp2.0"; "pars.fs"|])
+    ]
+    let actual = [for f in cracked.sources do yield f.FullName]
+    CollectionAssert.AreEquivalent(expected, actual)
+
 // Check that project.assets.json-based ProjectCracker finds same .dlls as MSBuild
 
 let clean(fsproj: FileInfo) = 

@@ -330,7 +330,7 @@ let crack(fsproj: FileInfo): CrackedProject =
         let project = project(fsproj).Load()
         let sources = 
             [ for i in project.GetItems("Compile") do 
-                let relativePath = i.EvaluatedInclude
+                let relativePath = i.EvaluatedInclude.Replace('\\', Path.DirectorySeparatorChar)
                 let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
                 let normalizePath = Path.GetFullPath(absolutePath)
                 yield FileInfo(normalizePath) ]
@@ -364,6 +364,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=None
             }
     with e -> 
+        dprintfn "Failed to build %s: %s" fsproj.Name e.Message
         {
             fsproj=fsproj
             target=placeholderTarget
