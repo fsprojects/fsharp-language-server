@@ -283,11 +283,12 @@ type Server(client: ILanguageClient) =
             | Ok(parseResult, checkResult) -> 
                 let parseErrors = asDiagnostics(parseResult.Errors)
                 let typeErrors = asDiagnostics(checkResult.Errors)
+                // This is just too slow. Also, it's sometimes wrong.
                 // Find unused opens
-                let timeUnusedOpens = Stopwatch.StartNew()
-                let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
-                let unusedOpenErrors = [for r in unusedOpenRanges do yield diagnostic("Unused open", r, DiagnosticSeverity.Information)]
-                dprintfn "Found %d unused opens in %dms" unusedOpenErrors.Length timeUnusedOpens.ElapsedMilliseconds
+                // let timeUnusedOpens = Stopwatch.StartNew()
+                // let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
+                // let unusedOpenErrors = [for r in unusedOpenRanges do yield diagnostic("Unused open", r, DiagnosticSeverity.Information)]
+                // dprintfn "Found %d unused opens in %dms" unusedOpenErrors.Length timeUnusedOpens.ElapsedMilliseconds
                 // Find unused declarations
                 let timeUnusedDeclarations = Stopwatch.StartNew()
                 let! uses = checkResult.GetAllUsesOfAllSymbolsInFile()
@@ -295,7 +296,8 @@ type Server(client: ILanguageClient) =
                 let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield diagnostic("Unused declaration", r, DiagnosticSeverity.Hint)]
                 dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
                 // Combine
-                return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
+                // return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
+                return parseErrors@typeErrors@unusedDeclarationErrors
         }
     let doCheck(file: FileInfo): Async<unit> = 
         async {
