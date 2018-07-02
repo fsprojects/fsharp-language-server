@@ -64,6 +64,36 @@ type private Dep = {
     autoReferenced: bool
 }
 
+let private frameworkPreference = [
+    "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
+    "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
+    "netcoreapp1.1", ".NETCoreApp,Version=v1.1";
+    "netcoreapp1.0", ".NETCoreApp,Version=v1.0";
+
+    "netstandard2.0", ".NETStandard,Version=v2.0";
+    "netstandard1.6", ".NETStandard,Version=v1.6";
+    "netstandard1.5", ".NETStandard,Version=v1.5";
+    "netstandard1.4", ".NETStandard,Version=v1.4";
+    "netstandard1.3", ".NETStandard,Version=v1.3";
+    "netstandard1.2", ".NETStandard,Version=v1.2";
+    "netstandard1.1", ".NETStandard,Version=v1.1";
+    "netstandard1.0", ".NETStandard,Version=v1.0";
+
+    "net472", ".NETFramework,Version=v4.7.2";
+    "net471", ".NETFramework,Version=v4.7.1";
+    "net47", ".NETFramework,Version=v4.7";
+    "net462", ".NETFramework,Version=v4.6.2";
+    "net461", ".NETFramework,Version=v4.6.1";
+    "net46", ".NETFramework,Version=v4.6";
+    "net452", ".NETFramework,Version=v4.5.2";
+    "net451", ".NETFramework,Version=v4.5.1";
+    "net45", ".NETFramework,Version=v4.5";
+    "net403", ".NETFramework,Version=v4.0.3";
+    "net40", ".NETFramework,Version=v4.0";
+    "net35", ".NETFramework,Version=v3.5";
+    "net20", ".NETFramework,Version=v2.0";
+    "net11", ".NETFramework,Version=v1.1" ]
+
 let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
     dprintfn "Parsing %s" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
@@ -71,39 +101,10 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
     let shortFramework, longFramework = 
-        let preference = [
-            "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
-            "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
-            "netcoreapp1.1", ".NETCoreApp,Version=v1.1";
-            "netcoreapp1.0", ".NETCoreApp,Version=v1.0";
-
-            "netstandard2.0", ".NETStandard,Version=v2.0";
-            "netstandard1.6", ".NETStandard,Version=v1.6";
-            "netstandard1.5", ".NETStandard,Version=v1.5";
-            "netstandard1.4", ".NETStandard,Version=v1.4";
-            "netstandard1.3", ".NETStandard,Version=v1.3";
-            "netstandard1.2", ".NETStandard,Version=v1.2";
-            "netstandard1.1", ".NETStandard,Version=v1.1";
-            "netstandard1.0", ".NETStandard,Version=v1.0";
-
-            "net472", ".NETFramework,Version=v4.7.2";
-            "net471", ".NETFramework,Version=v4.7.1";
-            "net47", ".NETFramework,Version=v4.7";
-            "net462", ".NETFramework,Version=v4.6.2";
-            "net461", ".NETFramework,Version=v4.6.1";
-            "net46", ".NETFramework,Version=v4.6";
-            "net452", ".NETFramework,Version=v4.5.2";
-            "net451", ".NETFramework,Version=v4.5.1";
-            "net45", ".NETFramework,Version=v4.5";
-            "net403", ".NETFramework,Version=v4.0.3";
-            "net40", ".NETFramework,Version=v4.0";
-            "net35", ".NETFramework,Version=v3.5";
-            "net20", ".NETFramework,Version=v2.0";
-            "net11", ".NETFramework,Version=v1.1" ]
         let projectContainsFramework(short: string) = 
             root?project?frameworks.TryGetProperty(short).IsSome
         let mutable found: (string * string) option = None
-        for short, long in preference do 
+        for short, long in frameworkPreference do 
             if projectContainsFramework(short) && found.IsNone then
                 found <- Some(short, long)
         found.Value
@@ -304,6 +305,37 @@ let private project(fsproj: FileInfo): ProjectAnalyzer =
     let manager = AnalyzerManager(options)
     manager.GetProject(fsproj.FullName)
 
+let private inferTargetFramework(fsproj: FileInfo): ProjectAnalyzer = 
+    let analyzer = project(fsproj)
+    let props = analyzer.Project.Properties
+    let findTargetFramework = 
+        [ for p in props do 
+            if p.Name = "TargetFramework" then 
+                yield p ]
+    if not(List.isEmpty findTargetFramework) then 
+        analyzer
+    else 
+        dprintfn "No TargetFramework in %s, looking for TargetFrameworks" fsproj.Name
+        let targetFrameworks = 
+            [ for p in props do 
+                if p.Name = "TargetFrameworks" then 
+                    yield! p.EvaluatedValue.Split(';') ]
+        let preferenceOrder = 
+            [ for shortFramework, _ in frameworkPreference do 
+                if List.contains shortFramework targetFrameworks then 
+                    yield shortFramework ]
+        let targetFramework = 
+            if List.isEmpty preferenceOrder then 
+                dprintfn "Couldn't find TargetFrameworks in %s, defaulting to netcoreapp2.1" fsproj.Name
+                "netcoreapp2.1"
+            else 
+                let chosen = List.head preferenceOrder
+                dprintfn "Chose TargetFramework %s from %A" chosen preferenceOrder
+                chosen
+        let analyzer = project(fsproj)
+        analyzer.SetGlobalProperty("TargetFramework", targetFramework)
+        analyzer
+
 let private projectTarget(csproj: FileInfo) = 
     let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
     let dllName = baseName + ".dll"
@@ -327,7 +359,7 @@ let crack(fsproj: FileInfo): CrackedProject =
     let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
     try 
         // Get source info from .fsproj
-        let project = project(fsproj).Load()
+        let project = inferTargetFramework(fsproj).Load()
         let sources = 
             [ for i in project.GetItems("Compile") do 
                 let relativePath = i.EvaluatedInclude.Replace('\\', Path.DirectorySeparatorChar)

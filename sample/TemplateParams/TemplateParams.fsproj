@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>netcoreapp2.0</TargetFramework>
+        <TargetFrameworks>net45;netstandard2.0</TargetFrameworks>
     </PropertyGroup>
 
     <!-- Property definitions that get referenced by Compile directives -->

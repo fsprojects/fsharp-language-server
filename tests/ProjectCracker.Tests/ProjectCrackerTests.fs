@@ -56,7 +56,7 @@ let ``resolve template params``() =
     let cracked = ProjectCracker.crack(fsproj)
     let expected = [
         Path.Combine([|projectRoot.FullName; "src"; "fsharp"; "QueueList.fs"|]); 
-        Path.Combine([|projectRoot.FullName; "sample"; "TemplateParams"; "netcoreapp2.0"; "pars.fs"|])
+        Path.Combine([|projectRoot.FullName; "sample"; "TemplateParams"; "netstandard2.0"; "pars.fs"|])
     ]
     let actual = [for f in cracked.sources do yield f.FullName]
     CollectionAssert.AreEquivalent(expected, actual)
