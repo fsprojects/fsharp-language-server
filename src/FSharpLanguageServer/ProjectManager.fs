@@ -68,21 +68,10 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         else 
             fsprojOrFsx.LastWriteTime
 
-    /// Has this .fsproj or .fsx file or any of its transitive dependencies been modified?
-    let rec needsUpdate(fsprojOrFsx: FileInfo) = 
-        match knownProjects.TryGetValue(fsprojOrFsx.FullName) with 
-        | false, _ -> true 
-        | _, lazyOptions -> 
-            let options = lazyOptions.resolved.Value.options
-            let deps = [for _, r in options.ReferencedProjects do yield FileInfo(r.ProjectFileName)]
-            lastModified(fsprojOrFsx) > options.LoadTime || List.exists needsUpdate deps
-
-    /// What projects need to be updated?
-    let changedProjects() = 
-        [for fileName in knownProjects.Keys do 
-            let file = FileInfo(fileName)
-            if needsUpdate(file) then 
-                yield file]
+    /// Find any .fsproj files associated with a project.assets.json
+    let projectFileForAssets(assetsJson: FileInfo) = 
+        let dir = assetsJson.Directory.Parent
+        dir.GetFiles("*.fsproj")
 
     /// Find base dlls
     /// Workaround of https://github.com/fsharp/FSharp.Compiler.Service/issues/847
@@ -241,42 +230,39 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
                 dprintfn "Couldn't find %s in %s" d dir 
         ]
 
-    /// Analyze a script file
-    let analyzeFsx(fsx: FileInfo) = 
-        dprintfn "Creating project options for script %s" fsx.Name
-        let source = File.ReadAllText(fsx.FullName)
-        let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
-        let combinedOtherOptions = [|
-            for p in dotNetFramework do 
-                    yield "-r:" + p.FullName
-            for o in inferred.OtherOptions do 
-                // If a dll is included by default, skip it
-                let matchesName(f: FileInfo) = o.EndsWith(f.Name)
-                let alreadyIncluded = List.exists matchesName dotNetFramework
-                if not(alreadyIncluded) then
-                    yield o 
-        |]
-        let options = {inferred with OtherOptions = combinedOtherOptions}
-        printOptions(options)
-        {
-            sources=[for f in inferred.SourceFiles do yield FileInfo(f)]
-            options=options
-            target=FileInfo("NoOutputForFsx")
-            errors=Conversions.asDiagnostics(errors)
-        }
-    let ensureFsx(fsx: FileInfo) = 
-        if needsUpdate(fsx) then 
-            knownProjects.[fsx.FullName] <- {file=fsx; resolved=lazy(analyzeFsx(fsx))}
-            
-    let ensureAll(fs: FileInfo list) =
+    /// Add a project to the cache
+    let rec analyze(fsprojOrFsx: FileInfo) = 
+        /// Analyze a script file
+        let analyzeFsx(fsx: FileInfo) = 
+            dprintfn "Creating project options for script %s" fsx.Name
+            let source = File.ReadAllText(fsx.FullName)
+            let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
+            let combinedOtherOptions = [|
+                for p in dotNetFramework do 
+                        yield "-r:" + p.FullName
+                for o in inferred.OtherOptions do 
+                    // If a dll is included by default, skip it
+                    let matchesName(f: FileInfo) = o.EndsWith(f.Name)
+                    let alreadyIncluded = List.exists matchesName dotNetFramework
+                    if not(alreadyIncluded) then
+                        yield o 
+            |]
+            let options = {inferred with OtherOptions = combinedOtherOptions}
+            printOptions(options)
+            {
+                sources=[for f in inferred.SourceFiles do yield FileInfo(f)]
+                options=options
+                target=FileInfo("NoOutputForFsx")
+                errors=Conversions.asDiagnostics(errors)
+            }
         /// Analyze a project
-        let rec analyzeFsproj(fsproj: FileInfo) = 
+        let analyzeFsproj(fsproj: FileInfo) = 
             dprintfn "Analyzing %s" fsproj.Name
             let cracked = ProjectCracker.crack(fsproj)
             // Ensure we've analyzed all dependencies
             // We'll need their target dlls to form FSharpProjectOptions
             for r in cracked.projectReferences do 
-                ensureFsproj(r)
+                ensure(r)
             // Convert to FSharpProjectOptions
             let options = {
                 ExtraProjectInfo = None 
@@ -323,20 +309,34 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
                 target=cracked.target
                 errors=match cracked.error with None -> [] | Some(e) -> [Conversions.errorAtTop(e)]
             }
-        /// Add a project to the cache
-        and ensureFsproj(fsproj: FileInfo) = 
-            // TODO detect loop by caching set of `currentlyAnalyzing` projects
-            if needsUpdate(fsproj) then 
-                knownProjects.[fsproj.FullName] <- {file=fsproj; resolved=lazy(analyzeFsproj(fsproj))}
+        // Direct to analyzeFsx or analyzeFsproj, depending on type
+        if fsprojOrFsx.Name.EndsWith(".fsx") then 
+            knownProjects.[fsprojOrFsx.FullName] <- {file=fsprojOrFsx; resolved=lazy(analyzeFsx(fsprojOrFsx))}
+        elif fsprojOrFsx.Name.EndsWith(".fsproj") then 
+            knownProjects.[fsprojOrFsx.FullName] <- {file=fsprojOrFsx; resolved=lazy(analyzeFsproj(fsprojOrFsx))}
+        else 
+            dprintfn "Don't know how to analyze project %s" fsprojOrFsx.Name
+    /// Ensure a project is in the cache
+    and ensure(fsprojOrFsx: FileInfo) = 
+        if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then 
+            dprintfn "Discovered %s, will analyze it later" fsprojOrFsx.Name
+            analyze(fsprojOrFsx)
+    /// Ensure a list of projects is in the cache
+    let ensureAll(fs: FileInfo list) =
         for f in fs do 
-            if f.Name.EndsWith(".fsx") then 
-                dprintfn "Discovered script %s, will analyze it later" f.Name
-                ensureFsx(f)
-            elif f.Name.EndsWith(".fsproj") then 
-                dprintfn "Discovered project %s, will analyze it later" f.Name
-                ensureFsproj(f)
-            else 
-                dprintfn "Don't know how to analyze project %s" f.Name
+            ensure(f)
+    /// Invalidate all descendents of a modified .fsproj or .fsx file
+    let invalidateDescendents(fsprojOrFsx: FileInfo) = 
+        let isProject(options: FSharpProjectOptions) = options.ProjectFileName = fsprojOrFsx.FullName
+        let isDescendent(project: LazyProject) = 
+            let ancestors = [for _, options in project.resolved.Value.options.ReferencedProjects do yield options]
+            project.resolved.IsValueCreated && List.exists isProject ancestors
+        let descendents = [for KeyValue(fileName, project) in knownProjects do if isDescendent(project) then yield FileInfo(fileName)]
+        for d in descendents do
+            dprintfn "%s has been invalidated by changes to %s" d.Name fsprojOrFsx.Name
+            analyze(d)
+        dprintfn "%s has been changed" fsprojOrFsx.Name
+        analyze(fsprojOrFsx)
 
     member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> = 
         async {
@@ -347,13 +347,14 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         }
     member this.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
-        ensureAll(changedProjects())
+        invalidateDescendents(fsprojOrFsx)
     member this.NewProjectFile(fsprojOrFsx: FileInfo) = 
-        ensureAll(fsprojOrFsx::changedProjects())
+        ensureAll([fsprojOrFsx])
+        invalidateDescendents(fsprojOrFsx)
     member this.UpdateProjectFile(fsprojOrFsx: FileInfo) = 
-        ensureAll(changedProjects())
+        invalidateDescendents(fsprojOrFsx)
     member this.UpdateAssetsJson(assets: FileInfo) = 
-        ensureAll(changedProjects())
+        for fsproj in projectFileForAssets(assets) do invalidateDescendents(fsproj)
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> = 
         let isSourceFile(f: FileInfo) = f.FullName = sourceFile.FullName
         // Does `p` contain a reference to `sourceFile`?
@@ -369,7 +370,7 @@ type ProjectManager(client: ILanguageClient, checker: FSharpChecker) =
         let crackLazily = seq {
             // If file is an .fsx, return itself 
             if sourceFile.Name.EndsWith(".fsx") then 
-                ensureFsx(sourceFile)
+                ensure(sourceFile)
                 yield knownProjects.[sourceFile.FullName]
             // First, look at all projects that have *already* been cracked
             for options in alreadyCracked do 
