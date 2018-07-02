@@ -46,7 +46,7 @@ let ``find script file``() =
     let project = projects.FindProjectOptions(file)
     match project with 
     | Error(m) -> Assert.Fail(sprintf "%A" m)
-    | Ok(f) -> if not(f.ProjectFileName.EndsWith "MainScript.fsx.fsproj") then Assert.Fail(sprintf "%A" f)
+    | Ok(f) -> if not(f.ProjectFileName.EndsWith("MainScript.fsx.fsproj")) then Assert.Fail(sprintf "%A" f)
 
 // [<Test>] TODO repair this somehow. Another build step?
 let ``find an local dll``() = 
