@@ -2,6 +2,7 @@ module ProjectCracker
 
 open LSP.Log
 open System
+open System.Diagnostics
 open System.IO
 open System.Xml
 open System.Reflection
@@ -359,6 +360,7 @@ let crack(fsproj: FileInfo): CrackedProject =
     let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
     try 
         // Get source info from .fsproj
+        let timeProject = Stopwatch.StartNew()
         let project = inferTargetFramework(fsproj).Load()
         let sources = 
             [ for i in project.GetItems("Compile") do 
@@ -366,6 +368,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
                 let normalizePath = Path.GetFullPath(absolutePath)
                 yield FileInfo(normalizePath) ]
+        dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
         let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
         if not(projectAssetsJson.Exists) then
@@ -379,19 +382,21 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
             }
         else
+            let timeAssets = Stopwatch.StartNew()
             let assets = parseProjectAssets(projectAssetsJson)
             // msbuild produces paths like src/LSP/bin/Debug/netcoreapp2.0/LSP.dll
             // TODO this seems fragile
             let target = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
             let isFsproj(f: FileInfo) = f.Name.EndsWith(".fsproj")
             let fsProjects, csProjects = List.partition isFsproj assets.projects
-
+            let otherProjects = [for csproj in csProjects do yield projectTarget(csproj)]
+            dprintfn "Cracked project.assets.json in %dms" timeAssets.ElapsedMilliseconds
             {
                 fsproj=fsproj
                 target=target
                 sources=sources
                 projectReferences=fsProjects
-                otherProjectReferences=[for csproj in csProjects do yield projectTarget(csproj)]
+                otherProjectReferences=otherProjects
                 packageReferences=assets.packages
                 error=None
             }
