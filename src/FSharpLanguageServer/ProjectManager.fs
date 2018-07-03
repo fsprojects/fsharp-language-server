@@ -28,7 +28,7 @@ type private ProjectCache() =
     let knownProjects = new Dictionary<String, LazyProject>()
 
     member this.Invalidate(fsprojOrFsx: FileInfo) = 
-        knownProjects.Remove(fsprojOrFsx.FullName)
+        knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
     member this.Get(fsprojOrFsx: FileInfo, analyzeLater: FileInfo -> LazyProject): LazyProject = 
         if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then 
             knownProjects.Add(fsprojOrFsx.FullName, analyzeLater(fsprojOrFsx))
@@ -313,6 +313,7 @@ type ProjectManager(checker: FSharpChecker) =
 
     /// Invalidate all descendents of a modified .fsproj or .fsx file
     let invalidateDescendents(fsprojOrFsx: FileInfo) = 
+        cache.Invalidate(fsprojOrFsx)
         for fileName in knownProjects do 
             let file = FileInfo(fileName)
             let project = cache.Get(file, analyzeLater)
@@ -320,7 +321,7 @@ type ProjectManager(checker: FSharpChecker) =
                 for _, ancestor in project.resolved.Value.options.ReferencedProjects do 
                     if ancestor.ProjectFileName = fsprojOrFsx.FullName then 
                         dprintfn "%s has been invalidated by changes to %s" ancestor.ProjectFileName fsprojOrFsx.Name
-                        cache.Invalidate(FileInfo(ancestor.ProjectFileName)) |> ignore
+                        cache.Invalidate(FileInfo(ancestor.ProjectFileName))
 
     /// All transitive deps of anproject, including itself
     let transitiveDeps(fsprojOrFsx: FileInfo) = 
