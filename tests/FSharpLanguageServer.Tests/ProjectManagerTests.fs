@@ -28,7 +28,7 @@ let setup() =
 
 [<Test>]
 let ``find project file``() = 
-    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let projects = ProjectManager(FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
@@ -39,7 +39,7 @@ let ``find project file``() =
 
 [<Test>]
 let ``find script file``() = 
-    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let projects = ProjectManager(FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "Script"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "Script"; "LoadedByScript.fs"|])
@@ -50,7 +50,7 @@ let ``find script file``() =
 
 // [<Test>] TODO repair this somehow. Another build step?
 let ``find an local dll``() = 
-    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let projects = ProjectManager(FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot(root))
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
@@ -62,7 +62,7 @@ let ``find an local dll``() =
 
 [<Test>]
 let ``project-file-not-found``() = 
-    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let projects = ProjectManager(FSharpChecker.Create())
     let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
     let project = projects.FindProjectOptions file
     match project with 
@@ -71,13 +71,13 @@ let ``project-file-not-found``() =
 
 [<Test>]
 let ``bad project file``() = 
-    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let projects = ProjectManager(FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "BadProject"|] |> DirectoryInfo
     Async.RunSynchronously(projects.AddWorkspaceRoot root)
 
 [<Test>]
 let ``get script options``() = 
-    let projects = ProjectManager(MockClient(), FSharpChecker.Create())
+    let projects = ProjectManager(FSharpChecker.Create())
     let script = Path.Combine [|projectRoot.FullName; "sample"; "Script"; "MainScript.fsx"|] |> FileInfo 
     projects.NewProjectFile(script)
     let options = match projects.FindProjectOptions(script) with Ok(options) -> options

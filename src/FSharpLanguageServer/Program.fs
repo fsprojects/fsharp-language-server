@@ -150,7 +150,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let checker = FSharpChecker.Create()
-    let projects = ProjectManager(client, checker)
+    let projects = ProjectManager(checker)
 
     /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option = 
