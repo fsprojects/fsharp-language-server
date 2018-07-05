@@ -193,8 +193,13 @@ type Server(client: ILanguageClient) =
                     with e -> 
                         return Error(e.Message)
         }
-    /// Typecheck a file, ignoring caches
-    let forceCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+
+    /// Typecheck `file`
+    /// If `allowCached`, will re-use cached results where the source exactly matches
+    /// `allowCached` is a bad idea if upstream dependencies of `file` have been edited
+    /// If `allowStale`, will re-use stale results where the source doesn't match
+    /// `allowStale` only really works for simple identifier expressions like x.y
+    let checkOpenFile(file: FileInfo, allowCached: bool, allowStale: bool): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.Get(file) with 
             | _, None -> 
@@ -204,44 +209,30 @@ type Server(client: ILanguageClient) =
             | Error(errs), _ -> 
                 return Error(errs)
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
-                let timeCheck = Stopwatch.StartNew()
-                let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
-                dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
-                match force with 
-                | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
-                | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
-        }
-    /// Typecheck a file
-    let checkOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
-        async {
-            match projects.FindProjectOptions(file), docs.GetVersion(file) with 
-            | _, None -> 
-                // If file doesn't exist, there's nothing to report
-                dprintfn "%s was closed" file.FullName
-                return Error []
-            | Error(errs), _ -> 
-                return Error(errs)
-            | Ok(projectOptions), Some(sourceVersion) -> 
+                let recompile = async {
+                    let timeCheck = Stopwatch.StartNew()
+                    let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
+                    dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
+                    match force with 
+                    | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
+                    | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
+                }
                 match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
-                | Some(parseResult, checkResult, version) when version = sourceVersion -> 
-                    return Ok(parseResult, checkResult)
+                | Some(parseResult, checkResult, version) -> 
+                    if allowCached && version = sourceVersion then 
+                        return Ok(parseResult, checkResult)
+                    else if allowCached && allowStale then 
+                        try 
+                            dprintfn "Trying to recompile %s with timeout" file.Name
+                            let! worker = Async.StartChild(recompile, millisecondsTimeout=200)
+                            return! worker
+                        with :? TimeoutException ->
+                            dprintfn "Re-compile timed out, using stale results"
+                            return Ok(parseResult, checkResult)
+                    else 
+                        return! recompile
                 | _ -> 
-                    return! forceCheckOpenFile(file)
-        }
-    /// Typecheck a file quickly and a little less accurately
-    /// If the file has never been checked before, this is the same as `checkOpenFile`
-    /// If the file has been checked before, the previous check is returned, even if it's out-of-date
-    let quickCheckOpenFile(file: FileInfo): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
-        async {
-            match projects.FindProjectOptions(file) with 
-            | Error(errs) -> return Error(errs)
-            | Ok(projectOptions) -> 
-                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with 
-                | Some(parseResult, checkResult, _) -> 
-                    // Return the cached check, even if it is out-of-date
-                    return Ok(parseResult, checkResult)
-                | _ -> 
-                    return! forceCheckOpenFile(file)
+                    return! recompile
         }
 
     /// When did we last check each file on disk?
@@ -301,7 +292,7 @@ type Server(client: ILanguageClient) =
         }
     let doCheck(file: FileInfo): Async<unit> = 
         async {
-            let! check = checkOpenFile(file)
+            let! check = checkOpenFile(file, true, false)
             let! errors = getErrors(file, check)
             publishErrors(file, errors)
         }
@@ -311,7 +302,7 @@ type Server(client: ILanguageClient) =
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
             let file = FileInfo(textDocument.uri.LocalPath)
-            let! c = checkOpenFile(file)
+            let! c = checkOpenFile(file, true, false)
             let line = lineContent(file, position.line)
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character - 1)
             match c, maybeId with 
@@ -551,7 +542,7 @@ type Server(client: ILanguageClient) =
                 use progress = new ProgressBar(todo.Length, sprintf "Check %d files" todo.Length, client, todo.Length <= 1)
                 for file in todo do 
                     progress.Increment(file)
-                    let! check = forceCheckOpenFile(file)
+                    let! check = checkOpenFile(file, false, false)
                     let! errors = getErrors(file, check)
                     publishErrors(file, errors)
             }
@@ -589,17 +580,11 @@ type Server(client: ILanguageClient) =
                 dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
                 let line = lineContent(file, p.position.line)
                 let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
-                let! c = 
-                    // When a partial identifier is not present, stale completions are very inaccurate
-                    // For example Some(1).? will complete top-level names rather than the members of Option
-                    // Therefore, we will always re-check the file, even if it takes a while
-                    if partialName.QualifyingIdents.IsEmpty && partialName.PartialIdent = "" then 
-                        dprintfn "No partial name, re-checking file..."
-                        checkOpenFile(file)
-                    // When a partial identifier is present, stale completions are quite accurate
-                    else
-                        dprintfn "Partial name %A" partialName
-                        quickCheckOpenFile(file)
+                // When a partial identifier is not present, stale completions are very inaccurate
+                // For example Some(1).? will complete top-level names rather than the members of Option
+                // Therefore, we will always re-check the file, even if it takes a while
+                let noPartialName = partialName.QualifyingIdents.IsEmpty && partialName.PartialIdent = ""
+                let! c = checkOpenFile(file, true, not(noPartialName))
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
                 | Error errors -> 
@@ -614,7 +599,7 @@ type Server(client: ILanguageClient) =
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                let! c = checkOpenFile(file)
+                let! c = checkOpenFile(file, true, false)
                 let line = lineContent(file, p.position.line)
                 let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character - 1)
                 match c, maybeId with 
@@ -646,7 +631,7 @@ type Server(client: ILanguageClient) =
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                let! c = quickCheckOpenFile(file)
+                let! c = checkOpenFile(file, true, true)
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
