@@ -356,6 +356,24 @@ let ``create Run Test code lens``() =
     CollectionAssert.Contains(lines, 5, sprintf "No line 5 in %A" lenses)
 
 [<Test>]
+let ``Go To Implementation code lens``() = 
+    let client, server = createServerAndReadFile("Signature", "HasSignature.fsi")
+    let lenses = server.CodeLens({ textDocument = textDocument("Signature", "HasSignature.fsi") }) |> Async.RunSynchronously
+    let simple = [for l in lenses do if l.range.start.line = 2 then yield l].Head
+    let resolveSimple = server.ResolveCodeLens(simple) |> Async.RunSynchronously
+    if resolveSimple.command.IsNone then 
+        Assert.Fail(sprintf "No resolved command in %A" resolveSimple)
+
+[<Test>]
+let ``Go To nested-Implementation code lens``() = 
+    let client, server = createServerAndReadFile("Signature", "HasSignature.fsi")
+    let lenses = server.CodeLens({ textDocument = textDocument("Signature", "HasSignature.fsi") }) |> Async.RunSynchronously
+    let nested = [for l in lenses do if l.range.start.line = 5 then yield l].Head 
+    let resolveNested = server.ResolveCodeLens(nested) |> Async.RunSynchronously
+    if resolveNested.command.IsNone then 
+        Assert.Fail(sprintf "No resolved command in %A" resolveNested)
+
+[<Test>]
 let ``report no type errors in CSharp reference``() = 
     let client, server = createServerAndReadFile("ReferenceCSharp", "Library.fs")
     let messages = diagnosticMessages(client)

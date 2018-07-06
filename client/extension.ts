@@ -6,7 +6,7 @@
 
 import * as path from 'path';
 import * as cp from 'child_process';
-import { window, workspace, ExtensionContext, Progress, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
+import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
 
 export function activate(context: ExtensionContext) {
@@ -52,6 +52,12 @@ export function activate(context: ExtensionContext) {
 	// Register test-runner
 	commands.registerCommand('fsharp.command.test.run', runTest);
 	commands.registerCommand('fsharp.command.test.debug', debugTest);
+	commands.registerCommand('fsharp.command.goto', goto);
+}
+
+function goto(file: string, startLine: number, startColumn: number, _endLine: number, _endColumn: number) {
+	let selection = new Range(startLine, startColumn, startLine, startColumn);
+	workspace.openTextDocument(file).then(doc => window.showTextDocument(doc, { selection }));
 }
 
 interface FSharpTestTask extends TaskDefinition {

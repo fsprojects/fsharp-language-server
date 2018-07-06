@@ -9,6 +9,7 @@
   <ItemGroup>
     <Compile Include="ProgressBar.fs" />
     <Compile Include="TipFormatter.fs" />
+    <Compile Include="Navigation.fs" />
     <Compile Include="Conversions.fs" />
     <Compile Include="ProjectManager.fs" />
     <Compile Include="UnusedDeclarations.fs" />

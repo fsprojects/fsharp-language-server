@@ -316,6 +316,7 @@ let private inferTargetFramework(fsproj: FileInfo): ProjectAnalyzer =
     if not(List.isEmpty findTargetFramework) then 
         analyzer
     else 
+        // TODO get this from project.assets.json
         dprintfn "No TargetFramework in %s, looking for TargetFrameworks" fsproj.Name
         let targetFrameworks = 
             [ for p in props do 

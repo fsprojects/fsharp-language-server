@@ -205,31 +205,61 @@ let declarationLocation(s: FSharpSymbol): Location option =
 let useLocation(s: FSharpSymbolUse): Location = 
     asLocation(s.RangeAlternate)
 
-/// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
-/// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
-let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind = 
+/// Convert an F# `NavigationDeclarationItemKind` to an LSP `SymbolKind`
+/// `NavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
+let private asSymbolKind(k: NavigationDeclarationItemKind): SymbolKind = 
     match k with 
-    | NamespaceDecl -> SymbolKind.Namespace
-    | ModuleFileDecl -> SymbolKind.Module
-    | ExnDecl -> SymbolKind.Class
-    | ModuleDecl -> SymbolKind.Module
-    | TypeDecl -> SymbolKind.Interface
-    | MethodDecl -> SymbolKind.Method
-    | PropertyDecl -> SymbolKind.Property
-    | FieldDecl -> SymbolKind.Field
-    | OtherDecl -> SymbolKind.Variable
+    | NavigationDeclarationItemKind.NamespaceDecl -> SymbolKind.Namespace
+    | NavigationDeclarationItemKind.ModuleFileDecl -> SymbolKind.Module
+    | NavigationDeclarationItemKind.ExnDecl -> SymbolKind.Class
+    | NavigationDeclarationItemKind.ModuleDecl -> SymbolKind.Module
+    | NavigationDeclarationItemKind.TypeDecl -> SymbolKind.Interface
+    | NavigationDeclarationItemKind.MethodDecl -> SymbolKind.Method
+    | NavigationDeclarationItemKind.PropertyDecl -> SymbolKind.Property
+    | NavigationDeclarationItemKind.FieldDecl -> SymbolKind.Field
+    | NavigationDeclarationItemKind.OtherDecl -> SymbolKind.Variable
 
-/// Convert an F# `FSharpNavigationDeclarationItem` to an LSP `SymbolInformation`
-/// `FSharpNavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
+/// Convert an F# `NavigationDeclarationItem` to an LSP `SymbolInformation`
+/// `NavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
 /// `container` is present when `d` is part of a module or type
-let asSymbolInformation(d: FSharpNavigationDeclarationItem, container: FSharpNavigationDeclarationItem option): SymbolInformation = 
-    let declarationName(d: FSharpNavigationDeclarationItem) = d.Name
+let asSymbolInformation(d: NavigationDeclarationItem, container: NavigationDeclarationItem option): SymbolInformation = 
+    let declarationName(d: NavigationDeclarationItem) = d.Name
     {
         name=d.Name 
         kind=asSymbolKind d.Kind 
         location=asLocation d.Range 
         containerName=Option.map declarationName container
     }
+
+/// Convert symbols declared in an .fsi file to a CodeLens that helps the user navigate to the definition
+let asGoToImplementation(name: string list, file: FileInfo, range: Range.range): CodeLens = 
+    let jsonFile = JsonValue.String(file.FullName)
+    let jsonName = JsonValue.Array([|for i in name do yield JsonValue.String(i)|])
+    {
+        range=asRange(range)
+        command=None
+        data=JsonValue.Array([|jsonFile; jsonName|])
+    }
+
+let goToImplementationData(goTo: CodeLens) = 
+    match goTo.data with 
+    | JsonValue.Array([|JsonValue.String(file); JsonValue.Array(jsonNames)|]) -> 
+        FileInfo(file), [for JsonValue.String(j) in jsonNames do yield j ]
+
+let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Range.range): CodeLens = 
+    let command = 
+        {
+            title="Go To Definition"
+            command="fsharp.command.goto"
+            arguments=[
+                JsonValue.String(file.FullName)
+                JsonValue.Number(decimal(range.StartLine - 1))
+                JsonValue.Number(decimal(range.StartColumn))
+                JsonValue.Number(decimal(range.EndLine - 1))
+                JsonValue.Number(decimal(range.EndColumn))
+            ]
+        }
+    { unresolved with command = Some(command) }
 
 let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBinding): CodeLens =
     {

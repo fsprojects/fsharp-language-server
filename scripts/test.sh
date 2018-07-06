@@ -7,6 +7,7 @@ dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
 dotnet restore sample/HasTests/HasTests.fsproj
 dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
+dotnet restore sample/Signature/Signature.fsproj
 dotnet build sample/CSharpProject/CSharpProject.csproj
 
 echo 'Running tests...'

@@ -85,12 +85,37 @@ let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGr
             result <- i 
     if result = -1 then None else Some result
 
-/// Find all symbols in a parsed AST
-let private flattenSymbols(parse: FSharpParseFileResults): (FSharpNavigationDeclarationItem * FSharpNavigationDeclarationItem option) list = 
-    [ for d in parse.GetNavigationItems().Declarations do 
-        yield d.Declaration, None
-        for n in d.Nested do 
-            yield n, Some(d.Declaration) ]
+/// Find searchable declarations
+let private findDeclarations(parse: FSharpParseFileResults) = 
+    let items = 
+        match parse.ParseTree with 
+        | Some(Ast.ParsedInput.SigFile(Ast.ParsedSigFileInput(_, _, _, _, modules))) -> 
+            Navigation.getNavigationFromSigFile(modules).Declarations
+        | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> 
+            Navigation.getNavigationFromImplFile(modules).Declarations
+        | _ -> [||]
+    [ for i in items do 
+        yield i.Declaration, None
+        for n in i.Nested do 
+            yield n, Some(i.Declaration) ]
+
+let private findSignatureDeclarations(parse: FSharpParseFileResults) = 
+    match parse.ParseTree with 
+    | Some(Ast.ParsedInput.SigFile(Ast.ParsedSigFileInput(_, _, _, _, modules))) -> 
+        let items = Navigation.getNavigationFromSigFile(modules)
+        [ for i in items.Declarations do 
+            for n in i.Nested do 
+                yield [i.Declaration.Name; n.Name], n.Range ]
+    | _ -> []
+
+let private findSignatureImplementation(parse: FSharpParseFileResults, name: string list) = 
+    match parse.ParseTree with 
+    | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> 
+        let items = Navigation.getNavigationFromImplFile(modules)
+        [ for i in items.Declarations do 
+            for n in i.Nested do 
+                if [i.Declaration.Name; n.Name] = name then yield n.Range ]
+    | _ -> []
 
 /// Find functions annotated with [<Test>]
 let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.SynBinding) list = 
@@ -492,7 +517,7 @@ type Server(client: ILanguageClient) =
                             completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
                             signatureHelpProvider = Some({triggerCharacters=['('; ',']})
                             documentSymbolProvider = true
-                            codeLensProvider = Some({resolveProvider=false})
+                            codeLensProvider = Some({resolveProvider=true})
                             workspaceSymbolProvider = true
                             definitionProvider = true
                             referencesProvider = true
@@ -684,7 +709,7 @@ type Server(client: ILanguageClient) =
                     dprintfn "%s" e 
                     return []
                 | Ok parse ->
-                    let flat = flattenSymbols(parse)
+                    let flat = findDeclarations(parse)
                     return List.map asSymbolInformation flat
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
@@ -703,7 +728,7 @@ type Server(client: ILanguageClient) =
                                 try
                                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                                     let! parse = checker.ParseFile(sourceFile.FullName, sourceText, parsingOptions)
-                                    for declaration, container in flattenSymbols(parse) do 
+                                    for declaration, container in findDeclarations(parse) do 
                                         if matchesQuery(p.query, declaration.Name) then 
                                             all.Add(asSymbolInformation(declaration, container))
                                 with e -> 
@@ -718,11 +743,19 @@ type Server(client: ILanguageClient) =
                 | Ok(projectOptions), Some(sourceText) -> 
                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                     let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
-                    let fns = testFunctions(parse)
-                    let fsproj = FileInfo(projectOptions.ProjectFileName)
-                    return [ for id, bindings in fns do 
-                                yield asRunTest(fsproj, id, bindings)
-                                yield asDebugTest(fsproj, id, bindings) ]
+                    if file.Name.EndsWith(".fs") then 
+                        let fns = testFunctions(parse)
+                        let fsproj = FileInfo(projectOptions.ProjectFileName)
+                        return [ for id, bindings in fns do 
+                                    yield asRunTest(fsproj, id, bindings)
+                                    yield asDebugTest(fsproj, id, bindings) ]
+                    else if file.Name.EndsWith(".fsi") then 
+                        return 
+                            [ for name, range in findSignatureDeclarations(parse) do 
+                                yield asGoToImplementation(name, file, range) ]
+                    else 
+                        dprintfn "Don't know how to compute code lenses on extension %s" file.Extension
+                        return []
                 | Error(e), _ -> 
                     dprintfn "Failed to create code lens because project options failed to load: %A" e
                     return []
@@ -730,7 +763,35 @@ type Server(client: ILanguageClient) =
                     dprintfn "Failed to create code lens because file %s does not exist" file.FullName
                     return []
             }
-        member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = TODO()
+        member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = 
+            async {
+                if p.data <> JsonValue.Null then 
+                    dprintfn "Resolving %A" p.data
+                    let fsi, name = goToImplementationData(p)
+                    if not(fsi.Extension = ".fsi") then 
+                        raise(Exception(sprintf "Signature file %s should end with .fsi" fsi.Name))
+                    let file = FileInfo(fsi.FullName.Substring(0, fsi.FullName.Length - 1))
+                    match projects.FindProjectOptions(file), getOrRead(file) with 
+                    | Ok(projectOptions), Some(sourceText) -> 
+                        let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                        let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
+                        match findSignatureImplementation(parse, name) with 
+                        | [range] -> 
+                            return resolveGoToImplementation(p, file, range)
+                        | [] -> 
+                            dprintfn "Signature %A has no implementation in %s" name file.Name
+                            return p
+                        | many ->
+                            dprintfn "Signature %A has multiple implementations in %s: %A" name file.Name many
+                            return p
+                    | Error(e), _ -> 
+                        dprintfn "Failed to resolve code lens because project options failed to load: %A" e
+                        return p
+                    | _, None -> 
+                        dprintfn "Failed to resolve code lens because file %s does not exist" file.FullName
+                        return p
+                else return p
+            }
         member this.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
         member this.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
         member this.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = TODO()
