@@ -205,19 +205,19 @@ let declarationLocation(s: FSharpSymbol): Location option =
 let useLocation(s: FSharpSymbolUse): Location = 
     asLocation(s.RangeAlternate)
 
-/// Convert an F# `NavigationDeclarationItemKind` to an LSP `SymbolKind`
-/// `NavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
-let private asSymbolKind(k: NavigationDeclarationItemKind): SymbolKind = 
+/// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
+/// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
+let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind = 
     match k with 
-    | NavigationDeclarationItemKind.NamespaceDecl -> SymbolKind.Namespace
-    | NavigationDeclarationItemKind.ModuleFileDecl -> SymbolKind.Module
-    | NavigationDeclarationItemKind.ExnDecl -> SymbolKind.Class
-    | NavigationDeclarationItemKind.ModuleDecl -> SymbolKind.Module
-    | NavigationDeclarationItemKind.TypeDecl -> SymbolKind.Interface
-    | NavigationDeclarationItemKind.MethodDecl -> SymbolKind.Method
-    | NavigationDeclarationItemKind.PropertyDecl -> SymbolKind.Property
-    | NavigationDeclarationItemKind.FieldDecl -> SymbolKind.Field
-    | NavigationDeclarationItemKind.OtherDecl -> SymbolKind.Variable
+    | NamespaceDecl -> SymbolKind.Namespace
+    | ModuleFileDecl -> SymbolKind.Module
+    | ExnDecl -> SymbolKind.Class
+    | ModuleDecl -> SymbolKind.Module
+    | TypeDecl -> SymbolKind.Interface
+    | MethodDecl -> SymbolKind.Method
+    | PropertyDecl -> SymbolKind.Property
+    | FieldDecl -> SymbolKind.Field
+    | OtherDecl -> SymbolKind.Variable
 
 /// Convert an F# `NavigationDeclarationItem` to an LSP `SymbolInformation`
 /// `NavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
