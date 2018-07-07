@@ -780,10 +780,13 @@ type Server(client: ILanguageClient) =
                             return resolveGoToImplementation(p, file, range)
                         | [] -> 
                             dprintfn "Signature %A has no implementation in %s" name file.Name
-                            return p
+                            return resolveMissingGoToImplementation(p, fsi)
                         | many ->
                             dprintfn "Signature %A has multiple implementations in %s: %A" name file.Name many
-                            return p
+                            // Go to the first overload
+                            // This is wrong but still useful
+                            let range = many.Head
+                            return resolveGoToImplementation(p, file, range)
                     | Error(e), _ -> 
                         dprintfn "Failed to resolve code lens because project options failed to load: %A" e
                         return p

@@ -261,6 +261,21 @@ let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Range
         }
     { unresolved with command = Some(command) }
 
+let resolveMissingGoToImplementation(unresolved: CodeLens, file: FileInfo): CodeLens = 
+    let command = 
+        {
+            title = "Missing Implementation"
+            command = "fsharp.command.goto"
+            arguments = [
+                JsonValue.String(file.FullName)
+                JsonValue.Number(decimal(unresolved.range.start.line))
+                JsonValue.Number(decimal(unresolved.range.start.character))
+                JsonValue.Number(decimal(unresolved.range.``end``.line))
+                JsonValue.Number(decimal(unresolved.range.``end``.character))
+            ]
+        }
+    { unresolved with command = Some(command) }
+
 let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBinding): CodeLens =
     {
         range=asRange(test.RangeOfBindingSansRhs)

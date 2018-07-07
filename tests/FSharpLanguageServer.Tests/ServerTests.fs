@@ -356,22 +356,40 @@ let ``create Run Test code lens``() =
     CollectionAssert.Contains(lines, 5, sprintf "No line 5 in %A" lenses)
 
 [<Test>]
-let ``Go To Implementation code lens``() = 
+let ``Implementation code lens``() = 
     let client, server = createServerAndReadFile("Signature", "HasSignature.fsi")
     let lenses = server.CodeLens({ textDocument = textDocument("Signature", "HasSignature.fsi") }) |> Async.RunSynchronously
-    let simple = [for l in lenses do if l.range.start.line = 2 then yield l].Head
-    let resolveSimple = server.ResolveCodeLens(simple) |> Async.RunSynchronously
-    if resolveSimple.command.IsNone then 
-        Assert.Fail(sprintf "No resolved command in %A" resolveSimple)
+    let lens = [for l in lenses do if l.range.start.line = 2 then yield l].Head
+    let resolve = server.ResolveCodeLens(lens) |> Async.RunSynchronously
+    if resolve.command.IsNone then 
+        Assert.Fail(sprintf "No resolved command in %A" resolve)
 
 [<Test>]
-let ``Go To nested-Implementation code lens``() = 
+let ``nested Implementation code lens``() = 
     let client, server = createServerAndReadFile("Signature", "HasSignature.fsi")
     let lenses = server.CodeLens({ textDocument = textDocument("Signature", "HasSignature.fsi") }) |> Async.RunSynchronously
-    let nested = [for l in lenses do if l.range.start.line = 5 then yield l].Head 
-    let resolveNested = server.ResolveCodeLens(nested) |> Async.RunSynchronously
-    if resolveNested.command.IsNone then 
-        Assert.Fail(sprintf "No resolved command in %A" resolveNested)
+    let lens = [for l in lenses do if l.range.start.line = 5 then yield l].Head 
+    let resolve = server.ResolveCodeLens(lens) |> Async.RunSynchronously
+    if resolve.command.IsNone then 
+        Assert.Fail(sprintf "No resolved command in %A" resolve)
+
+[<Test>]
+let ``missing Implementation code lens``() = 
+    let client, server = createServerAndReadFile("Signature", "HasSignature.fsi")
+    let lenses = server.CodeLens({ textDocument = textDocument("Signature", "HasSignature.fsi") }) |> Async.RunSynchronously
+    let lens = [for l in lenses do if l.range.start.line = 6 then yield l].Head 
+    let resolve = server.ResolveCodeLens(lens) |> Async.RunSynchronously
+    if resolve.command.IsNone then 
+        Assert.Fail(sprintf "No resolved command in %A" resolve)
+
+[<Test>]
+let ``overloaded method Implementation code lens``() = 
+    let client, server = createServerAndReadFile("Signature", "HasSignature.fsi")
+    let lenses = server.CodeLens({ textDocument = textDocument("Signature", "HasSignature.fsi") }) |> Async.RunSynchronously
+    let lens = [for l in lenses do if l.range.start.line = 10 then yield l].Head 
+    let resolve = server.ResolveCodeLens(lens) |> Async.RunSynchronously
+    if resolve.command.IsNone then 
+        Assert.Fail(sprintf "No resolved command in %A" resolve)
 
 [<Test>]
 let ``report no type errors in CSharp reference``() = 

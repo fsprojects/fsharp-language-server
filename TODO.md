@@ -24,13 +24,7 @@
 - Concurrency errors; use a single thread for everything except FSharpCompilerService ops
 
 # Optimizations
-- Cancel redundant analyze-.fsproj sequences when .fsproj files get modified repeatedly
-- Only rebuild .fsproj files that depend on the saved one
-- Only re-analyze .fsx when # directives are changed
-- Only show progress bars once 1s has passed
-- Try erasing source after cursor to speed up incremental re-compilation
-- Check out get-project-options implementation in https://github.com/fsharp/FSharp.Compiler.Service/blob/62098efc35fe24f7e6824b89e47ff1eb031d55a5/vsintegration/src/FSharp.Editor/LanguageService/ProjectSitesAndFiles.fs
-- Check out Omnisharp project loading OmniSharp.MSBuild.ProjectLoader
+- Add analyze-incrementally operation to F# compiler
 
 # Features
 - Allow emitting obj/FscArgs.txt as a project-cracker backup
