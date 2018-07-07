@@ -249,7 +249,7 @@ let goToImplementationData(goTo: CodeLens) =
 let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Range.range): CodeLens = 
     let command = 
         {
-            title="Go To Definition"
+            title="Implementation"
             command="fsharp.command.goto"
             arguments=[
                 JsonValue.String(file.FullName)
