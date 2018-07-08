@@ -249,7 +249,7 @@ let goToImplementationData(goTo: CodeLens) =
 let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Range.range): CodeLens = 
     let command = 
         {
-            title="Implementation"
+            title=sprintf "%s(%d)" file.Name range.StartLine
             command="fsharp.command.goto"
             arguments=[
                 JsonValue.String(file.FullName)
@@ -264,9 +264,9 @@ let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Range
 let resolveMissingGoToImplementation(unresolved: CodeLens, file: FileInfo): CodeLens = 
     let command = 
         {
-            title = "Missing Implementation"
-            command = "fsharp.command.goto"
-            arguments = [
+            title="Not Found"
+            command="fsharp.command.goto"
+            arguments=[
                 JsonValue.String(file.FullName)
                 JsonValue.Number(decimal(unresolved.range.start.line))
                 JsonValue.Number(decimal(unresolved.range.start.character))

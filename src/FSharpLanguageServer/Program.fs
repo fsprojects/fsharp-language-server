@@ -609,6 +609,7 @@ type Server(client: ILanguageClient) =
                 // For example Some(1).? will complete top-level names rather than the members of Option
                 // Therefore, we will always re-check the file, even if it takes a while
                 let noPartialName = partialName.QualifyingIdents.IsEmpty && partialName.PartialIdent = ""
+                // TODO when this is the only edited line, and the line looks like x.y.z.?, then stale completions are quite accurate
                 let! c = checkOpenFile(file, true, not(noPartialName))
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
