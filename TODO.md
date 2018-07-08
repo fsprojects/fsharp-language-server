@@ -22,6 +22,7 @@
 - Save upstream file not triggering re-lint
 - Unused-open is sometimes wrong??? See ProgressBar.fs
 - Concurrency errors; use a single thread for everything except FSharpCompilerService ops
+- Set --framework in test command
 
 # Optimizations
 - Add analyze-incrementally operation to F# compiler
