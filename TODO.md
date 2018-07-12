@@ -23,9 +23,12 @@
 - Unused-open is sometimes wrong??? See ProgressBar.fs
 - Concurrency errors; use a single thread for everything except FSharpCompilerService ops
 - Set --framework in test command
+- Signature code lenses disappear when there are parse errors
+- Hover is off-by-one; you need to hover slightly to the right to get the popup
 
 # Optimizations
 - Add analyze-incrementally operation to F# compiler
+- When .fsi files are present, changing corresponding .fs file doesn't invalidate anything
 
 # Features
 - Allow emitting obj/FscArgs.txt as a project-cracker backup

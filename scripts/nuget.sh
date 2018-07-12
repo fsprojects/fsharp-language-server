@@ -8,4 +8,8 @@ fcs/build.sh NuGet
 # Copy result of previous step to nuget/, a local nuget feed
 cd ../fsharp-language-server
 rm -rf nuget/fsharp.compiler.service
-nuget add ../FSharp.Compiler.Service/release/fcs/FSharp.Compiler.Service.24.0.1.nupkg -Source ./nuget
+rm -rf src/FSharpLanguageServer/obj
+rm -rf src/FSharpLanguageServer/bin
+rm -rf ~/.nuget/packages/fsharp.compiler.service/1000.0.0
+nuget add ../FSharp.Compiler.Service/release/fcs/FSharp.Compiler.Service.1000.0.0.nupkg -Source ./nuget
+dotnet restore src/FSharpLanguageServer
