@@ -221,7 +221,7 @@ type Server(client: ILanguageClient) =
 
     /// Typecheck `file`
     /// If `focus` is set, will try to re-use previous type information outside of `focus` to speed up compilation
-    let checkOpenFile(file: FileInfo, focus: Range.pos option): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
+    let checkOpenFile(file: FileInfo, focus: Position option): Async<Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>> = 
         async {
             match projects.FindProjectOptions(file), docs.Get(file) with 
             | _, None -> 
@@ -232,7 +232,8 @@ type Server(client: ILanguageClient) =
                 return Error(errs)
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 let timeCheck = Stopwatch.StartNew()
-                let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions, ?focus=focus)
+                let focusPos = match focus with Some(p) -> Some(Range.mkPos p.line (p.character-1)) | None -> None
+                let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions, ?focus=focusPos)
                 dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                 match force with 
                 | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics(parseResult.Errors))
@@ -306,7 +307,7 @@ type Server(client: ILanguageClient) =
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
             let file = FileInfo(textDocument.uri.LocalPath)
-            let! c = checkOpenFile(file, None)
+            let! c = checkOpenFile(file, Some(position))
             let line = lineContent(file, position.line)
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character - 1)
             match c, maybeId with 
@@ -584,7 +585,7 @@ type Server(client: ILanguageClient) =
                 dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
                 let line = lineContent(file, p.position.line)
                 let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
-                let! c = checkOpenFile(file, Some(Range.mkPos p.position.line (p.position.character-1)))
+                let! c = checkOpenFile(file, Some(p.position))
                 dprintfn "Finished typecheck, looking for completions..."
                 match c with 
                 | Error errors -> 
@@ -599,7 +600,7 @@ type Server(client: ILanguageClient) =
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                let! c = checkOpenFile(file, None)
+                let! c = checkOpenFile(file, Some(p.position))
                 let line = lineContent(file, p.position.line)
                 let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character - 1)
                 match c, maybeId with 
@@ -631,7 +632,7 @@ type Server(client: ILanguageClient) =
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                let! c = checkOpenFile(file, None)
+                let! c = checkOpenFile(file, Some(p.position))
                 match c with 
                 | Error errors -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
