@@ -172,9 +172,6 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
                 if isTestFunction(b) then 
                     yield ctx, b ]
 
-let private fcsSourceVersion(lspSourceVersion: int, isFocus: bool) = 
-    lspSourceVersion + (if isFocus then 0 else 1)
-
 type Server(client: ILanguageClient) = 
     let docs = DocumentStore()
     let checker = FSharpChecker.Create()
@@ -240,9 +237,9 @@ type Server(client: ILanguageClient) =
                 dprintfn "Parsed %s in %dms" file.Name timeParse.ElapsedMilliseconds
                 let timeCheck = Stopwatch.StartNew()
                 let focusPos = match focus with Some(p) -> Some(Range.mkPos (p.line+1) p.character) | None -> None
-                // Offset source version so that we re-compile when do non-focused compile
-                let sourceVersion = fcsSourceVersion(sourceVersion, focus.IsSome)
-                let sourceText = if focus.IsSome then sourceText + "\n//focus" else sourceText
+                // If this is a focused-compile, tack on an extra newline and use a nonsense version
+                // to ensure that the *next* compilation actually re-compiles
+                let sourceVersion, sourceText = if focus.IsSome then -1, sourceText + "\n//focus" else sourceVersion, sourceText
                 let! force = checker.CheckFileInProject(parseResult, file.FullName, sourceVersion, sourceText, projectOptions, ?focus=focusPos, cache=true)
                 dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                 match force with 
@@ -466,7 +463,7 @@ type Server(client: ILanguageClient) =
                     // Check file
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
                     let timeCheck = Stopwatch.StartNew()
-                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, fcsSourceVersion(sourceVersion, false), sourceText, projectOptions)
+                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, sourceText, projectOptions)
                     dprintfn "Checked %s in %dms" sourceFile.Name timeCheck.ElapsedMilliseconds
                     match maybeCheck with 
                     | FSharpCheckFileAnswer.Aborted -> dprintfn "Aborted checking %s" sourceFile.Name
