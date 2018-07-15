@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
+# Build F# compiler service
+if [ ! -d ../FSharp.Compiler.Service ]; then 
+    echo 'You need to clone https://github.com/georgewfraser/FSharp.Compiler.Service next to this directory'
+    exit 1
+fi
+
 # Build F# compiler service, which is assumed to be in a sibling directory named 'FSharp.Compiler.Service'
 cd ../FSharp.Compiler.Service/
 fcs/build.sh NuGet

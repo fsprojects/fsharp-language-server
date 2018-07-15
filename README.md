@@ -36,6 +36,8 @@ This project is an implementation of the [language server protocol](https://micr
 ![Debug test](videos/DebugTest.mov.gif)
 
 ## Code structure
+*To build this project, you must have [this fork](https://github.com/georgewfraser/FSharp.Compiler.Service) of the F# compiler checked out in a sibling directory named FSharp.Compiler.Service*.
+
 The language server protocol (LSP) is very similar to the API defined by the F# compiler service (FCS); most of the implementation is devoted to translating between the types used by FCS and the JSON representation of LSP.
 
 - client/extension.ts: Client-side VSCode launcher

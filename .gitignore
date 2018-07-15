@@ -1,3 +1,4 @@
+nuget/
 bin/
 obj/
 out/
@@ -7,3 +8,4 @@ node_modules/
 build.vsix
 Scratch.fsx
 Scratch.ts
+Scratch.md

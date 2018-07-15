@@ -1,4 +1,5 @@
 .vscode/**
+nuget/**
 client/obj/**
 client/bin/**
 sample/**
@@ -10,5 +11,6 @@ tests/**
 build.vsix
 fsharp-language-server.sln
 Scratch.fsx
+Scratch.md
 TODO.md
 tsconfig.json
