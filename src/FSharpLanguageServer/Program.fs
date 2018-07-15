@@ -235,11 +235,11 @@ type Server(client: ILanguageClient) =
                 let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                 let! parseResult = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                 dprintfn "Parsed %s in %dms" file.Name timeParse.ElapsedMilliseconds
-                let timeCheck = Stopwatch.StartNew()
                 let focusPos = match focus with Some(p) -> Some(Range.mkPos (p.line+1) p.character) | None -> None
                 // If this is a focused-compile, tack on an extra newline and use a nonsense version
                 // to ensure that the *next* compilation actually re-compiles
                 let sourceVersion, sourceText = if focus.IsSome then -1, sourceText + "\n//focus" else sourceVersion, sourceText
+                let timeCheck = Stopwatch.StartNew()
                 let! force = checker.CheckFileInProject(parseResult, file.FullName, sourceVersion, sourceText, projectOptions, ?focus=focusPos, cache=true)
                 dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                 match force with 
