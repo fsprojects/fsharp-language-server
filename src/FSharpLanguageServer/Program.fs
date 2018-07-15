@@ -231,13 +231,18 @@ type Server(client: ILanguageClient) =
             | Error(errs), _ -> 
                 return Error(errs)
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
+                let timeParse = Stopwatch.StartNew()
+                let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                let! parseResult = checker.ParseFile(file.FullName, sourceText, parsingOptions)
+                dprintfn "Parsed %s in %dms" file.Name timeParse.ElapsedMilliseconds
                 let timeCheck = Stopwatch.StartNew()
-                let focusPos = match focus with Some(p) -> Some(Range.mkPos p.line (p.character-1)) | None -> None
-                let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions, ?focus=focusPos)
+                let focusPos = match focus with Some(p) -> Some(Range.mkPos (p.line+1) p.character) | None -> None
+                let sourceVersion = if focus.IsSome then -1 else sourceVersion
+                let! force = checker.CheckFileInProject(parseResult, file.FullName, sourceVersion, sourceText, projectOptions, ?focus=focusPos, cache=true)
                 dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                 match force with 
-                | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics(parseResult.Errors))
-                | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
+                | FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics(parseResult.Errors))
+                | FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
         }
 
     /// When did we last check each file on disk?
