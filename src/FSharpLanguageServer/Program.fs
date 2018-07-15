@@ -639,7 +639,7 @@ type Server(client: ILanguageClient) =
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, Some(p.position))
                 match c with 
-                | Error errors -> 
+                | Error(errors) -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) -> 
@@ -648,7 +648,7 @@ type Server(client: ILanguageClient) =
                     | None -> 
                         dprintfn "No method call in line %s" line 
                         return None
-                    | Some endOfMethodName -> 
+                    | Some(endOfMethodName) -> 
                         match QuickParse.GetCompleteIdentifierIsland false line (endOfMethodName - 1) with 
                         | None -> 
                             dprintfn "No identifier before column %d in %s" (endOfMethodName - 1) line
