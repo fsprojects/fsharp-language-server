@@ -4,8 +4,6 @@ obj/
 out/
 packages/
 node_modules/
+scratch/
 .idea/
 build.vsix
-Scratch.fsx
-Scratch.ts
-Scratch.md
