@@ -205,6 +205,8 @@ function createProgressListeners(client: LanguageClient) {
 function binName() {
 	if (process.platform === 'win32')
 		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'win10-x64', 'publish', 'FSharpLanguageServer.exe')
+	else if (process.platform === 'linux')
+		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'linux-x64', 'publish', 'FSharpLanguageServer')
 	else
 		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'osx.10.11-x64', 'publish', 'FSharpLanguageServer')
 }
