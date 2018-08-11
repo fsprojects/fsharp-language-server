@@ -76,7 +76,7 @@ Open an fsharp file, move the cursor, and call functions. Mappings are up to you
 * Definition: `call LanguageClient#textDocument_definition()`
 * etc...
 
-Neovim with Deoplete completion:
+Neovim with Deoplete completion:\
 ![VimDeoplete](videos/VimDeoplete.mov.gif)
 
 (alternatively there is another vim language server plugin [vim-lsp](https://github.com/prabirshrestha/vim-lsp) but this one hasn't been tried.
