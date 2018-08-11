@@ -77,7 +77,7 @@ Definition: `call LanguageClient#textDocument_definition()`
 etc...
 
 Neovim with Deoplete completion:
-![VimDeoplete](videos/Vimdeoplete.mov.gif)
+![VimDeoplete](videos/VimDeoplete.mov.gif)
 
 (alternatively there is another vim language server plugin [vim-lsp](https://github.com/prabirshrestha/vim-lsp) but this one hasn't been tried.
 
