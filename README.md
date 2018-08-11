@@ -71,10 +71,10 @@ let g:LanguageClient_serverCommands = {
     \ }
 ```
 Mappings are up to you.
-Hover `call LanguageClient#textDocument_hover()`
-Rename: `call LanguageClient#textDocument_rename()`
-Definition: `call LanguageClient#textDocument_definition()`
-etc...
+* Hover `call LanguageClient#textDocument_hover()`
+* Rename: `call LanguageClient#textDocument_rename()`
+* Definition: `call LanguageClient#textDocument_definition()`
+* etc...
 
 Neovim with Deoplete completion:
 ![VimDeoplete](videos/VimDeoplete.mov.gif)
