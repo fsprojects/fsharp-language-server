@@ -64,24 +64,17 @@ dotnet build -c Release
 
 Install [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) 
 
-Update your vim config to point LanguageClient-neovim to the FSharp Lanuage Server for fsharp filetypes:
+Update your vim config to point LanguageClient-neovim to the FSharp Language Server for fsharp filetypes:
 ```
 let g:LanguageClient_serverCommands = {
     \ 'fsharp': ['dotnet', '/Users/name/code/fsharp-language-server/src/FSharpLanguageServer/bin/Release/netcoreapp2.0/target/FSharpLanguageServer.dll']
     \ }
 ```
-Create mappings, reload config, open an fsharp file.
-
-```
-" Mappings are up to you.
-" Hover:
-call LanguageClient#textDocument_hover()
-" Rename:
-call LanguageClient#textDocument_rename()
-" Goto definition
-call LanguageClient#textDocument_definition()
-" etc...
-```
+Mappings are up to you.
+Hover `call LanguageClient#textDocument_hover()`
+Rename: `call LanguageClient#textDocument_rename()`
+Definition: `call LanguageClient#textDocument_definition()`
+etc...
 
 Neovim with Deoplete completion:
 ![VimDeoplete](videos/Vimdeoplete.mov.gif)
