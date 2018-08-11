@@ -70,7 +70,7 @@ let g:LanguageClient_serverCommands = {
     \ 'fsharp': ['dotnet', '/Users/name/code/fsharp-language-server/src/FSharpLanguageServer/bin/Release/netcoreapp2.0/target/FSharpLanguageServer.dll']
     \ }
 ```
-Mappings are up to you.
+Open an fsharp file, move the cursor, and call functions. Mappings are up to you:
 * Hover `call LanguageClient#textDocument_hover()`
 * Rename: `call LanguageClient#textDocument_rename()`
 * Definition: `call LanguageClient#textDocument_definition()`
