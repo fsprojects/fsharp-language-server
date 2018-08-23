@@ -502,6 +502,31 @@ type Server(client: ILanguageClient) =
     /// so that the client-side code int client/extension.ts starts running immediately
     let mutable deferredInitialize = async { () }
 
+    let tryReadSetting (settings: JsonValue) (name: string) =
+        let rec tryReadInner parts (json: JsonValue) =
+            match parts with
+            | [] -> Some json
+            | name::parts ->
+                match json with
+                | JsonValue.Record props ->
+                    props |> Array.tryPick (fun (name2, v) ->
+                        if name = name2 then Some v else None)
+                    |> Option.bind (tryReadInner parts)
+                | _ -> None
+        let parts = name.Split('.') |> Array.toList
+        tryReadInner parts settings
+
+    let tryGetProjectsInclude settings =
+        match tryReadSetting settings "fsharp.projects.include" with
+        | Some(JsonValue.Array values) ->
+            values
+            |> Array.choose (function
+                | JsonValue.String s -> Some s
+                | _ -> None)
+            |> Array.toList
+            |> Some
+        | _ -> None
+
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams) =
             async {
@@ -538,6 +563,8 @@ type Server(client: ILanguageClient) =
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
             async {
                 dprintfn "New configuration %s" (p.ToString())
+                tryGetProjectsInclude p.settings 
+                |> Option.iter projects.IncludeProjectFiles
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {

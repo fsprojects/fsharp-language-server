@@ -36,6 +36,7 @@ type private ProjectCache() =
 
 /// Maintains caches of parsed versions of .fsprojOrFsx files
 type ProjectManager(checker: FSharpChecker) = 
+    let mutable workspaceRoot: DirectoryInfo option = None
     /// Remember what .fsproj and .fsx files are present 
     let knownProjects = new HashSet<String>()
     //// Cache expensive analyze operations
@@ -336,8 +337,9 @@ type ProjectManager(checker: FSharpChecker) =
         walk(root.resolved.Value.options)
         List.ofSeq(result)
 
-    member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> = 
+    member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> =         
         async {
+            workspaceRoot <- Some root
             for f in root.EnumerateFiles("*.fs*", SearchOption.AllDirectories) do 
                 if f.Name.EndsWith(".fsx") || f.Name.EndsWith(".fsproj") then
                     knownProjects.Add(f.FullName) |> ignore
@@ -349,6 +351,14 @@ type ProjectManager(checker: FSharpChecker) =
     member this.NewProjectFile(fsprojOrFsx: FileInfo) = 
         knownProjects.Add(fsprojOrFsx.FullName) |> ignore
         invalidateDescendents(fsprojOrFsx)
+    member this.IncludeProjectFiles(fsprojs: string list ) =
+        workspaceRoot |> Option.iter (fun root ->
+            let fsprojs =
+                fsprojs |> List.map (fun path ->
+                    Path.Combine(root.FullName, path) |> Path.GetFullPath) |> set
+            for knownProject in knownProjects |> List.ofSeq do
+                if not(fsprojs.Contains knownProject) then
+                    this.DeleteProjectFile(FileInfo knownProject))
     member this.UpdateProjectFile(fsprojOrFsx: FileInfo) = 
         invalidateDescendents(fsprojOrFsx)
     member this.UpdateAssetsJson(assets: FileInfo) = 
