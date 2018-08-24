@@ -55,7 +55,31 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 [Install from the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.fsharp-language-server)
 
 ### Vim
-**Help wanted**--should be straightforward with [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) or [vim-lsp](https://github.com/prabirshrestha/vim-lsp), a PR with instructions here would be appreciated.
+Clone this repo to your system and build it:
+
+```
+npm install
+dotnet build -c Release
+```
+
+Install [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) 
+
+Update your vim config to point LanguageClient-neovim to the FSharp Language Server for fsharp filetypes:
+```
+let g:LanguageClient_serverCommands = {
+    \ 'fsharp': ['dotnet', '/Users/name/code/fsharp-language-server/src/FSharpLanguageServer/bin/Release/netcoreapp2.0/target/FSharpLanguageServer.dll']
+    \ }
+```
+Open an fsharp file, move the cursor, and call functions. Mappings are up to you:
+* Hover `call LanguageClient#textDocument_hover()`
+* Rename: `call LanguageClient#textDocument_rename()`
+* Definition: `call LanguageClient#textDocument_definition()`
+* etc...
+
+Neovim with Deoplete completion:\
+![VimDeoplete](videos/VimDeoplete.mov.gif)
+
+(alternatively there is another vim language server plugin [vim-lsp](https://github.com/prabirshrestha/vim-lsp) but this one hasn't been tried.
 
 ### Emacs
 **Help wanted**--should be straightforward with [emacs-lsp](https://github.com/emacs-lsp/lsp-mode), a PR with instructions here would be appreciated.
