@@ -75,11 +75,6 @@
                     ],
                     "default": "off",
                     "description": "Traces the communication between VSCode and the language server."
-                },
-                "fsharp.projects.include": {
-                    "scope": "window",
-                    "type": "array",
-                    "description": "If set, only these project files will be parsed."
                 }
             }
         },

@@ -36,7 +36,7 @@ type private ProjectCache() =
 
 /// Maintains caches of parsed versions of .fsprojOrFsx files
 type ProjectManager(checker: FSharpChecker) = 
-    let mutable workspaceRoot: DirectoryInfo option = None
+    let mutable solutionProjects: string list = []
     /// Remember what .fsproj and .fsx files are present 
     let knownProjects = new HashSet<String>()
     //// Cache expensive analyze operations
@@ -337,9 +337,34 @@ type ProjectManager(checker: FSharpChecker) =
         walk(root.resolved.Value.options)
         List.ofSeq(result)
 
+    /// Normalizes directory separator before comparing
+    let equalPaths (p1: string) (p2: string) =
+        p1.Replace("\\", "/") = p2.Replace("\\", "/")
+
+    let getSolutionProjectFiles (slnPath: FileInfo) =
+        let reg = System.Text.RegularExpressions.Regex("""^Project\(".*?"\) = ".*?", "(.*)",""")
+        File.ReadLines slnPath.FullName
+        |> Seq.choose (fun line ->
+            let m = reg.Match(line)
+            if m.Success then
+                let relativePath = m.Groups.[1].Value
+                if relativePath.EndsWith(".fsproj") then
+                    Path.Combine(slnPath.Directory.FullName, relativePath)
+                    |> Path.GetFullPath |> Some
+                else None
+            else None)
+        |> Seq.toList
+
     member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> =         
         async {
-            workspaceRoot <- Some root
+            solutionProjects <-
+                root.EnumerateFiles("*.sln", SearchOption.TopDirectoryOnly)
+                |> Seq.tryHead
+                |> Option.map (fun slnPath ->
+                    let slnProjs = getSolutionProjectFiles slnPath
+                    dprintfn "Found solution %s with .fsproj references: %A" slnPath.FullName slnProjs
+                    slnProjs)
+                |> Option.defaultValue []
             for f in root.EnumerateFiles("*.fs*", SearchOption.AllDirectories) do 
                 if f.Name.EndsWith(".fsx") || f.Name.EndsWith(".fsproj") then
                     knownProjects.Add(f.FullName) |> ignore
@@ -351,14 +376,6 @@ type ProjectManager(checker: FSharpChecker) =
     member this.NewProjectFile(fsprojOrFsx: FileInfo) = 
         knownProjects.Add(fsprojOrFsx.FullName) |> ignore
         invalidateDescendents(fsprojOrFsx)
-    member this.IncludeProjectFiles(fsprojs: string list ) =
-        workspaceRoot |> Option.iter (fun root ->
-            let fsprojs =
-                fsprojs |> List.map (fun path ->
-                    Path.Combine(root.FullName, path) |> Path.GetFullPath) |> set
-            for knownProject in knownProjects |> List.ofSeq do
-                if not(fsprojs.Contains knownProject) then
-                    this.DeleteProjectFile(FileInfo knownProject))
     member this.UpdateProjectFile(fsprojOrFsx: FileInfo) = 
         invalidateDescendents(fsprojOrFsx)
     member this.UpdateAssetsJson(assets: FileInfo) = 
@@ -375,30 +392,57 @@ type ProjectManager(checker: FSharpChecker) =
         let isCracked(p: LazyProject) = p.resolved.IsValueCreated
         let knownProjectsList = [for f in knownProjects do yield cache.Get(FileInfo(f), analyzeLater)]
         let alreadyCracked, notYetCracked = List.partition isCracked knownProjectsList
-        let crackLazily = seq {
+        let crackLazily = 
             // If file is an .fsx, return itself 
             if sourceFile.Name.EndsWith(".fsx") then 
-                yield cache.Get(sourceFile, analyzeLater)
-            // First, look at all projects that have *already* been cracked
-            for options in alreadyCracked do 
-                if isMatch(options.resolved.Value) then 
-                    yield options
-            // If that doesn't work, check for an .fsproj that contains the simple name of `sourceFile`
-            dprintfn "No cracked project references %s, looking at uncracked projects..." sourceFile.Name
-            for options in notYetCracked do 
-                if isPotentialMatch(options) then 
-                    dprintfn "The text of %s contains the string '%s', cracking" options.file.Name sourceFile.Name
-                    if isMatch(options.resolved.Value) then
-                        yield options
-        }
-        match Seq.tryHead crackLazily with 
-        | None -> Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
-        | Some(options) -> 
+                [cache.Get(sourceFile, analyzeLater)]
+            else
+                // First, look at all projects that have *already* been cracked
+                let alreadyCrackedOptions =
+                    alreadyCracked |> List.filter (fun options ->
+                        isMatch(options.resolved.Value))
+                if not(List.isEmpty alreadyCrackedOptions) then
+                    alreadyCrackedOptions
+                else
+                    // If that doesn't work, check for an .fsproj that contains the simple name of `sourceFile`
+                    dprintfn "No cracked project references %s, looking at uncracked projects..." sourceFile.Name
+                    notYetCracked
+                    |> List.choose (fun options ->
+                        if isPotentialMatch(options) then 
+                            dprintfn "The text of %s contains the string '%s', cracking" options.file.Name sourceFile.Name
+                            if isMatch(options.resolved.Value) then
+                                Some options
+                            else None
+                        else None)
+        let checkErrors (options: LazyProject) =
             let cracked = options.resolved.Value
             if cracked.errors.IsEmpty then 
                 Ok(cracked.options)
             else 
                 Error(cracked.errors)
+        match crackLazily with 
+        | [] -> Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
+        | [options] -> checkErrors options
+        | candidates ->
+            dprintfn "Multiple .fsproj files reference %s" sourceFile.Name
+            let useFirstCandidate () =
+                let candidate = List.head candidates
+                dprintfn ".fsproj paths not found in solution, picking first candidate: %s" candidate.file.FullName
+                candidate
+            match solutionProjects with
+            | [] -> useFirstCandidate()
+            | slnProjs ->
+                candidates |> List.choose (fun options ->
+                    List.tryFindIndex (equalPaths options.file.FullName) slnProjs
+                    |> Option.map (fun i -> options, i))
+                |> List.sortBy snd
+                |> List.tryHead
+                |> Option.map (fun (options,_) ->
+                    dprintfn "Picking first .fsproj found in solution: %s" options.file.FullName
+                    options)
+                |> Option.defaultWith useFirstCandidate
+            |> checkErrors
+        
     /// All open projects, in dependency order
     /// Ancestor projects come before projects that depend on them
     member this.OpenProjects: FSharpProjectOptions list = 
