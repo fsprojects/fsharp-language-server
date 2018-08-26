@@ -502,6 +502,20 @@ type Server(client: ILanguageClient) =
     /// so that the client-side code int client/extension.ts starts running immediately
     let mutable deferredInitialize = async { () }
 
+    let tryReadSetting (settings: JsonValue) (name: string) =
+        let rec tryReadInner parts (json: JsonValue) =
+            match parts with
+            | [] -> Some json
+            | name::parts ->
+                match json with
+                | JsonValue.Record props ->
+                    props |> Array.tryPick (fun (name2, v) ->
+                        if name = name2 then Some v else None)
+                    |> Option.bind (tryReadInner parts)
+                | _ -> None
+        let parts = name.Split('.') |> Array.toList
+        tryReadInner parts settings
+
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams) =
             async {
