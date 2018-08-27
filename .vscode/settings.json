@@ -7,5 +7,6 @@
         "**/bin/": true,
         "**/obj/": true
     },
-    "fsharp.trace.server": "messages"
+    "fsharp.trace.server": "messages",
+    "files.trimTrailingWhitespace": false
 }
