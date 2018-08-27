@@ -6,7 +6,7 @@
     "license": "MIT",
     "icon": "Icon512.png",
     "version": "0.1.12",
-    "preview": true,
+    "preview": false,
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
