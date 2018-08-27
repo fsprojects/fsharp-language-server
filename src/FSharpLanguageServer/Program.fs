@@ -591,6 +591,14 @@ type Server(client: ILanguageClient) =
                             projects.UpdateProjectFile(file)
                         | FileChangeType.Deleted ->
                             projects.DeleteProjectFile(file)
+                    elif file.Name.EndsWith(".sln") then
+                        match change.``type`` with 
+                        | FileChangeType.Created ->
+                            projects.UpdateSlnFile(file)
+                        | FileChangeType.Changed -> 
+                            projects.UpdateSlnFile(file)
+                        | FileChangeType.Deleted ->
+                            projects.DeleteSlnFile(file)
                     elif file.Name = "project.assets.json" then 
                         projects.UpdateAssetsJson(file)
                 // Re-check all open files

@@ -38,6 +38,17 @@ let ``find project file``() =
     | Ok(f) -> if not(f.ProjectFileName.EndsWith "MainProject.fsproj") then Assert.Fail(sprintf "%A" f)
 
 [<Test>]
+let ``choose fsproj referenced by sln``() = 
+    let projects = ProjectManager(FSharpChecker.Create())
+    let root = Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"|] |> DirectoryInfo
+    Async.RunSynchronously(projects.AddWorkspaceRoot(root))
+    let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"; "Main.fs"|])
+    let project = projects.FindProjectOptions(file)
+    match project with 
+    | Error(m) -> Assert.Fail(sprintf "%A" m)
+    | Ok(f) -> if not(f.ProjectFileName.EndsWith "ReferencedProject.fsproj") then Assert.Fail(sprintf "%A" f)
+
+[<Test>]
 let ``find script file``() = 
     let projects = ProjectManager(FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "Script"|] |> DirectoryInfo

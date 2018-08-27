@@ -28,6 +28,9 @@ jobs:
       - run:
           name: Build sample/CSharpProject
           command: dotnet build sample/CSharpProject/CSharpProject.csproj
+      - run:
+          name: Build sample/SlnReferences
+          command: dotnet build sample/SlnReferences/ReferencedProject.fsproj
               
       - run: 
           name: Build all
