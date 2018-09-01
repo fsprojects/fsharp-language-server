@@ -319,7 +319,7 @@ let ``find project symbols``() =
 [<Test>]
 let ``go to definition``() = 
     let client, server = createServerAndReadFile("MainProject", "Reference.fs")
-    match server.GotoDefinition(textDocumentPosition("MainProject", "Reference.fs", 3, 31)) |> Async.RunSynchronously with 
+    match server.GotoDefinition(textDocumentPosition("MainProject", "Reference.fs", 3, 30)) |> Async.RunSynchronously with 
     | [] -> Assert.Fail("No symbol definition")
     | [single] -> ()
     | many -> Assert.Fail(sprintf "Multiple definitions found %A" many)
@@ -330,7 +330,7 @@ let ``find references``() =
     let p = 
         {
             textDocument = textDocument("MainProject", "DeclareSymbol.fs")
-            position = { line=3-1; character=6-1 }
+            position = { line=3-1; character=5-1 }
             context = { includeDeclaration=true }
         }
     let list = server.FindReferences(p) |> Async.RunSynchronously
