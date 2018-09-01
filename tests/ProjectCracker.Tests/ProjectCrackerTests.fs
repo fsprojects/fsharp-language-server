@@ -45,6 +45,12 @@ let ``find compile sources``() =
     CollectionAssert.AreEquivalent(["IndirectLibrary.fs"], [for f in cracked.sources do yield f.Name])
 
 [<Test>]
+let ``find reference includes``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "HasLocalDll.fsproj"|] |> FileInfo 
+    let cracked = ProjectCracker.crack(fsproj)
+    CollectionAssert.AreEquivalent(["IndirectDep.dll"], [for f in cracked.directReferences do yield f.Name])
+
+[<Test>]
 let ``find CSharp reference``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp"; "ReferenceCSharp.fsproj"|] |> FileInfo 
     let cracked = ProjectCracker.crack(fsproj)

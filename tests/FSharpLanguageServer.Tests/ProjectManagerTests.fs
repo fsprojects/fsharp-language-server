@@ -59,7 +59,7 @@ let ``find script file``() =
     | Error(m) -> Assert.Fail(sprintf "%A" m)
     | Ok(f) -> if not(f.ProjectFileName.EndsWith("MainScript.fsx.fsproj")) then Assert.Fail(sprintf "%A" f)
 
-// [<Test>] TODO repair this somehow. Another build step?
+[<Test>]
 let ``find an local dll``() = 
     let projects = ProjectManager(FSharpChecker.Create())
     let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo

@@ -1,3 +1,6 @@
 module HasLocalDll
 
-let test = IndirectLibrary.myInt
+[<EntryPoint>]
+let main(argv) = 
+    printf "Hello, %d" IndirectLibrary.myInt
+    0

@@ -282,6 +282,9 @@ type ProjectManager(checker: FSharpChecker) =
                         // Reference packages
                         for r in cracked.packageReferences do 
                             yield "-r:" + r.FullName
+                        // Direct dll references
+                        for r in cracked.directReferences do 
+                            yield "-r:" + r.FullName
                     |]
                 ProjectFileName = fsproj.FullName 
                 ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
