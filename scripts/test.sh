@@ -2,6 +2,7 @@
 # Build the test projects and run all tests
 
 echo 'Building sample projects...'
+dotnet restore sample/EmptyProject/EmptyProject.fsproj
 dotnet restore sample/MainProject/MainProject.fsproj
 dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj

@@ -8,6 +8,9 @@ jobs:
       - checkout
       
       - run:
+          name: Restore sample/EmptyProject
+          command: dotnet restore sample/EmptyProject/EmptyProject.fsproj
+      - run:
           name: Restore sample/MainProject
           command: dotnet restore sample/MainProject/MainProject.fsproj
       - run:
