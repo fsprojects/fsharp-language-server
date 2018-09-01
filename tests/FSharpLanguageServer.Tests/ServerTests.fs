@@ -190,6 +190,20 @@ let ``hover over function``() =
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
 
 [<Test>]
+let ``hover over left edge``() = 
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+    match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 3, 13)) |> Async.RunSynchronously with 
+    | None -> Assert.Fail("No hover")
+    | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
+
+[<Test>]
+let ``hover over right edge``() = 
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+    match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 3, 17)) |> Async.RunSynchronously with 
+    | None -> Assert.Fail("No hover")
+    | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
+
+[<Test>]
 let ``hover over qualified name``() = 
     let client, server = createServerAndReadFile("MainProject", "Hover.fs")
     match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 12, 38)) |> Async.RunSynchronously with 

@@ -635,7 +635,7 @@ type Server(client: ILanguageClient) =
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, true, false)
                 let line = lineContent(file, p.position.line)
-                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character - 1)
+                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character)
                 match c, maybeId with 
                 | Error(errors), _ -> 
                     dprintfn "Check failed, ignored %d errors" (List.length(errors))
