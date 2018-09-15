@@ -202,9 +202,25 @@ function createProgressListeners(client: LanguageClient) {
 	});
 }
 
-function binName() {
-	if (process.platform === 'win32')
-		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'win10-x64', 'publish', 'FSharpLanguageServer.exe')
-	else
-		return path.join('src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0', 'osx.10.11-x64', 'publish', 'FSharpLanguageServer')
+function binName(): string {
+	var baseParts = ['src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0'];
+	var pathParts = getPathParts(process.platform);
+	var fullParts = baseParts.concat(pathParts);
+
+	return path.join(...fullParts);
+}
+
+function getPathParts(platform: string): string[] {
+	switch (platform) {
+		case 'win32':
+			return ['win10-x64', 'publish', 'FSharpLanguageServer.exe'];
+
+		case 'linux':
+			return ['linux-x64', 'publish', 'FSharpLanguageServer'];
+
+		case 'darwin':
+			return ['osx.10.11-x64', 'publish', 'FSharpLanguageServer'];
+	}
+
+	throw `unsupported platform: ${platform}`;
 }
