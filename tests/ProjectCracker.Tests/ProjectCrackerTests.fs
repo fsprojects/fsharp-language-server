@@ -39,6 +39,20 @@ let ``crack a project file``() =
     Assert.AreEqual("MainProject.dll", cracked.target.Name)
 
 [<Test>]
+let ``crack a project file with package references (case-sensitivity)`` () =
+    let projectName = "HasPackageReference.fsproj"
+    let cracked = 
+        [|projectRoot.FullName; "sample"; "HasPackageReference"; projectName |] 
+        |> Path.Combine 
+        |> FileInfo
+        |> ProjectCracker.crack
+
+    cracked.error |> Option.iter Assert.Fail
+
+    let dllNames = cracked.packageReferences |> List.map (fun e -> e.Name)
+    CollectionAssert.Contains(dllNames, "Logary.dll")
+
+[<Test>]
 let ``find compile sources``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "IndirectDep"; "IndirectDep.fsproj"|] |> FileInfo 
     let cracked = ProjectCracker.crack(fsproj)
