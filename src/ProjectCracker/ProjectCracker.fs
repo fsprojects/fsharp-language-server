@@ -67,6 +67,18 @@ type private Dep = {
     autoReferenced: bool
 }
 
+type JsonValue with
+    member x.TryGetProperty(propertyName, caseInsensitive:bool) = 
+        let comparison = 
+            if caseInsensitive then 
+                StringComparison.OrdinalIgnoreCase 
+            else 
+                StringComparison.Ordinal
+        x.Properties
+        |> Array.tryFind (fun (name,_) -> 
+            String.Equals(propertyName, name, comparison)
+        )
+
 let private frameworkPreference = [
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
     "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
@@ -117,7 +129,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let prefix = dependencyName + "/"
         let mutable found: string option = None 
         for dependencyVersion, _ in root?targets.[longFramework].Properties do 
-            if dependencyVersion.StartsWith(prefix) && found.IsNone then 
+            if dependencyVersion.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && found.IsNone then 
                 let version = dependencyVersion.Substring(prefix.Length)
                 found <- Some(version)
         match found with 
@@ -147,20 +159,27 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //         },
     //     }
     // }
+
+
+
     let rec findTransitiveDeps(dep: Dep) = 
         let nameVersion = dep.name + "/" + dep.version
-        if root?targets.[longFramework].TryGetProperty(nameVersion).IsNone then 
+
+        match root?targets.[longFramework].TryGetProperty(nameVersion, true) with 
+        | None ->
             dprintfn "Couldn't find %s in targets" nameVersion
-        elif transitiveDependencies.TryAdd(nameVersion, dep) then 
-            match root?targets.[longFramework].[nameVersion].TryGetProperty("dependencies") with 
-            | None -> ()
-            | Some(next) -> 
+        | Some (_,resultant) when transitiveDependencies.TryAdd(nameVersion, dep) ->
+           resultant.TryGetProperty("dependencies") 
+           |> Option.iter (fun next ->
                 for name, _ in next.Properties do 
                     // The version in "dependencies" can be a range like [1.0, 2.0), 
                     // so we will use the version from targets
                     let version = chooseVersion(name)
                     let dep = {name=name; version=version; autoReferenced=false}
                     findTransitiveDeps(dep)
+           )
+        | _ -> ()
+               
     // Find root dependencies by scanning the project section
     // "project": {
     //     "version": "1.0.0",
@@ -235,30 +254,38 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // }
     let findDlls(dep: Dep) = 
         let nameVersion = dep.name + "/" + dep.version
-        let lib = root?libraries.[nameVersion]
-        let prefix = lib?path.AsString()
-        // For autoReferenced=true dependencies, we will include all dlls
-        if dep.autoReferenced then 
-            [ for json in lib?files.AsArray() do 
-                let f = json.AsString()
-                if f.EndsWith(".dll") then
-                    let relative = Path.Combine(prefix, f)
-                    match absoluteDll(relative) with 
-                    | None -> ()
-                    | Some(f) -> yield f ]
-        // Otherwise, we'll look at the list of "compile" .dlls in "targets"
-        else 
-            let target = root?targets.[longFramework].[nameVersion]
-            match target.TryGetProperty("compile") with 
-            | None -> 
-                dprintfn "%s has no compile-time dependencies" nameVersion
-                []
-            | Some(map) -> 
-                [ for dll, _ in map.Properties do 
-                    let rel = Path.Combine(prefix, dll)
-                    match absoluteDll(rel) with 
-                    | None -> ()
-                    | Some(abs) -> yield abs ]
+        match root?libraries.TryGetProperty(nameVersion, true) with
+        | None -> 
+            dprintfn "Unable to find %s in %A" nameVersion root?libraries
+            []
+        | Some (_,lib) ->
+            let prefix = lib?path.AsString()
+            // For autoReferenced=true dependencies, we will include all dlls
+            if dep.autoReferenced then 
+                [ for json in lib?files.AsArray() do 
+                    let f = json.AsString()
+                    if f.EndsWith(".dll") then
+                        let relative = Path.Combine(prefix, f)
+                        match absoluteDll(relative) with 
+                        | None -> ()
+                        | Some(f) -> yield f ]
+            // Otherwise, we'll look at the list of "compile" .dlls in "targets"
+            else 
+                match root?targets.[longFramework].TryGetProperty(nameVersion, true) with
+                | None ->
+                    dprintfn "Unable to find %s in %A" nameVersion root?targets.[longFramework]
+                    []
+                | Some (_,target) ->
+                    match target.TryGetProperty("compile") with 
+                    | None -> 
+                        dprintfn "%s has no compile-time dependencies" nameVersion
+                        []
+                    | Some(map) -> 
+                        [ for dll, _ in map.Properties do 
+                            let rel = Path.Combine(prefix, dll)
+                            match absoluteDll(rel) with 
+                            | None -> ()
+                            | Some(abs) -> yield abs ]
     // Find all package dlls
     let packageDlls = [for d in transitiveDependencies.Values do yield! findDlls(d)]
     // Resolve conflicts by getting name and version from each DLL, choosing the highest version
