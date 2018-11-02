@@ -6,45 +6,12 @@ jobs:
 
     steps:
       - checkout
-      
       - run:
-          name: Restore sample/EmptyProject
-          command: dotnet restore sample/EmptyProject/EmptyProject.fsproj
-      - run:
-          name: Restore sample/MainProject
-          command: dotnet restore sample/MainProject/MainProject.fsproj
-      - run:
-          name: Restore sample/HasLocalDll
-          command: dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
-      - run:
-          name: Restore sample/FSharpKoans.Core
-          command: dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
-      - run:
-          name: Restore sample/HasTests
-          command: dotnet restore sample/HasTests/HasTests.fsproj
-      - run:
-          name: Restore sample/ReferenceCSharp
-          command: dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
-      - run:
-          name: Restore sample/ReferenceCSharp.AssemblyName
-          command: dotnet restore sample/ReferenceCSharp.AssemblyName/ReferenceCSharp.AssemblyName.fsproj
-      - run:
-          name: Restore sample/Signature
-          command: dotnet restore sample/Signature/Signature.fsproj
-      - run:
-          name: Restore sample/HasPackageReference
-          command: dotnet restore sample/HasPackageReference/HasPackageReference.fsproj
-      - run:
-          name: Build sample/CSharpProject
-          command: dotnet build sample/CSharpProject/CSharpProject.csproj
-      - run:
-          name: Build sample/SlnReferences
-          command: dotnet build sample/SlnReferences/ReferencedProject.fsproj
-              
+          name: Restore test projects
+          command: bash scripts/restore.sh
       - run: 
           name: Build all
           command: dotnet build
-              
       - run: 
           name: Test LSP.Tests
           command: dotnet test tests/LSP.Tests
