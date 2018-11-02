@@ -57,6 +57,12 @@ let ``find CSharp reference``() =
     CollectionAssert.AreEquivalent(["CSharpProject.dll"], [for f in cracked.otherProjectReferences do yield f.Name])
 
 [<Test>]
+let ``find CSharp reference with modified AssemblyName``() = 
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp.AssemblyName"; "ReferenceCSharp.AssemblyName.fsproj"|] |> FileInfo 
+    let cracked = ProjectCracker.crack(fsproj)
+    CollectionAssert.AreEquivalent(["CSharpProject.AssemblyName.Modified.dll"], [for f in cracked.otherProjectReferences do yield f.Name])
+
+[<Test>]
 let ``resolve template params``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "TemplateParams"; "TemplateParams.fsproj"|] |> FileInfo 
     let cracked = ProjectCracker.crack(fsproj)

@@ -56,6 +56,7 @@ let private readAssembly(dll: FileInfo): Result<string * Version, string> =
     with e -> Error(e.Message)
 
 type private ProjectAssets = {
+    projectName: string
     framework: string 
     packages: FileInfo list 
     projects: FileInfo list
@@ -101,6 +102,8 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     dprintfn "Parsing %s" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())  
+    // Find the assembly base name
+    let projectName = root?project?restore?projectName.AsString()
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
     let shortFramework, longFramework = 
@@ -296,6 +299,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 let norm = Path.GetFullPath(abs)
                 yield FileInfo(norm) ]
     {
+        projectName=projectName
         framework=shortFramework
         packages=List.map FileInfo packageDllsWithoutConflicts
         projects=projects
@@ -347,6 +351,7 @@ let private projectTarget(csproj: FileInfo) =
     let projectAssetsJson = FileInfo(Path.Combine [|csproj.DirectoryName; "obj"; "project.assets.json"|])
     if projectAssetsJson.Exists then 
         let assets = parseProjectAssets(projectAssetsJson)
+        let dllName = assets.projectName + ".dll"
         // TODO this seems fragile
         FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
     else 

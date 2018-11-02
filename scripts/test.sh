@@ -8,8 +8,10 @@ dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
 dotnet restore sample/HasTests/HasTests.fsproj
 dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
+dotnet restore sample/ReferenceCSharp.AssemblyName/ReferenceCSharp.AssemblyName.fsproj
 dotnet restore sample/Signature/Signature.fsproj
 dotnet build sample/CSharpProject/CSharpProject.csproj
+dotnet build sample/CSharpProject.AssemblyName/CSharpProject.AssemblyName.csproj
 dotnet build sample/SlnReferences/ReferencedProject.fsproj
 # Be sure to update .circleci/config.yml when you add sample projects
 
