@@ -68,6 +68,14 @@ type private Dep = {
     autoReferenced: bool
 }
 
+type JsonValue with
+    member x.GetCaseInsensitive(propertyName) = 
+        let mutable result: Option<JsonValue> = None
+        for (k, v) in x.Properties do 
+            if String.Equals(propertyName, k, StringComparison.OrdinalIgnoreCase ) then 
+                result <- Some(v)
+        result
+
 let private frameworkPreference = [
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
     "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
@@ -120,7 +128,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let prefix = dependencyName + "/"
         let mutable found: string option = None 
         for dependencyVersion, _ in root?targets.[longFramework].Properties do 
-            if dependencyVersion.StartsWith(prefix) && found.IsNone then 
+            if dependencyVersion.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && found.IsNone then 
                 let version = dependencyVersion.Substring(prefix.Length)
                 found <- Some(version)
         match found with 
@@ -152,10 +160,11 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // }
     let rec findTransitiveDeps(dep: Dep) = 
         let nameVersion = dep.name + "/" + dep.version
-        if root?targets.[longFramework].TryGetProperty(nameVersion).IsNone then 
+        match root?targets.[longFramework].GetCaseInsensitive(nameVersion) with 
+        | None ->
             dprintfn "Couldn't find %s in targets" nameVersion
-        elif transitiveDependencies.TryAdd(nameVersion, dep) then 
-            match root?targets.[longFramework].[nameVersion].TryGetProperty("dependencies") with 
+        | Some (lib) when transitiveDependencies.TryAdd(nameVersion, dep) ->
+            match lib.TryGetProperty("dependencies") with 
             | None -> ()
             | Some(next) -> 
                 for name, _ in next.Properties do 
@@ -164,6 +173,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     let version = chooseVersion(name)
                     let dep = {name=name; version=version; autoReferenced=false}
                     findTransitiveDeps(dep)
+        | _ -> ()
     // Find root dependencies by scanning the project section
     // "project": {
     //     "version": "1.0.0",
@@ -238,7 +248,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // }
     let findDlls(dep: Dep) = 
         let nameVersion = dep.name + "/" + dep.version
-        let lib = root?libraries.[nameVersion]
+        let lib = root?libraries.GetCaseInsensitive(nameVersion).Value
         let prefix = lib?path.AsString()
         // For autoReferenced=true dependencies, we will include all dlls
         if dep.autoReferenced then 
@@ -251,7 +261,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     | Some(f) -> yield f ]
         // Otherwise, we'll look at the list of "compile" .dlls in "targets"
         else 
-            let target = root?targets.[longFramework].[nameVersion]
+            let target = root?targets.[longFramework].GetCaseInsensitive(nameVersion).Value
             match target.TryGetProperty("compile") with 
             | None -> 
                 dprintfn "%s has no compile-time dependencies" nameVersion

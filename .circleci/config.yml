@@ -29,6 +29,9 @@ jobs:
           name: Restore sample/Signature
           command: dotnet restore sample/Signature/Signature.fsproj
       - run:
+          name: Restore sample/HasPackageReference
+          command: dotnet restore sample/HasPackageReference/HasPackageReference.fsproj
+      - run:
           name: Build sample/CSharpProject
           command: dotnet build sample/CSharpProject/CSharpProject.csproj
       - run:
