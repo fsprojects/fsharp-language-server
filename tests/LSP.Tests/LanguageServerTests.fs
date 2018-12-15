@@ -30,8 +30,8 @@ let ``write text``() =
 let ``write response``() = 
     let writer, toString = binaryWriter() 
     LanguageServer.respond(writer, 1, "2")
-    let expected = "Content-Length: 19\r\n\r\n\
-                    {\"id\":1,\"result\":2}"
+    let expected = "Content-Length: 35\r\n\r\n\
+                    {\"id\":1,\"jsonrpc\":\"2.0\",\"result\":2}"
     let found = toString()
     Assert.AreEqual(expected, found)
 
@@ -39,8 +39,8 @@ let ``write response``() =
 let ``write multibyte characters``() = 
     let writer, toString = binaryWriter() 
     LanguageServer.respond(writer, 1, "🔥")
-    let expected = "Content-Length: 22\r\n\r\n\
-                    {\"id\":1,\"result\":🔥}"
+    let expected = "Content-Length: 38\r\n\r\n\
+                    {\"id\":1,\"jsonrpc\":\"2.0\",\"result\":🔥}"
     let found = toString()
     Assert.AreEqual(expected, found)
 

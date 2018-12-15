@@ -58,11 +58,11 @@ let private writeClient (client: BinaryWriter, messageText: string) =
     client.Write(messageBytes)
 
 let respond(client: BinaryWriter, requestId: int, jsonText: string) = 
-    let messageText = sprintf """{"id":%d,"result":%s}""" requestId jsonText
+    let messageText = sprintf """{"id":%d,"jsonrpc":"2.0","result":%s}""" requestId jsonText
     writeClient(client, messageText)
 
 let private notifyClient(client: BinaryWriter, method: string, jsonText: string) = 
-    let messageText = sprintf """{"method":"%s","params":%s}""" method jsonText
+    let messageText = sprintf """{"jsonrpc":"2.0","method":"%s","params":%s}""" method jsonText
     writeClient(client, messageText)
 
 let private thenMap (f: 'A -> 'B) (result: Async<'A>): Async<'B> =
