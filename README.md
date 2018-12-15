@@ -82,7 +82,40 @@ Neovim with Deoplete completion:\
 (alternatively there is another vim language server plugin [vim-lsp](https://github.com/prabirshrestha/vim-lsp) but this one hasn't been tried.
 
 ### Emacs
-**Help wanted**--should be straightforward with [emacs-lsp](https://github.com/emacs-lsp/lsp-mode), a PR with instructions here would be appreciated.
+
+#### Spacemacs
+
+Clone this repo to your system and build it:
+
+```
+npm install
+
+# Pick the appropriate target based upon your OS 
+dotnet publish -c Release -r linux-x64 src/FSharpLanguageServer
+dotnet publish -c Release -r osx.10.11-x64 src/FSharpLanguageServer
+dotnet publish -c Release -r win10-x64 src/FSharpLanguageServer
+```
+
+Make sure that the FSharpLanguageServer (in `src/FSharpLanguageServer/bin/Release/netcoreapp2.0/PLATFORM/publish`) is in your PATH. Alternatively, you can set the path to the server executable manually within your .spacemacs user-config:
+
+```
+(setq fsharp2-lsp-executable "/path/to/FSharpLanguageServer")
+```
+
+Since the stock fsharp layer does not currently include LSP support, you will need to use the fsharp2 layer (a fork of fsharp) which does. To use fsharp2, copy the custom layer into your Spacemacs private layers directory. In order for this layer to work, you must be on the Spacemacs **develop** branch, since the LSP layer is not yet available in Spacemacs master.
+
+```
+cp -r spacemacs/fsharp2 ~/.emacs.d/private
+```
+
+Finally, make sure that you have these layers enabled in your dotspacemacs-configuration-layers. You will need to remove the fsharp layer if you have it, since fsharp2 conflicts with it.
+
+- lsp 
+- fsharp2 
+- syntax-checking
+- auto-completion
+
+![EmacsLspMode](videos/EmacsLspMode.gif)
 
 ## How is this project different than [Ionide](https://github.com/ionide)?
 Ionide is a suite of F# plugins for VSCode; F# language server is analagous to the [FSAC](https://github.com/fsharp/FsAutoComplete) component. While FSAC is based on a custom JSON protocol; F#LS is based on the [language server protocol](https://microsoft.github.io/language-server-protocol/specification) standard. 
