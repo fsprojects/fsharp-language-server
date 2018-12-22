@@ -77,6 +77,7 @@ type JsonValue with
         result
 
 let private frameworkPreference = [
+    "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
     "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
     "netcoreapp1.1", ".NETCoreApp,Version=v1.1";
