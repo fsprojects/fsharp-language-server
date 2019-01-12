@@ -38,10 +38,7 @@
    (spacemacs/declare-prefix-for-mode 'fsharp-mode "mx" "executable")
    (spacemacs/declare-prefix-for-mode 'fsharp-mode "mc" "compile")
    (spacemacs/declare-prefix-for-mode 'fsharp-mode "mg" "goto")
-   (spacemacs/declare-prefix-for-mode 'fsharp-mode "mh" "hint"))
-
-  (`lsp 
-   (spacemacs/lsp-bind-keys-for-mode 'fsharp-mode))))
+   (spacemacs/declare-prefix-for-mode 'fsharp-mode "mh" "hint"))))
 
 (defun spacemacs//fsharp2-setup-company ()
  "Conditionally setup company mode"

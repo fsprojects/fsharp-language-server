@@ -108,6 +108,12 @@ Since the stock fsharp layer does not currently include LSP support, you will ne
 cp -r spacemacs/fsharp2 ~/.emacs.d/private
 ```
 
+You may also wish to suppress warnings from lsp-mode, because FSharpLanguageServer emits some notifications that lsp-mode does not support. Note that this configuration applies to all LSP languages, not just F#.
+
+```
+(add-to-list 'warning-suppress-types '(lsp-mode))
+```
+
 Finally, make sure that you have these layers enabled in your dotspacemacs-configuration-layers. You will need to remove the fsharp layer if you have it, since fsharp2 conflicts with it.
 
 - lsp 
