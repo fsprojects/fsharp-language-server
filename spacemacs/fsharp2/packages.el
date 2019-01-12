@@ -16,7 +16,6 @@
      company
      counsel-gtags 
      helm-gtags
-     flycheck-mode
   ))
 
 (defun fsharp2/init-fsharp-mode ()

@@ -14,4 +14,4 @@
  "The backend to use for IDE features. Possible values are `fsac' and `lsp'")
 
 (defvar fsharp2-lsp-executable "FSharpLanguageServer"
- "The locatio nof the FSharpLanguageServer executable")
+ "The location of the FSharpLanguageServer executable")
