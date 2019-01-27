@@ -154,7 +154,7 @@ let ``deserialize simple types`` () =
     Assert.AreEqual('x', found.c)
     Assert.AreEqual("foo", found.s)
     Assert.AreEqual(Uri("https://github.com"), found.webUri)
-    Assert.AreEqual(Uri("file:///d:/foo.txt"), found.fileUri)
+    Assert.AreEqual(Uri("file:///d%3A/foo.txt"), found.fileUri)
 
 type NestedField = {
     oneField: int
