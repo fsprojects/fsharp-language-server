@@ -251,21 +251,32 @@ let ``parse a DidChangeWatchedFiles notification`` () =
 let ``parse a minimal Initialize request`` () = 
     let json = JsonValue.Parse """{
         "processId": 1,
-        "rootUri": "file://workspace",
+        "rootUri": "file:///workspace",
         "capabilities": {
         }
     }"""
     let (Initialize i) = parseRequest("initialize", json)
     let expected = (
             {
-                processId = Some 1;
-                rootUri = Some (Uri("file://workspace"));
+                processId = Some(1);
+                rootUri = Some(Uri("file:///workspace"));
                 initializationOptions = None;
                 capabilitiesMap = Map.empty;
                 trace = None
             }
         )
     Assert.AreEqual(expected, i)
+
+[<Test>]
+let ``parse a special character in a URI`` () = 
+    let json = JsonValue.Parse """{
+        "processId": 1,
+        "rootUri": "file:///dir/f%23-test",
+        "capabilities": {
+        }
+    }"""
+    let (Initialize i) = parseRequest("initialize", json)
+    Assert.AreEqual(i.rootUri.Value.LocalPath, "/dir/f#-test")
 
 [<Test>]
 let ``processId can be null`` () = 

@@ -177,10 +177,7 @@ let rec private deserializer<'T> (options: JsonReadOptions, t: Type): JsonValue 
         fun j -> box(j.AsString())
     elif t = typeof<Uri> then 
         fun j -> 
-            // It seems that the Uri(...) constructor assumes the string has already been unescaped
-            let escaped = j.AsString()
-            let unescaped = Uri.UnescapeDataString(escaped)
-            box(Uri(unescaped))
+            box(Uri(j.AsString()))
     elif t = typeof<JsonValue> then 
         fun j -> box(j)
     elif isList t then 
