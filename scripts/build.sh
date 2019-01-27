@@ -14,5 +14,4 @@ dotnet publish -c Release -r linux-x64 src/FSharpLanguageServer
 
 # Build vsix
 vsce package -o build.vsix
-
-echo 'Install build.vsix using the extensions menu'
+code --install-extension build.vsix
