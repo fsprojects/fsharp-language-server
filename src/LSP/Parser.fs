@@ -103,7 +103,7 @@ let parseMessage(jsonText: string): Message =
     let raw = deserializeRawMessage jsonText
     match raw.id, raw.``params`` with
     | Some id, Some p -> RequestMessage (id, raw.method, p)
-    | Some id, None -> raise(Exception(sprintf "Request message with id %d missing params" id))
+    | Some id, None -> RequestMessage (id, raw.method, (JsonValue.Record [||]))
     | None, _ -> NotificationMessage (raw.method, raw.``params``)
 
 let parseDidChangeConfigurationParams = deserializerFactory<DidChangeConfigurationParams> readOptions
