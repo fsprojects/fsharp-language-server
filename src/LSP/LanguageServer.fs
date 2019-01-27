@@ -218,7 +218,7 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                 try 
                     match Async.RunSynchronously(task, 0, cancel.Token) with 
                     | Some(result) -> respond(send, id, result)
-                    | None -> respond(send, id, "{}")
+                    | None -> respond(send, id, "null")
                 with :? OperationCanceledException -> 
                     dprintfn "Request %d was cancelled" id
             pendingRequests.TryRemove(id) |> ignore
