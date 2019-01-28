@@ -180,7 +180,11 @@ let rec private deserializer<'T> (options: JsonReadOptions, t: Type): JsonValue 
             // It seems that the Uri(_) constructor assumes the string has already been unescaped
             let escaped = j.AsString()
             let unescaped = Uri.UnescapeDataString(escaped)
-            box(Uri(unescaped))
+            // This is pretty hacky but I couldn't figure out a better way
+            // VSCode escapes # only once, but Uri(_) expects an unescaped string
+            // It seems like either VSCode should be escaping # twice, or Uri(_) should be accepting escaped input
+            let partlyEscaped = unescaped.Replace("?", "%3F").Replace("#", "%23")
+            box(Uri(partlyEscaped))
     elif t = typeof<JsonValue> then 
         fun j -> box(j)
     elif isList t then 
