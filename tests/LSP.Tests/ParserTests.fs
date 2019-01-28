@@ -3,6 +3,7 @@ module LSP.ParserTests
 open Types
 open System
 open Parser
+open Uris
 open FSharp.Data
 open NUnit.Framework
 
@@ -276,7 +277,7 @@ let ``parse a special character in a URI`` () =
         }
     }"""
     let (Initialize i) = parseRequest("initialize", json)
-    Assert.AreEqual(i.rootUri.Value.LocalPath, "/dir/f#-test")
+    Assert.AreEqual("/dir/f#-test", asFile(i.rootUri.Value).FullName)
 
 [<Test>]
 let ``processId can be null`` () = 

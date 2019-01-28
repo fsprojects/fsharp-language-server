@@ -9,6 +9,7 @@ open NUnit.Framework
 open LSP.Types
 open LSP
 open LSP.Log
+open LSP.Uris
 open FSharp.Data
 
 [<SetUp>]
@@ -31,7 +32,7 @@ type MockClient() =
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
         member this.PublishDiagnostics(p: PublishDiagnosticsParams): unit = 
-            let file = FileInfo(p.uri.LocalPath)
+            let file = asFile(p.uri)
             dprintfn "Received %d diagnostics for %s" p.diagnostics.Length file.Name
             this.Diagnostics.Add(p)
         member this.ShowMessage(p: ShowMessageParams): unit = 
@@ -334,7 +335,7 @@ let ``find references``() =
             context = { includeDeclaration=true }
         }
     let list = server.FindReferences(p) |> Async.RunSynchronously
-    let isReferenceFs(r: Location) = r.uri.LocalPath.EndsWith("UseSymbol.fs")
+    let isReferenceFs(r: Location) = r.uri.OriginalString.EndsWith("UseSymbol.fs")
     let found = List.exists isReferenceFs list
     if not found then Assert.Fail(sprintf "Didn't find reference from UseSymbol.fs in %A" list)
 
@@ -350,7 +351,7 @@ let ``rename across files``() =
     let ranges = [
         for doc in edit.documentChanges do 
             for e in doc.edits do 
-                let file = FileInfo(doc.textDocument.uri.LocalPath).Name
+                let file = asFile(doc.textDocument.uri).Name
                 yield file, e.range.start.line + 1, e.range.start.character + 1, e.range.``end``.character + 1 ]
     if not (List.contains ("RenameReference.fs", 3, 45, 59) ranges) then Assert.Fail(sprintf "%A" ranges)
 

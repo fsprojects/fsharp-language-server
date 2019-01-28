@@ -8,6 +8,7 @@ open System.Diagnostics
 open System.IO
 open System.Text.RegularExpressions
 open LSP
+open LSP.Uris
 open LSP.Types
 open FSharp.Data
 open FSharp.Data.JsonExtensions
@@ -326,7 +327,7 @@ type Server(client: ILanguageClient) =
     /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> = 
         async {
-            let file = FileInfo(textDocument.uri.LocalPath)
+            let file = asFile(textDocument.uri)
             let! c = checkOpenFile(file, true, false)
             let line = lineContent(file, position.line)
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
@@ -507,8 +508,8 @@ type Server(client: ILanguageClient) =
             async {
                 match p.rootUri with 
                 | Some root -> 
-                    dprintfn "Add workspace root %s" root.LocalPath
-                    deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath)) 
+                    dprintfn "Add workspace root %s" (root.OriginalString)
+                    deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(asPath(root))) 
                 | _ -> dprintfn "No root URI in initialization message %A" p
                 return { 
                     capabilities = 
@@ -541,7 +542,7 @@ type Server(client: ILanguageClient) =
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 // Store text in docs
                 docs.Open(p)
                 // Create a progress bar if #todo > 1
@@ -552,7 +553,7 @@ type Server(client: ILanguageClient) =
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 docs.Change(p)
                 backgroundCheck.CheckLater(file)
             }
@@ -560,7 +561,7 @@ type Server(client: ILanguageClient) =
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
-                let targetFile = FileInfo(p.textDocument.uri.LocalPath)
+                let targetFile = asFile(p.textDocument.uri)
                 let todo = [ for fromFile in docs.OpenFiles() do 
                                 if projects.IsVisible(targetFile, fromFile) then 
                                     yield fromFile ]
@@ -573,7 +574,7 @@ type Server(client: ILanguageClient) =
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 docs.Close(p)
                 // Only show errors for open files
                 publishErrors(file, [])
@@ -581,7 +582,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {
                 for change in p.changes do 
-                    let file = FileInfo(change.uri.LocalPath)
+                    let file = asFile(change.uri)
                     dprintfn "Watched file %s %O" file.FullName change.``type``
                     if file.Name.EndsWith(".fsproj") || file.Name.EndsWith(".fsx") then 
                         match change.``type`` with 
@@ -609,7 +610,7 @@ type Server(client: ILanguageClient) =
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
                 let line = lineContent(file, p.position.line)
                 let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
@@ -632,7 +633,7 @@ type Server(client: ILanguageClient) =
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 let! c = checkOpenFile(file, true, false)
                 let line = lineContent(file, p.position.line)
                 let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character)
@@ -664,7 +665,7 @@ type Server(client: ILanguageClient) =
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 let! c = checkOpenFile(file, true, true)
                 match c with 
                 | Error errors -> 
@@ -711,7 +712,7 @@ type Server(client: ILanguageClient) =
         member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 let! maybeParse = parseFile(file)
                 match maybeParse with 
                 | Error e -> 
@@ -747,7 +748,7 @@ type Server(client: ILanguageClient) =
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
         member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = 
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = asFile(p.textDocument.uri)
                 match projects.FindProjectOptions(file), getOrRead(file) with 
                 | Ok(projectOptions), Some(sourceText) -> 
                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
@@ -826,7 +827,7 @@ type Server(client: ILanguageClient) =
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
             async {
                 for root in p.event.added do 
-                    let file = FileInfo(root.uri.LocalPath)
+                    let file = asFile(root.uri)
                     do! projects.AddWorkspaceRoot(file.Directory)
                 // TODO removed
             }

@@ -5,6 +5,7 @@
 
   <ItemGroup>
     <Compile Include="Log.fs" />
+    <Compile Include="Uris.fs" />
     <Compile Include="Ser.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Tokenizer.fs" />
