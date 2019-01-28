@@ -268,7 +268,7 @@ let ``parse a minimal Initialize request`` () =
     Assert.AreEqual(expected, i)
 
 [<Test>]
-let ``parse a special character in a URI`` () = 
+let ``parse a hash character in a URI`` () = 
     let json = JsonValue.Parse """{
         "processId": 1,
         "rootUri": "file:///dir/f%23-test",
@@ -276,7 +276,18 @@ let ``parse a special character in a URI`` () =
         }
     }"""
     let (Initialize i) = parseRequest("initialize", json)
-    Assert.AreEqual(i.rootUri.Value.LocalPath, "/dir/f#-test")
+    Assert.AreEqual("/dir/f#-test", i.rootUri.Value.LocalPath)
+
+[<Test>]
+let ``parse a colon character in a URI`` () = 
+    let json = JsonValue.Parse """{
+        "processId": 1,
+        "rootUri": "file:///c%3A/Projects/test-fs",
+        "capabilities": {
+        }
+    }"""
+    let (Initialize i) = parseRequest("initialize", json)
+    Assert.AreEqual("c:\\Projects\\test-fs", i.rootUri.Value.LocalPath)
 
 [<Test>]
 let ``processId can be null`` () = 
