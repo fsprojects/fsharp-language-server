@@ -251,7 +251,11 @@ module Navigation =
         let items = 
             // Show base name for this module only if it's not the root one
             let singleTopLevel = (modules.Length = 1)
-            modules |> List.collect (fun (SynModuleOrNamespace(id, _isRec, isModule, decls, _, _, access, m)) ->
+            modules |> List.collect (fun (SynModuleOrNamespace(id, _isRec, kind, decls, _, _, access, m)) ->
+                let isModule = 
+                    match kind with 
+                    | SynModuleOrNamespaceKind.AnonModule | SynModuleOrNamespaceKind.NamedModule -> true
+                    | _ -> false
                 let baseName = if (not singleTopLevel) then textOfLid id else ""
                 // Find let bindings (for the right dropdown)
                 let nested = processNestedDeclarations(decls)
@@ -391,7 +395,11 @@ module Navigation =
         let items = 
             // Show base name for this module only if it's not the root one
             let singleTopLevel = (modules.Length = 1)
-            modules |> List.collect (fun (SynModuleOrNamespaceSig(id, _isRec, isModule, decls, _, _, access, m)) ->
+            modules |> List.collect (fun (SynModuleOrNamespaceSig(id, _isRec, kind, decls, _, _, access, m)) ->
+                let isModule = 
+                    match kind with 
+                    | SynModuleOrNamespaceKind.AnonModule | SynModuleOrNamespaceKind.NamedModule -> true
+                    | _ -> false
                 let baseName = if (not singleTopLevel) then textOfLid id else ""
                 // Find let bindings (for the right dropdown)
                 let nested = processNestedSigDeclarations(decls)
