@@ -1,7 +1,7 @@
 
 image:
-- Ubuntu
 - Visual Studio 2017
+- Ubuntu
 init:
   # Good practice, because Windows line endings are different from Unix/Linux ones
   - git config --global core.autocrlf true
