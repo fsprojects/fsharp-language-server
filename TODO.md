@@ -33,3 +33,4 @@
 - Emit .trx files from tests, and use them to highlight failed tests
 - Show "you need to press play" popup the first time the user debugs something
 - Popup to do restore, like C#
+- Prompt the user to build projects when no obj/ directory is present
