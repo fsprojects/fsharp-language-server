@@ -1,4 +1,11 @@
 
 image: Visual Studio 2017
-build:
-  project: fsharp-language-server.sln
+init:
+  # Good practise, because Windows line endings are different from Unix/Linux ones
+  - cmd: git config --global core.autocrlf true
+before_build:
+  # Display .NET Core version
+  - cmd: dotnet --version
+  - cmd: dotnet restore
+test_script:
+  - cmd: dotnet test
