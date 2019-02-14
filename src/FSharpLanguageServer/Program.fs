@@ -119,12 +119,21 @@ let private findSignatureImplementation(parse: FSharpParseFileResults, name: str
 
 /// Find functions annotated with [<Test>]
 let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.SynBinding) list = 
+    let (|XunitTest|_|) str =
+        match str with
+        | "Fact" | "Xunit.FactAttribute"
+        | "Theory" | "Xunit.TheoryAttribute" -> Some true
+        | _ -> None
+    let (|NUnitTest|_|) str =
+        match str with
+        | "Test" | "NUnit.Framework.Test" -> Some true
+        | _ -> None
     let isTestAttribute(a: Ast.SynAttribute): bool = 
         let ids = a.TypeName.Lid
         let string = String.concat "." [for i in ids do yield i.idText]
         match string with 
         // TODO check for open NUnit.Framework before accepting plain "Test"
-        | "Test" | "NUnit.Framework.Test" -> true
+        | NUnitTest _ | XunitTest _ -> true
         | _ -> false
     let isTestFunction(binding: Ast.SynBinding): bool = 
         let attrs = match binding with Ast.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
