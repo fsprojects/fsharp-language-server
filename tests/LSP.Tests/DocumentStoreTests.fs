@@ -61,7 +61,7 @@ let ``open document``() =
     let found = store.GetText(FileInfo(exampleUri.LocalPath))
     Assert.AreEqual(Some(helloWorld), found)
 
-let exampleUri = Uri("file://example.txt")
+let exampleUri = Uri("file://" + Directory.GetCurrentDirectory() + "example.txt")
 let helloStore() = 
     let store = DocumentStore() 
     let helloWorld = "Hello world!"
