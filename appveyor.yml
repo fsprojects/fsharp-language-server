@@ -7,5 +7,7 @@ before_build:
   # Display .NET Core version
   - cmd: dotnet --version
   - cmd: dotnet restore
+build_script:
+  - cmd: dotnet build
 test_script:
   - cmd: dotnet test
