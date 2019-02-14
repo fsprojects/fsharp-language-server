@@ -1,17 +1,17 @@
 
 image:
-- Visual Studio 2017
 - Ubuntu
+- Visual Studio 2017
 init:
-  # Good practise, because Windows line endings are different from Unix/Linux ones
-  - cmd: git config --global core.autocrlf true
+  # Good practice, because Windows line endings are different from Unix/Linux ones
+  - sh: git config --global core.autocrlf true
 before_build:
   # Display .NET Core version
-  - cmd: dotnet --version
-  - cmd: dotnet restore
+  - sh: dotnet --version
+  - sh: dotnet restore
 build_script:
-  - cmd: dotnet build
+  - sh: dotnet build
 before_test:
-  - cmd: bash scripts/restore.sh
+  - sh: bash scripts/restore.sh
 test_script:
-  - cmd: dotnet test
+  - sh: dotnet test
