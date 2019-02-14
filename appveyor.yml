@@ -4,14 +4,14 @@ image:
 - Visual Studio 2017
 init:
   # Good practice, because Windows line endings are different from Unix/Linux ones
-  - sh: git config --global core.autocrlf true
+  - git config --global core.autocrlf true
 before_build:
   # Display .NET Core version
-  - sh: dotnet --version
-  - sh: dotnet restore
+  - dotnet --version
+  - dotnet restore
 build_script:
-  - sh: dotnet build
+  - dotnet build
 before_test:
-  - sh: bash scripts/restore.sh
+  - bash scripts/restore.sh
 test_script:
-  - sh: dotnet test
+  - dotnet test
