@@ -9,5 +9,7 @@ before_build:
   - cmd: dotnet restore
 build_script:
   - cmd: dotnet build
+before_test:
+  - cmd: bash scripts/restore.sh
 test_script:
   - cmd: dotnet test
