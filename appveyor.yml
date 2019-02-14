@@ -12,6 +12,7 @@ before_build:
 build_script:
   - dotnet build
 before_test:
+  - cmd: mkdir C:\Program Files\dotnet\shared\assembly # workaround of https://github.com/Microsoft/visualfsharp/issues/6161
   - dotnet restore sample/EmptyProject/EmptyProject.fsproj
   - dotnet restore sample/MainProject/MainProject.fsproj
   - dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
