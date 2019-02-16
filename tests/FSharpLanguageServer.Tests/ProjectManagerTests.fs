@@ -78,7 +78,7 @@ let ``project-file-not-found``() =
     let project = projects.FindProjectOptions file
     match project with 
     | Ok(f) -> Assert.Fail(sprintf "Shouldn't have found project file %s" f.ProjectFileName)
-    | Error(m) -> ()
+    | Error(_) -> ()
 
 [<Test>]
 let ``bad project file``() = 
@@ -91,7 +91,9 @@ let ``get script options``() =
     let projects = ProjectManager(FSharpChecker.Create())
     let script = Path.Combine [|projectRoot.FullName; "sample"; "Script"; "MainScript.fsx"|] |> FileInfo 
     projects.NewProjectFile(script)
-    let options = match projects.FindProjectOptions(script) with Ok(options) -> options
-    let references = [for o in options.OtherOptions do if o.StartsWith("-r:") then yield FileInfo(o.Substring("-r:".Length)).Name]
-    CollectionAssert.Contains(references, "FSharp.Core.dll")
-    CollectionAssert.Contains(references, "System.Runtime.dll")
+    match projects.FindProjectOptions(script) with 
+    | Error(m) -> Assert.Fail(sprintf "%A" m)
+    | Ok(options) -> 
+        let references = [for o in options.OtherOptions do if o.StartsWith("-r:") then yield FileInfo(o.Substring("-r:".Length)).Name]
+        CollectionAssert.Contains(references, "FSharp.Core.dll")
+        CollectionAssert.Contains(references, "System.Runtime.dll")
