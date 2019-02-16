@@ -5,9 +5,13 @@
 'use strict';
 
 import * as path from 'path';
+import * as fs from "fs";
 import * as cp from 'child_process';
 import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
+
+// Run using `dotnet` instead of self-contained executable
+const debugMode = false;
 
 export function activate(context: ExtensionContext) {
 
@@ -16,9 +20,18 @@ export function activate(context: ExtensionContext) {
 	
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
-	let serverOptions: ServerOptions = {
-		run : { command: serverMain, args: [], transport: TransportKind.stdio },
-		debug : { command: serverMain, args: [], transport: TransportKind.stdio }
+	let serverOptions: ServerOptions = { 
+		command: serverMain, 
+		args: [], 
+		transport: TransportKind.stdio 
+	}
+	if (debugMode) {
+		serverOptions = { 
+			command: findInPath('dotnet'), 
+			args: ['run', '--project', 'src/FSharpLanguageServer'], 
+			transport: TransportKind.stdio,
+			options: { cwd: context.extensionPath }
+		}
 	}
 	
 	// Options to control the language client
@@ -223,4 +236,15 @@ function getPathParts(platform: string): string[] {
 	}
 
 	throw `unsupported platform: ${platform}`;
+}
+
+function findInPath(binname: string) {
+	let pathparts = process.env['PATH'].split(path.delimiter);
+	for (let i = 0; i < pathparts.length; i++) {
+		let binpath = path.join(pathparts[i], binname);
+		if (fs.existsSync(binpath)) {
+			return binpath;
+		}
+	}
+	return null;
 }
