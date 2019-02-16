@@ -46,10 +46,12 @@ let ``convert line-spanning Range to offsets``() =
     let found = DocumentStoreUtils.findRange(textBuilder, range)
     Assert.AreEqual((7, 11), found)
 
+let exampleUri = Uri("file://" + Directory.GetCurrentDirectory() + "example.txt")
+
 [<Test>]
 let ``open document``() = 
     let store = DocumentStore() 
-    let exampleUri = Uri("file://example.txt")
+    let exampleUri = exampleUri
     let helloWorld = "Hello world!"
     let openDoc: DidOpenTextDocumentParams = 
         { textDocument = 
@@ -61,7 +63,6 @@ let ``open document``() =
     let found = store.GetText(FileInfo(exampleUri.LocalPath))
     Assert.AreEqual(Some(helloWorld), found)
 
-let exampleUri = Uri("file://" + Directory.GetCurrentDirectory() + "example.txt")
 let helloStore() = 
     let store = DocumentStore() 
     let helloWorld = "Hello world!"
