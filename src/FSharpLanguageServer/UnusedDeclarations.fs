@@ -3,7 +3,7 @@ module FSharpLanguageServer.UnusedDeclarations
 // From https://github.com/Microsoft/visualfsharp/blob/master/vsintegration/src/FSharp.Editor/Diagnostics/UnusedOpensDiagnosticAnalyzer.fs
 
 open System.Collections.Generic
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.SourceCodeServices
 
 type FSharpSymbol with
     member this.IsPrivateToFile =

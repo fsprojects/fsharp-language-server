@@ -1,8 +1,8 @@
 module FSharpLanguageServer.Program
 
 open LSP.Log
-open Microsoft.FSharp.Compiler
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler
+open FSharp.Compiler.SourceCodeServices
 open System
 open System.Diagnostics
 open System.IO
@@ -13,7 +13,7 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Conversions
 
-module Ast = Microsoft.FSharp.Compiler.Ast
+module Ast = FSharp.Compiler.Ast
 
 let private TODO() = raise (Exception "TODO")
 

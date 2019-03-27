@@ -1,14 +1,14 @@
 module FSharpLanguageServer.Conversions 
 
 open LSP.Log
-open Microsoft.FSharp.Compiler
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler
+open FSharp.Compiler.SourceCodeServices
 open System
 open System.IO
 open LSP.Types
 open FSharp.Data
 
-module Ast = Microsoft.FSharp.Compiler.Ast
+module Ast = FSharp.Compiler.Ast
 
 /// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpErrorInfo): Range = 

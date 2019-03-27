@@ -1,7 +1,7 @@
 module FSharpLanguageServer.Tests.ProjectManagerTests
 
-open Microsoft.FSharp.Compiler
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler
+open FSharp.Compiler.SourceCodeServices
 open FSharpLanguageServer.Tests.Common
 open FSharpLanguageServer
 open System

@@ -10,9 +10,9 @@ namespace FSharpLanguageServer
 //     module Inner = 
 //         val foo: string
 
-open Microsoft.FSharp.Compiler.SourceCodeServices
-open Microsoft.FSharp.Compiler.Range
-open Microsoft.FSharp.Compiler.Ast
+open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.Range
+open FSharp.Compiler.Ast
 
 /// Represents an item to be displayed in the navigation bar
 [<Sealed>]

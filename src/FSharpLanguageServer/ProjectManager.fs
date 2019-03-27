@@ -10,7 +10,7 @@ open System.Xml
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open LSP.Types
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.SourceCodeServices
 open ProjectCracker
 
 type private ResolvedProject = {

@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="26.0.1" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="27.0.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.8.4" />
   </ItemGroup>
 

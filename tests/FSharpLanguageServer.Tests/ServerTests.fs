@@ -4,7 +4,7 @@ open FSharpLanguageServer.Tests.Common
 open FSharpLanguageServer.Program
 open System
 open System.IO
-open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.SourceCodeServices
 open NUnit.Framework
 open LSP.Types
 open LSP
