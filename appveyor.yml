@@ -5,6 +5,9 @@ image:
 before_build:
   # Display .NET Core version
   - dotnet --version
+  # Display base path
+  - dotnet --info
+  # Restore deps
   - dotnet restore
 build_script:
   - dotnet build
