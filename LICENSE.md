@@ -1,6 +1,6 @@
 The MIT License (MIT)
 
-Copyright (c) [F# Language Server Contributors](https://github.com/georgewfraser/fsharp-language-server/graphs/contributors)
+Copyright (c) [F# Language Server Contributors](https://github.com/fsprojects/fsharp-language-server/graphs/contributors)
 All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

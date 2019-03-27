@@ -10,7 +10,7 @@
     "publisher": "georgewfraser",
     "repository": {
         "type": "git",
-        "url": "https://github.com/georgewfraser/fsharp-language-server"
+        "url": "https://github.com/fsprojects/fsharp-language-server"
     },
     "engines": {
         "vscode": "^1.24.0"
