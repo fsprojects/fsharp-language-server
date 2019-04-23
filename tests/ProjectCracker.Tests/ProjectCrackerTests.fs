@@ -141,6 +141,12 @@ let ``find package references in EmptyProject``() =
 let ``find package references in FSharpKoans``() = 
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "FSharpKoans.Core"; "FSharpKoans.Core.fsproj"|] |> FileInfo 
     CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
+        
+[<Test>]
+let ``issue 28``() = 
+    // NETStandard.Library is autoReferenced=true, but it is also an indirect dependency of dependencies that are not autoReferenced
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "Issue28"; "Issue28.fsproj"|] |> FileInfo 
+    CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
 
 [<Test>]
 let ``error for unbuilt project``() = 
