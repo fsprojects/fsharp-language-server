@@ -4,7 +4,10 @@ image:
 - Ubuntu
 before_build:
   # Display .NET Core version
+  - dotnet --list-sdks
   - dotnet --version
+  # Select a version
+  - dotnet new globaljson --sdk-version 2.2.103
   # Restore deps
   - dotnet restore
 build_script:
