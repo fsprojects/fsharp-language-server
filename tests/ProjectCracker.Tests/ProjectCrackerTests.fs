@@ -149,11 +149,11 @@ let ``issue 28``() =
     CollectionAssert.AreEquivalent(msbuild(fsproj), cracker(fsproj))
 
 [<Test>]
-let ``error for unbuilt project``() = 
+let ``build unbuilt project``() = 
     let bin = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "bin"|] 
     let obj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "obj"|] 
-    Directory.Delete(bin, true)
-    Directory.Delete(obj, true)
+    if Directory.Exists(bin) then Directory.Delete(bin, true)
+    if Directory.Exists(obj) then Directory.Delete(obj, true)
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "NotBuilt.fsproj"|] |> FileInfo 
     let cracked = ProjectCracker.crack(fsproj)
     if cracked.error.IsSome then Assert.Fail(cracked.error.Value)
