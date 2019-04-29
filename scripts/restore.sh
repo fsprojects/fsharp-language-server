@@ -2,8 +2,6 @@
 # Restore test projects
 
 echo 'Restoring sample projects...'
-dotnet restore sample/CSharpProject.AssemblyName/CSharpProject.AssemblyName.csproj
-dotnet restore sample/CSharpProject/CSharpProject.csproj
 dotnet restore sample/EmptyProject/EmptyProject.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
 dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
@@ -16,3 +14,6 @@ dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
 dotnet restore sample/Signature/Signature.fsproj
 dotnet restore sample/SlnReferences/ReferencedProject.fsproj
 dotnet restore sample/TemplateParams/TemplateParams.fsproj
+# These need to be built, not restored
+dotnet build sample/CSharpProject/CSharpProject.csproj
+dotnet build sample/CSharpProject.AssemblyName/CSharpProject.AssemblyName.csproj
