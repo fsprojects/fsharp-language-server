@@ -150,8 +150,12 @@ let ``issue 28``() =
 
 [<Test>]
 let ``error for unbuilt project``() = 
+    let bin = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "bin"|] 
+    let obj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "obj"|] 
+    Directory.Delete(bin, true)
+    Directory.Delete(obj, true)
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "NotBuilt.fsproj"|] |> FileInfo 
     let cracked = ProjectCracker.crack(fsproj)
-    match cracked.error with 
-    | None -> Assert.Fail("Should have failed to crack unbuilt project")
-    | Some(e) -> StringAssert.Contains("project.assets.json does not exist", e)
+    if cracked.error.IsSome then Assert.Fail(cracked.error.Value)
+    CollectionAssert.AreEquivalent(["NotBuilt.fs"], [for f in cracked.sources do yield f.Name])
+    CollectionAssert.IsNotEmpty(cracked.packageReferences)

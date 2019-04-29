@@ -322,41 +322,23 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 let private project(fsproj: FileInfo): ProjectAnalyzer = 
     let options = new AnalyzerManagerOptions()
     options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
-    options.CleanBeforeCompile <- false
     let manager = AnalyzerManager(options)
     manager.GetProject(fsproj.FullName)
 
-let private inferTargetFramework(fsproj: FileInfo): ProjectAnalyzer = 
-    let analyzer = project(fsproj)
-    let props = analyzer.Project.Properties
-    let findTargetFramework = 
-        [ for p in props do 
-            if p.Name = "TargetFramework" then 
-                yield p ]
-    if not(List.isEmpty findTargetFramework) then 
-        analyzer
-    else 
-        // TODO get this from project.assets.json
-        dprintfn "No TargetFramework in %s, looking for TargetFrameworks" fsproj.Name
-        let targetFrameworks = 
-            [ for p in props do 
-                if p.Name = "TargetFrameworks" then 
-                    yield! p.EvaluatedValue.Split(';') ]
-        let preferenceOrder = 
-            [ for shortFramework, _ in frameworkPreference do 
-                if List.contains shortFramework targetFrameworks then 
-                    yield shortFramework ]
-        let targetFramework = 
-            if List.isEmpty preferenceOrder then 
-                dprintfn "Couldn't find TargetFrameworks in %s, defaulting to netcoreapp2.1" fsproj.Name
-                "netcoreapp2.1"
-            else 
-                let chosen = List.head preferenceOrder
-                dprintfn "Chose TargetFramework %s from %A" chosen preferenceOrder
-                chosen
-        let analyzer = project(fsproj)
-        analyzer.SetGlobalProperty("TargetFramework", targetFramework)
-        analyzer
+let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult = 
+    let builds = project(fsproj).Build()
+    // TODO get target framework from project.assets.json
+    let mutable chosen: AnalyzerResult option = None
+    for shortFramework, _ in frameworkPreference do 
+        if chosen.IsNone then 
+            for build in builds do 
+                if build.TargetFramework = shortFramework then 
+                    chosen <- Some(build)
+    if chosen.IsNone then
+        for build in builds do 
+            if chosen.IsNone then 
+                chosen <- Some(build)
+    chosen.Value
 
 let private projectTarget(csproj: FileInfo) = 
     let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
@@ -372,7 +354,7 @@ let private projectTarget(csproj: FileInfo) =
         placeholderTarget
 
 let private absoluteIncludePath(fsproj: FileInfo, i: ProjectItem) = 
-    let relativePath = i.EvaluatedInclude.Replace('\\', Path.DirectorySeparatorChar)
+    let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
     let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
     let normalizePath = Path.GetFullPath(absolutePath)
     FileInfo(normalizePath)
@@ -389,13 +371,17 @@ let crack(fsproj: FileInfo): CrackedProject =
     try 
         // Get source info from .fsproj
         let timeProject = Stopwatch.StartNew()
-        let project = inferTargetFramework(fsproj).Load()
+        let project = inferTargetFramework(fsproj)
         let sources = 
-            [ for i in project.GetItems("Compile") do 
-                yield absoluteIncludePath(fsproj, i) ]
+            [ for KeyValue(k, v) in project.Items do 
+                if k = "Compile" then 
+                    for i in v do 
+                        yield absoluteIncludePath(fsproj, i) ]
         let directReferences = 
-            [ for i in project.GetItems("Reference") do 
-                yield absoluteIncludePath(fsproj, i) ]
+            [ for KeyValue(k, v) in project.Items do 
+                if k = "Reference" then 
+                    for i in v do 
+                        yield absoluteIncludePath(fsproj, i) ]
         dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
         let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
