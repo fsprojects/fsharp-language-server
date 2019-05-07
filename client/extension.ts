@@ -19,7 +19,7 @@ export function activate(context: ExtensionContext) {
 	let serverOptions: ServerOptions = { 
 		command: serverMain, 
 		args: [], 
-		transport: TransportKind.stdio 
+		transport: TransportKind.stdio
 	}
 	
 	// Options to control the language client
@@ -27,7 +27,7 @@ export function activate(context: ExtensionContext) {
 		// Register the server for F# documents
 		documentSelector: [{scheme: 'file', language: 'fsharp'}],
 		synchronize: {
-			// Synchronize the setting section 'languageServerExample' to the server
+			// Synchronize the setting section 'fsharp' to the server
 			configurationSection: 'fsharp',
 			// Notify the server about file changes to F# project files contain in the workspace
 			// TODO: is there a way to configure this via the language server protocol?

@@ -1,6 +1,6 @@
 {
-    "name": "fsharp-language-server",
-    "displayName": "F# Language Server",
+    "name": "coc-fsharp",
+    "displayName": "F# Language Server for coc.nvim",
     "description": "F# Language Support using FSharp Compiler Services",
     "author": "Yatao Li",
     "license": "MIT",
@@ -18,7 +18,7 @@
     "categories": [
         "Programming Languages",
         "Linters",
-        "coc"
+        "coc.nvim"
     ],
     "activationEvents": [
         "onLanguage:fsharp"
@@ -68,7 +68,7 @@
             "title": "FSharp configuration",
             "properties": {
                 "fsharp.trace.server": {
-                    "scope": "window",
+                    "scope": "application",
                     "type": "string",
                     "enum": [
                         "off",
@@ -77,6 +77,15 @@
                     ],
                     "default": "off",
                     "description": "Traces the communication between VSCode and the language server."
+                },
+                "fsharp.project.define": {
+                    "scope": "resource",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Specifies macro definitions for a F# project."
                 }
             }
         }
