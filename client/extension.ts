@@ -132,7 +132,7 @@ function createProgressListeners(client: LanguageClient) {
 }
 
 function binName(): string {
-	var baseParts = ['src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0'];
+	var baseParts = ['bin'];
 	var pathParts = getPathParts(process.platform);
 	var fullParts = baseParts.concat(pathParts);
 
@@ -142,13 +142,13 @@ function binName(): string {
 function getPathParts(platform: string): string[] {
 	switch (platform) {
 		case 'win32':
-			return ['win10-x64', 'publish', 'FSharpLanguageServer.exe'];
+			return ['win10-x64', 'FSharpLanguageServer.exe'];
 
 		case 'linux':
-			return ['linux-x64', 'publish', 'FSharpLanguageServer'];
+			return ['linux-x64', 'FSharpLanguageServer'];
 
 		case 'darwin':
-			return ['osx.10.11-x64', 'publish', 'FSharpLanguageServer'];
+			return ['osx.10.11-x64', 'FSharpLanguageServer'];
 	}
 
 	throw `unsupported platform: ${platform}`;

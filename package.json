@@ -6,7 +6,6 @@
     "license": "MIT",
     "icon": "Icon512.png",
     "version": "0.1.26",
-    "preview": true,
     "publisher": "yatli",
     "repository": {
         "type": "git",
@@ -15,6 +14,10 @@
     "engines": {
         "coc": ">=0.0.66"
     },
+    "keywords": [
+        "fsharp",
+        "coc.nvim"
+    ],
     "categories": [
         "Programming Languages",
         "Linters",
