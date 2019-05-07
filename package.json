@@ -2,22 +2,23 @@
     "name": "fsharp-language-server",
     "displayName": "F# Language Server",
     "description": "F# Language Support using FSharp Compiler Services",
-    "author": "George Fraser",
+    "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
     "version": "0.1.26",
-    "preview": false,
-    "publisher": "georgewfraser",
+    "preview": true,
+    "publisher": "yatli",
     "repository": {
         "type": "git",
-        "url": "https://github.com/fsprojects/fsharp-language-server"
+        "url": "https://github.com/yatli/fsharp-language-server"
     },
     "engines": {
         "coc": ">=0.0.66"
     },
     "categories": [
         "Programming Languages",
-        "Linters"
+        "Linters",
+        "coc"
     ],
     "activationEvents": [
         "onLanguage:fsharp"
@@ -78,32 +79,9 @@
                     "description": "Traces the communication between VSCode and the language server."
                 }
             }
-        },
-        "taskDefinitions": [
-            {
-                "type": "fsharp.task.test",
-                "required": [
-                    "projectPath",
-                    "fullyQualifiedName"
-                ],
-                "properties": {
-                    "projectPath": {
-                        "type": "string"
-                    },
-                    "fullyQualifiedName": {
-                        "type": "string"
-                    }
-                }
-            }
-        ],
-        "breakpoints": [
-            {
-                "language": "fsharp"
-            }
-        ]
+        }
     },
     "scripts": {
-        "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./"
     },
@@ -113,6 +91,6 @@
     },
     "devDependencies": {
         "@types/node": "^10.3.3",
-        "typescript": "^2.9.2"
+        "typescript": "^3.0.3"
     }
 }
