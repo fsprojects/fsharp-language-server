@@ -13,7 +13,7 @@
         "url": "https://github.com/fsprojects/fsharp-language-server"
     },
     "engines": {
-        "vscode": "^1.24.0"
+        "coc": ">=0.0.66"
     },
     "categories": [
         "Programming Languages",
@@ -105,19 +105,14 @@
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
-        "watch": "tsc -watch -p ./",
-        "postinstall": "node ./node_modules/vscode/bin/install",
-        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+        "watch": "tsc -watch -p ./"
     },
-    "extensionDependencies": [
-        "ms-vscode.csharp"
-    ],
+    "extensionDependencies": [],
     "dependencies": {
-        "vscode-languageclient": "^4.2.1"
+        "coc.nvim": "^0.0.66"
     },
     "devDependencies": {
         "@types/node": "^10.3.3",
-        "typescript": "^2.9.2",
-        "vscode": "^1.1.18"
+        "typescript": "^2.9.2"
     }
 }

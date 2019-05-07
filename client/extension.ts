@@ -7,7 +7,8 @@
 import * as path from 'path';
 import * as fs from "fs";
 import * as cp from 'child_process';
-import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
+import * as vscode from './coc_compat';
+import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from vscode;
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
 
 // Run using `dotnet` instead of self-contained executable
