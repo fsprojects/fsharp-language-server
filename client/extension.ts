@@ -93,7 +93,8 @@ function createProgressListeners(client: LanguageClient) {
         
         startProgress(start: StartProgress) {
             // TODO implement user cancellation (???)
-            this.title =  `${start.title} (${start.nFiles})`
+            this.title =  start.title
+            this.nFiles = start.nFiles
             this.statusBarItem = workspace.createStatusBarItem(0, { progress : true });
             this.statusBarItem.text = this.title;
         }
@@ -106,7 +107,7 @@ function createProgressListeners(client: LanguageClient) {
             if (this.statusBarItem != null) {
                 this.countChecked++;
                 let newPercent = this.percentComplete();
-                this.statusBarItem.text = `${this.title} ${newPercent}%... [${fileName}]`
+                this.statusBarItem.text = `${this.title} (${newPercent}%)... [${fileName}]`
                 this.statusBarItem.show();
             }
         }
