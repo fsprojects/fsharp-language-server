@@ -132,7 +132,7 @@ function createProgressListeners(client: LanguageClient) {
 }
 
 function binName(): string {
-	var baseParts = ['bin'];
+	var baseParts = ['out', 'server'];
 	var pathParts = getPathParts(process.platform);
 	var fullParts = baseParts.concat(pathParts);
 

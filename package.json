@@ -26,7 +26,7 @@
     "activationEvents": [
         "onLanguage:fsharp"
     ],
-    "main": "out/client/extension",
+    "main": "out/client/extension.js",
     "files": [ "out", "syntaxes" ],
     "contributes": {
         "languages": [
