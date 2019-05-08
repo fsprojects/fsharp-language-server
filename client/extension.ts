@@ -52,7 +52,7 @@ export function activate(context: ExtensionContext) {
 
 	// Register test-runner
     commands.registerCommand('fsharp.command.test.run', runTest);
-	commands.registerCommand('fsharp.command.goto', goto);
+    commands.registerCommand('fsharp.command.goto', goto);
 }
 
 function goto(file: string, startLine: number, startColumn: number, _endLine: number, _endColumn: number) {

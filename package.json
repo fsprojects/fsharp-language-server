@@ -26,12 +26,8 @@
     "activationEvents": [
         "onLanguage:fsharp"
     ],
-    "main": "./out/client/extension",
-    "files": [
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/osx.10.11-x64/publish",
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/linux-x64/publish",
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/win10-x64/publish"
-    ],
+    "main": "out/client/extension",
+    "files": [ "out", "syntaxes" ],
     "contributes": {
         "languages": [
             {
@@ -46,24 +42,24 @@
                     ".fsx",
                     ".fsi"
                 ],
-                "configuration": "./syntaxes/fsharp.configuration.json"
+                "configuration": "syntaxes/fsharp.configuration.json"
             }
         ],
         "grammars": [
             {
                 "language": "fsharp",
                 "scopeName": "source.fsharp",
-                "path": "./syntaxes/fsharp.json"
+                "path": "syntaxes/fsharp.json"
             },
             {
                 "language": "fsharp",
                 "scopeName": "source.fsharp.fsx",
-                "path": "./syntaxes/fsharp.fsx.json"
+                "path": "syntaxes/fsharp.fsx.json"
             },
             {
                 "language": "fsharp",
                 "scopeName": "source.fsharp.fsi",
-                "path": "./syntaxes/fsharp.fsi.json"
+                "path": "syntaxes/fsharp.fsi.json"
             }
         ],
         "configuration": {
