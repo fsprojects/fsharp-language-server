@@ -5,14 +5,14 @@
     "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.31",
+    "version": "0.1.32",
     "publisher": "yatli",
     "repository": {
         "type": "git",
         "url": "https://github.com/yatli/fsharp-language-server"
     },
     "engines": {
-        "coc": ">=0.0.66"
+        "coc": ">=0.0.67"
     },
     "keywords": [
         "fsharp",
@@ -98,7 +98,7 @@
     },
     "extensionDependencies": [],
     "dependencies": {
-        "coc.nvim": "^0.0.66"
+        "coc.nvim": "^0.0.67"
     },
     "devDependencies": {
         "@types/node": "^10.3.3",

@@ -8,8 +8,8 @@ import * as path from 'path';
 import { workspace, ExtensionContext, commands, StatusBarItem } from 'coc.nvim';
 import { TerminalResult } from 'coc.nvim/lib/types';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'coc.nvim';
-import { NotificationType } from 'coc.nvim/node_modules/vscode-languageserver-protocol';
-import { Range } from 'coc.nvim/node_modules/vscode-languageserver-types';
+import { NotificationType } from 'vscode-languageserver-protocol';
+import { Range } from 'vscode-languageserver-types';
 
 export function activate(context: ExtensionContext) {
 
