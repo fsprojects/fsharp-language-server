@@ -16,7 +16,10 @@
     },
     "keywords": [
         "fsharp",
-        "coc.nvim"
+        "coc.nvim",
+        "dotnet",
+        ".NET Core",
+        ".NET"
     ],
     "categories": [
         "Programming Languages",
