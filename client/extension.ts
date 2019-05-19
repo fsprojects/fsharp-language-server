@@ -21,6 +21,8 @@ export function activate(context: ExtensionContext) {
 		args: [], 
 		transport: TransportKind.stdio
 	}
+
+    workspace.addRootPatterns('fsharp', ['*.fsproj', '*.fsx', 'projects.assets.json', '.vim', '.git', '.hg'])
 	
 	// Options to control the language client
 	let clientOptions: LanguageClientOptions = {

@@ -376,6 +376,17 @@ type ProjectManager(checker: FSharpChecker) as this =
                 else if f.Name.EndsWith(".sln") then
                     knownSolutions.[f.FullName] <- slnProjectReferences(f)
         }
+    member this.RemoveWorkspaceRoot(root: DirectoryInfo): Async<unit> =         
+        async {
+            for f in root.EnumerateFiles("*.*", SearchOption.AllDirectories) do 
+                knownProjects.Remove(f.FullName) |> ignore
+                knownSolutions.Remove(f.FullName) |> ignore
+        }
+    member this.ClearWorkspaceRoot(): Async<unit> = 
+        async {
+            knownProjects.Clear()
+            knownSolutions.Clear()
+        }
     member this.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
         cache.Invalidate(fsprojOrFsx) |> ignore
