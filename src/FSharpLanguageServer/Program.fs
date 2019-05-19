@@ -12,6 +12,7 @@ open LSP.Types
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Conversions
+open Config
 
 module Ast = FSharp.Compiler.Ast
 
@@ -207,6 +208,10 @@ type Server(client: ILanguageClient) =
         else 
             reader.ReadLine()
 
+    let getParsingOptions(projectOptions) =
+        let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+        { parsingOptions with ConditionalCompilationDefines = projects.ConditionalCompilationDefines}
+
     /// Parse a file 
     let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> = 
         async {
@@ -221,7 +226,7 @@ type Server(client: ILanguageClient) =
                     return Ok parse
                 | None ->
                     try
-                        let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                        let parsingOptions = getParsingOptions(projectOptions)
                         let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                         return Ok(parse)
                     with e -> 
@@ -546,7 +551,11 @@ type Server(client: ILanguageClient) =
             async { () }
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
             async {
-                dprintfn "New configuration %s" (p.ToString())
+                let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString())
+                projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Fsharp.Project.Define
+                dprintfn "New configuration %O" (fsconfig.JsonValue)
+                dprintfn "conditionalCompilationDefines = %A" projects.ConditionalCompilationDefines
+
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
@@ -744,7 +753,7 @@ type Server(client: ILanguageClient) =
                             | None -> () 
                             | Some sourceText ->
                                 try
-                                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                                    let parsingOptions = getParsingOptions(projectOptions)
                                     let! parse = checker.ParseFile(sourceFile.FullName, sourceText, parsingOptions)
                                     for declaration, container in findDeclarations(parse) do 
                                         if matchesQuery(p.query, declaration.Name) then 
@@ -759,7 +768,7 @@ type Server(client: ILanguageClient) =
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 match projects.FindProjectOptions(file), getOrRead(file) with 
                 | Ok(projectOptions), Some(sourceText) -> 
-                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                    let parsingOptions = getParsingOptions(projectOptions)
                     let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                     if file.Name.EndsWith(".fs") then 
                         let fns = testFunctions(parse)
@@ -791,7 +800,7 @@ type Server(client: ILanguageClient) =
                     let file = FileInfo(fsi.FullName.Substring(0, fsi.FullName.Length - 1))
                     match projects.FindProjectOptions(file), getOrRead(file) with 
                     | Ok(projectOptions), Some(sourceText) -> 
-                        let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
+                        let parsingOptions = getParsingOptions(projectOptions)
                         let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                         match findSignatureImplementation(parse, name) with 
                         | [range] -> 

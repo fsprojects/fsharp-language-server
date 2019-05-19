@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Config.fs" />
     <Compile Include="ProgressBar.fs" />
     <Compile Include="TipFormatter.fs" />
     <Compile Include="Navigation.fs" />

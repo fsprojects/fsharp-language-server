@@ -36,7 +36,7 @@ type private ProjectCache() =
         knownProjects.[fsprojOrFsx.FullName]
 
 /// Maintains caches of parsed versions of .fsprojOrFsx files
-type ProjectManager(checker: FSharpChecker) = 
+type ProjectManager(checker: FSharpChecker) as this = 
     /// Remember what .fsproj files are referenced by .sln files
     /// Keys are full paths to .sln files
     /// Values are lists of .fsproj files referenced by the .sln file
@@ -285,6 +285,8 @@ type ProjectManager(checker: FSharpChecker) =
                         // Direct dll references
                         for r in cracked.directReferences do 
                             yield "-r:" + r.FullName
+                        for d in this.ConditionalCompilationDefines do
+                            yield "-d:" + d
                     |]
                 ProjectFileName = fsproj.FullName 
                 ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
@@ -468,3 +470,5 @@ type ProjectManager(checker: FSharpChecker) =
                 let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
                 let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))
                 List.exists containsTarget deps
+
+    member val ConditionalCompilationDefines: string list = [] with get,set
