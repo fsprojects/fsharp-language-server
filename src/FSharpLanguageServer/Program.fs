@@ -844,12 +844,17 @@ type Server(client: ILanguageClient) =
             }
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
+            let __doworkspace (xs: WorkspaceFolder list) fn = 
+                async {
+                    for root in xs do 
+                        let file = FileInfo(root.uri.LocalPath)
+                        do! fn file.Directory
+                }
             async {
-                for root in p.event.added do 
-                    let file = FileInfo(root.uri.LocalPath)
-                    do! projects.AddWorkspaceRoot(file.Directory)
-                // TODO removed
+                do! __doworkspace p.event.added projects.AddWorkspaceRoot
+                do! __doworkspace p.event.removed projects.RemoveWorkspaceRoot
             }
+
 
 [<EntryPoint>]
 let main(argv: array<string>): int =
