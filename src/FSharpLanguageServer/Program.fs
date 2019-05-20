@@ -553,7 +553,7 @@ type Server(client: ILanguageClient) =
             async {
                 let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString())
                 projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Fsharp.Project.Define
-                projects.ObjDirectoryPrefix <- fsconfig.Fsharp.Project.ObjPath
+                projects.ObjDirectoryPrefix <- fsconfig.Fsharp.Project.Objdirectory
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
                 dprintfn "conditionalCompilationDefines = %A" projects.ConditionalCompilationDefines
                 dprintfn "IntermediateOutputPath prefix = %A" projects.ObjDirectoryPrefix
