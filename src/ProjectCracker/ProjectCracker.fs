@@ -18,6 +18,7 @@ open Microsoft.Build.Utilities
 open Microsoft.Build.Framework
 open Microsoft.Build.Logging
 open Buildalyzer
+open System.Linq
 
 // Other points of reference:
 // Omnisharp-roslyn cracks .csproj files: https://github.com/OmniSharp/omnisharp-roslyn/blob/master/tests/OmniSharp.MSBuild.Tests/ProjectFileInfoTests.cs
@@ -106,6 +107,31 @@ let private frameworkPreference = [
     "net20", ".NETFramework,Version=v2.0";
     "net11", ".NETFramework,Version=v1.1" ]
 
+let private project(fsproj: FileInfo): ProjectAnalyzer = 
+    let options = new AnalyzerManagerOptions()
+    options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
+    let manager = AnalyzerManager(options)
+    manager.GetProject(fsproj.FullName)
+
+let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult = 
+    let proj   = project(fsproj)
+    let builds = proj.Build()
+
+    // TODO get target framework from project.assets.json
+    let build_tfms = builds |> Seq.map (fun build -> build, build.TargetFramework)
+    let pref_tfms = frameworkPreference
+
+    Enumerable
+     .Join(build_tfms, pref_tfms, (fun (_, b) -> b), (fun (a, _) -> a), (fun a _ -> fst a))
+     .Concat(builds)
+     .First()
+
+let private absoluteIncludePath(fsproj: FileInfo, i: ProjectItem) = 
+    let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
+    let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
+    let normalizePath = Path.GetFullPath(absolutePath)
+    FileInfo(normalizePath)
+
 let private projectAssets = new Dictionary<String, String>()
 
 let invalidateProjectAssets (fsprojOrFsx: FileInfo) =
@@ -124,17 +150,12 @@ let getAssets(fsprojOrFsx: FileInfo) =
 
     let msbuildprops =
         try
-            Project(projfile).AllEvaluatedProperties
-            |> List.ofSeq
+            Path.Combine [|fsprojOrFsx.DirectoryName; project(fsprojOrFsx).Build().First().GetProperty("IntermediateOutputPath") |]
         with | ex -> 
             dprintfn "ProjectManager: msbuildprops: %s" <| ex.ToString()
-            []
+            Path.Combine [| fsprojOrFsx.Directory.FullName; "obj" |]
 
     let assets =  msbuildprops
-                  |> Seq.filter (fun x -> x.Name = "IntermediateOutputPath")
-                  |> Seq.map (fun x -> x.EvaluatedValue)
-                  |> Seq.tryHead
-                  |> Option.defaultValue (Path.Combine [| fsprojOrFsx.Directory.FullName; "obj" |])
                   |> (fun p -> Path.Combine [| p; "project.assets.json" |])
                   |> FileInfo
 
@@ -148,7 +169,21 @@ let getProject(assets: FileInfo) =
                 yield FileInfo k
     }
 
-let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
+let rec private projectTarget(csproj: FileInfo) = 
+    let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
+    let dllName = baseName + ".dll"
+    let placeholderTarget = FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
+    let projectAssetsJson = getAssets csproj
+    if projectAssetsJson.Exists then 
+        let assets = parseProjectAssets(projectAssetsJson)
+        let dllName = assets.projectName + ".dll"
+        // TODO this seems fragile
+        FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
+    else 
+        placeholderTarget
+
+
+and private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
     dprintfn "Parsing %s" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())  
@@ -360,46 +395,6 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         packages=List.map FileInfo packageDllsWithoutConflicts
         projects=projects
     }
-
-let private project(fsproj: FileInfo): ProjectAnalyzer = 
-    let options = new AnalyzerManagerOptions()
-    options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
-    let manager = AnalyzerManager(options)
-    manager.GetProject(fsproj.FullName)
-
-let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult = 
-    let builds = project(fsproj).Build()
-    // TODO get target framework from project.assets.json
-    let mutable chosen: AnalyzerResult option = None
-    for shortFramework, _ in frameworkPreference do 
-        if chosen.IsNone then 
-            for build in builds do 
-                if build.TargetFramework = shortFramework then 
-                    chosen <- Some(build)
-    if chosen.IsNone then
-        for build in builds do 
-            if chosen.IsNone then 
-                chosen <- Some(build)
-    chosen.Value
-
-let private projectTarget(csproj: FileInfo) = 
-    let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
-    let dllName = baseName + ".dll"
-    let placeholderTarget = FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
-    let projectAssetsJson = getAssets csproj
-    if projectAssetsJson.Exists then 
-        let assets = parseProjectAssets(projectAssetsJson)
-        let dllName = assets.projectName + ".dll"
-        // TODO this seems fragile
-        FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
-    else 
-        placeholderTarget
-
-let private absoluteIncludePath(fsproj: FileInfo, i: ProjectItem) = 
-    let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
-    let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
-    let normalizePath = Path.GetFullPath(absolutePath)
-    FileInfo(normalizePath)
 
 /// Crack an .fsproj file by:
 /// - Running the "Restore" target and reading 
