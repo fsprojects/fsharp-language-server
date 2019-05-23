@@ -7,3 +7,4 @@ Scratch.fsx
 Scratch.ts
 publish/
 coc-fsharp-*.tgz
+.vs

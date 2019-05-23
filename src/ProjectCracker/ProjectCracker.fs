@@ -106,6 +106,48 @@ let private frameworkPreference = [
     "net20", ".NETFramework,Version=v2.0";
     "net11", ".NETFramework,Version=v1.1" ]
 
+let private projectAssets = new Dictionary<String, String>()
+
+let invalidateProjectAssets (fsprojOrFsx: FileInfo) =
+    projectAssets.Remove(fsprojOrFsx.FullName) |> ignore
+
+let getAssets(fsprojOrFsx: FileInfo) =
+    if fsprojOrFsx.Extension = ".fsx" then
+        FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
+    else
+
+    let projfile = fsprojOrFsx.FullName
+    let mutable assets = ""
+    if projectAssets.TryGetValue(projfile, &assets) then
+        FileInfo(assets)
+    else
+
+    let msbuildprops =
+        try
+            Project(projfile).AllEvaluatedProperties
+            |> List.ofSeq
+        with | ex -> 
+            dprintfn "ProjectManager: msbuildprops: %s" <| ex.ToString()
+            []
+
+    let assets =  msbuildprops
+                  |> Seq.filter (fun x -> x.Name = "IntermediateOutputPath")
+                  |> Seq.map (fun x -> x.EvaluatedValue)
+                  |> Seq.tryHead
+                  |> Option.defaultValue (Path.Combine [| fsprojOrFsx.Directory.FullName; "obj" |])
+                  |> (fun p -> Path.Combine [| p; "project.assets.json" |])
+                  |> FileInfo
+
+    projectAssets.[projfile] <- assets.FullName
+    assets
+
+let getProject(assets: FileInfo) =
+    seq {
+        for KeyValue(k,v) in projectAssets do
+            if v = assets.FullName then
+                yield FileInfo k
+    }
+
 let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
     dprintfn "Parsing %s" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
@@ -344,7 +386,7 @@ let private projectTarget(csproj: FileInfo) =
     let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
     let dllName = baseName + ".dll"
     let placeholderTarget = FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
-    let projectAssetsJson = FileInfo(Path.Combine [|csproj.DirectoryName; "obj"; "project.assets.json"|])
+    let projectAssetsJson = getAssets csproj
     if projectAssetsJson.Exists then 
         let assets = parseProjectAssets(projectAssetsJson)
         let dllName = assets.projectName + ".dll"
@@ -384,7 +426,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                         yield absoluteIncludePath(fsproj, i) ]
         dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
-        let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
+        let projectAssetsJson = getAssets fsproj
         if not(projectAssetsJson.Exists) then
             {
                 fsproj=fsproj 
