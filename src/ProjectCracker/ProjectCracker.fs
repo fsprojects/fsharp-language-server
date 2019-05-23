@@ -150,7 +150,7 @@ let getAssets(fsprojOrFsx: FileInfo) =
 
     let msbuildprops =
         try
-            Path.Combine [|fsprojOrFsx.DirectoryName; project(fsprojOrFsx).Build().First().GetProperty("IntermediateOutputPath") |]
+            Path.Combine [|fsprojOrFsx.DirectoryName; project(fsprojOrFsx).Build().First().GetProperty("BaseIntermediateOutputPath") |]
         with | ex -> 
             dprintfn "ProjectManager: msbuildprops: %s" <| ex.ToString()
             Path.Combine [| fsprojOrFsx.Directory.FullName; "obj" |]
