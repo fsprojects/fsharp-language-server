@@ -155,9 +155,9 @@ let getAssets(fsprojOrFsx: FileInfo) =
             dprintfn "ProjectManager: msbuildprops: %s" <| ex.ToString()
             Path.Combine [| fsprojOrFsx.Directory.FullName; "obj" |]
 
-    let assets =  msbuildprops
-                  |> (fun p -> Path.Combine [| p; "project.assets.json" |])
-                  |> FileInfo
+    let assets = msbuildprops
+                 |> (fun p -> Path.Combine [| p; "project.assets.json" |])
+                 |> FileInfo
 
     projectAssets.[projfile] <- assets.FullName
     assets
@@ -169,21 +169,14 @@ let getProject(assets: FileInfo) =
                 yield FileInfo k
     }
 
-let rec private projectTarget(csproj: FileInfo) = 
-    let baseName = Path.GetFileNameWithoutExtension(csproj.Name)
-    let dllName = baseName + ".dll"
-    let placeholderTarget = FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
-    let projectAssetsJson = getAssets csproj
-    if projectAssetsJson.Exists then 
-        let assets = parseProjectAssets(projectAssetsJson)
-        let dllName = assets.projectName + ".dll"
-        // TODO this seems fragile
-        FileInfo(Path.Combine [|csproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
-    else 
-        placeholderTarget
+let private projectTarget(csproj: FileInfo) = 
+    let project = inferTargetFramework csproj
+    let dllName = project.GetProperty("AssemblyName") + ".dll"
+    let dllPath = Path.Combine [|csproj.DirectoryName; project.GetProperty("OutputPath"); dllName |]
+    FileInfo(dllPath)
 
 
-and private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
+let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
     dprintfn "Parsing %s" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())  
@@ -401,10 +394,6 @@ and private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 /// - Reading .fsproj using the MSBuild API
 /// - Reading libraries from project.assets.json
 let crack(fsproj: FileInfo): CrackedProject = 
-    // Figure out name of output .dll
-    let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)
-    let dllName = baseName + ".dll"
-    let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
     try 
         // Get source info from .fsproj
         let timeProject = Stopwatch.StartNew()
@@ -422,26 +411,27 @@ let crack(fsproj: FileInfo): CrackedProject =
         dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
         let projectAssetsJson = getAssets fsproj
+        let outputPath        = project.GetProperty("OutputPath")
+        let dllName           = project.GetProperty("AssemblyName") + ".dll"
+        let dllTarget         = FileInfo(Path.Combine [|outputPath; dllName|])
         if not(projectAssetsJson.Exists) then
             {
-                fsproj=fsproj 
-                target=placeholderTarget 
-                sources=sources
-                projectReferences=[]
-                otherProjectReferences=[]
-                packageReferences=[]
-                directReferences=directReferences
-                error=Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
+                fsproj                 = fsproj
+                target                 = dllTarget
+                sources                = sources
+                projectReferences      = []
+                otherProjectReferences = []
+                packageReferences      = []
+                directReferences       = directReferences
+                error                  = Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
             }
         else
-            let timeAssets = Stopwatch.StartNew()
-            let assets = parseProjectAssets(projectAssetsJson)
-            // msbuild produces paths like src/LSP/bin/Debug/netcoreapp2.0/LSP.dll
-            // TODO this seems fragile
-            let target = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; assets.framework; dllName|])
-            let isFsproj(f: FileInfo) = f.Name.EndsWith(".fsproj")
+            let timeAssets             = Stopwatch.StartNew()
+            let assets                 = parseProjectAssets(projectAssetsJson)
+            let target                 = FileInfo(Path.Combine [|outputPath; dllName|])
+            let isFsproj(f: FileInfo)  = f.Name.EndsWith(".fsproj")
             let fsProjects, csProjects = List.partition isFsproj assets.projects
-            let otherProjects = [for csproj in csProjects do yield projectTarget(csproj)]
+            let otherProjects          = [for csproj in csProjects do yield projectTarget(csproj)]
             dprintfn "Cracked project.assets.json in %dms" timeAssets.ElapsedMilliseconds
             {
                 fsproj=fsproj
@@ -454,6 +444,9 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=None
             }
     with e -> 
+        let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)
+        let dllName = baseName + ".dll"
+        let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
         dprintfn "Failed to build %s: %s" fsproj.Name e.Message
         {
             fsproj=fsproj
