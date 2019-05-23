@@ -8,8 +8,7 @@ type FSharpLanguageServerConfig = JsonProvider<"""
       "server": "off"
     },
     "project": {
-      "define": [ "USE_SOME_FLAG" ],
-      "obj.path": "<default:project_dir/obj>"
+      "define": [ "USE_SOME_FLAG" ]
     }
   }
   }

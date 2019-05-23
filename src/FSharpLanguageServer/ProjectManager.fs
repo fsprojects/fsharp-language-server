@@ -62,14 +62,10 @@ type ProjectManager(checker: FSharpChecker) as this =
         dprintfn "  UnresolvedReferences: %A" options.UnresolvedReferences
         dprintfn "  UseScriptResolutionRules: %A" options.UseScriptResolutionRules
 
-    let objdirPrefix(fsprojOrFsx: FileInfo) =
-        if String.IsNullOrEmpty this.ObjDirectoryPrefix then fsprojOrFsx.Directory.FullName
-        else Path.Combine [| this.ObjDirectoryPrefix; fsprojOrFsx.Directory.Name |]
-
     /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) = 
-        let assets = FileInfo(Path.Combine [| objdirPrefix fsprojOrFsx; "obj"; "project.assets.json" |])
+        let assets = FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
         if assets.Exists then 
             max fsprojOrFsx.LastWriteTime assets.LastWriteTime
         else 
@@ -487,4 +483,3 @@ type ProjectManager(checker: FSharpChecker) as this =
                 List.exists containsTarget deps
 
     member val ConditionalCompilationDefines: string list = [] with get,set
-    member val ObjDirectoryPrefix: string = "" with get,set
