@@ -28,9 +28,10 @@ type private LazyProject = {
 type private ProjectCache() = 
     let knownProjects = new Dictionary<String, LazyProject>()
 
-    member this.Invalidate(fsprojOrFsx: FileInfo) = 
+    member __.Invalidate(fsprojOrFsx: FileInfo) = 
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
-    member this.Get(fsprojOrFsx: FileInfo, analyzeLater: FileInfo -> LazyProject): LazyProject = 
+        ProjectCracker.invalidateProjectAssets fsprojOrFsx
+    member __.Get(fsprojOrFsx: FileInfo, analyzeLater: FileInfo -> LazyProject): LazyProject = 
         if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then 
             knownProjects.Add(fsprojOrFsx.FullName, analyzeLater(fsprojOrFsx))
         knownProjects.[fsprojOrFsx.FullName]
@@ -65,16 +66,11 @@ type ProjectManager(checker: FSharpChecker) as this =
     /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) = 
-        let assets = FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
+        let assets = ProjectCracker.getAssets fsprojOrFsx
         if assets.Exists then 
             max fsprojOrFsx.LastWriteTime assets.LastWriteTime
         else 
             fsprojOrFsx.LastWriteTime
-
-    /// Find any .fsproj files associated with a project.assets.json
-    let projectFileForAssets(assetsJson: FileInfo) = 
-        let dir = assetsJson.Directory.Parent
-        dir.GetFiles("*.fsproj")
 
     /// Find base dlls
     /// Workaround of https://github.com/fsharp/FSharp.Compiler.Service/issues/847
@@ -314,7 +310,7 @@ type ProjectManager(checker: FSharpChecker) as this =
                 errors=match cracked.error with None -> [] | Some(e) -> [Conversions.errorAtTop(e)]
             }
         // Direct to analyzeFsx or analyzeFsproj, depending on type
-        if fsprojOrFsx.Name.EndsWith(".fsx") then 
+        if fsprojOrFsx.Extension =".fsx" then 
             {file=fsprojOrFsx; resolved=lazy(analyzeFsx(fsprojOrFsx))}
         elif fsprojOrFsx.Name.EndsWith(".fsproj") then 
             {file=fsprojOrFsx; resolved=lazy(analyzeFsproj(fsprojOrFsx))}
@@ -368,30 +364,43 @@ type ProjectManager(checker: FSharpChecker) as this =
                     let path = Path.Combine(sln.Directory.FullName, relativePath)
                     let normalize = Path.GetFullPath(path)
                     yield FileInfo(normalize) ]
-    member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> =         
+    member __.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> =         
         async {
             for f in root.EnumerateFiles("*.*", SearchOption.AllDirectories) do 
-                if f.Name.EndsWith(".fsx") || f.Name.EndsWith(".fsproj") then
+                match f.Extension with
+                | ".fsx" | ".fsproj" ->
                     knownProjects.Add(f.FullName) |> ignore
-                else if f.Name.EndsWith(".sln") then
+                | ".sln" ->
                     knownSolutions.[f.FullName] <- slnProjectReferences(f)
+                | _ -> ()
         }
-    member this.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
+    member __.RemoveWorkspaceRoot(root: DirectoryInfo): Async<unit> =         
+        async {
+            for f in root.EnumerateFiles("*.*", SearchOption.AllDirectories) do 
+                knownProjects.Remove(f.FullName) |> ignore
+                knownSolutions.Remove(f.FullName) |> ignore
+        }
+    member __.ClearWorkspaceRoot(): Async<unit> = 
+        async {
+            knownProjects.Clear()
+            knownSolutions.Clear()
+        }
+    member __.DeleteProjectFile(fsprojOrFsx: FileInfo) = 
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
         cache.Invalidate(fsprojOrFsx) |> ignore
         invalidateDescendents(fsprojOrFsx)
-    member this.NewProjectFile(fsprojOrFsx: FileInfo) = 
+    member __.NewProjectFile(fsprojOrFsx: FileInfo) = 
         knownProjects.Add(fsprojOrFsx.FullName) |> ignore
         invalidateDescendents(fsprojOrFsx)
-    member this.UpdateProjectFile(fsprojOrFsx: FileInfo) = 
+    member __.UpdateProjectFile(fsprojOrFsx: FileInfo) = 
         invalidateDescendents(fsprojOrFsx)
-    member this.DeleteSlnFile(sln: FileInfo) = 
+    member __.DeleteSlnFile(sln: FileInfo) = 
         knownSolutions.Remove(sln.FullName) |> ignore
-    member this.UpdateSlnFile(sln: FileInfo) = 
+    member __.UpdateSlnFile(sln: FileInfo) = 
         knownSolutions.[sln.FullName] <- slnProjectReferences(sln)
-    member this.UpdateAssetsJson(assets: FileInfo) = 
-        for fsproj in projectFileForAssets(assets) do invalidateDescendents(fsproj)
-    member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> = 
+    member __.UpdateAssetsJson(assets: FileInfo) = 
+        for fsproj in ProjectCracker.getProject(assets) do invalidateDescendents(fsproj)
+    member __.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> = 
         let isSourceFile(f: FileInfo) = f.FullName = sourceFile.FullName
         // Does `p` contain a reference to `sourceFile`?
         let isMatch(p: ResolvedProject) = List.exists isSourceFile p.sources
@@ -440,7 +449,7 @@ type ProjectManager(checker: FSharpChecker) as this =
                 Error(cracked.errors)
     /// All open projects, in dependency order
     /// Ancestor projects come before projects that depend on them
-    member this.OpenProjects: FSharpProjectOptions list = 
+    member __.OpenProjects: FSharpProjectOptions list = 
         let touched = new HashSet<String>()
         let result = new List<FSharpProjectOptions>()
         let rec walk(options: FSharpProjectOptions) = 
@@ -453,7 +462,7 @@ type ProjectManager(checker: FSharpChecker) as this =
             walk(project.resolved.Value.options)
         List.ofSeq(result)
     /// All transitive dependencies of `projectFile`, in dependency order
-    member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
+    member __.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
         transitiveDeps(projectFile)
     /// Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) = 

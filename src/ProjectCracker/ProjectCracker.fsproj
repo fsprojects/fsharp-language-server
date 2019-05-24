@@ -1,6 +1,6 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -8,7 +8,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Buildalyzer" Version="2.2.0" />
+    <PackageReference Include="Buildalyzer" Version="2.3.0" />
     <!-- Fix warnings from Buildalyzer indirect refs to old versions -->
     <PackageReference Include="System.Threading.ThreadPool" Version="4.3.0" />
     <PackageReference Include="System.Net.NameResolution" Version="4.3.0" />
@@ -19,5 +19,9 @@
   
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="4.6.2" />
   </ItemGroup>
 </Project>

@@ -1,8 +1,8 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netcoreapp2.1</TargetFramework>
     <RuntimeIdentifiers>win10-x64;osx.10.11-x64;linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
@@ -19,12 +19,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="27.0.1" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="28.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.8.4" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
     <ProjectReference Include="..\ProjectCracker\ProjectCracker.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="FSharp.Core" Version="4.6.2" />
   </ItemGroup>
 </Project>

@@ -3,7 +3,8 @@ obj/
 out/
 packages/
 node_modules/
-.idea/
-build.vsix
 Scratch.fsx
 Scratch.ts
+publish/
+coc-fsharp-*.tgz
+.vs
