@@ -189,7 +189,7 @@ type Server(client: ILanguageClient) =
     /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option = 
         match docs.GetText(file) with 
-        | Some text -> Some(text)
+        | Some(text) -> Some(text)
         | None when file.Exists -> Some(File.ReadAllText(file.FullName))
         | None -> None
 
@@ -386,21 +386,21 @@ type Server(client: ILanguageClient) =
     let maybeMatchesQuery(query: string, file: FileInfo): string option = 
         match getOrRead(file) with 
         | None -> None 
-        | Some text -> 
+        | Some(text) -> 
             let matches = symbolPattern.Matches(text)
             let test(m: Match) = matchesQuery(query, m.Value)
             if Seq.exists test matches then 
-                Some text 
+                Some(text) 
             else 
                 None
     let exactlyMatches(findSymbol: string, file: FileInfo): string option =
         match getOrRead(file) with 
         | None -> None 
-        | Some text -> 
+        | Some(text) -> 
             let matches = symbolPattern.Matches(text)
             let test(m: Match) = m.Value = findSymbol
             if Seq.exists test matches then 
-                Some text 
+                Some(text) 
             else 
                 None
 
@@ -732,18 +732,21 @@ type Server(client: ILanguageClient) =
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
             async {
-                let projectNames = String.concat ", " [for p in projects.OpenProjects do yield p.ProjectFileName]
-                dprintfn "Looking for symbols matching %s in %s" p.query projectNames
+                dprintfn "Looking for symbols matching `%s`" p.query
                 // Read open projects until we find at least 50 symbols that match query
                 let all = System.Collections.Generic.List<SymbolInformation>()
+                // TODO instead of checking open projects, check all .fs files, using default parsing options
                 for projectOptions in projects.OpenProjects do 
+                    dprintfn "...check project %s" projectOptions.ProjectFileName
                     for sourceFileName in projectOptions.SourceFiles do 
                         let sourceFile = FileInfo(sourceFileName)
                         if all.Count < 50 then 
+                            dprintfn "...scan %s" sourceFile.Name
                             match maybeMatchesQuery(p.query, sourceFile) with 
                             | None -> () 
                             | Some sourceText ->
                                 try
+                                    dprintfn "...parse %s" sourceFile.Name
                                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                                     let! parse = checker.ParseFile(sourceFile.FullName, sourceText, parsingOptions)
                                     for declaration, container in findDeclarations(parse) do 

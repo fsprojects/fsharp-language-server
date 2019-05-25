@@ -436,8 +436,8 @@ type ProjectManager(checker: FSharpChecker) =
                 Ok(cracked.options)
             else 
                 Error(cracked.errors)
-    /// All open projects, in dependency order
-    /// Ancestor projects come before projects that depend on them
+    /// All open projects, in dependency order.
+    /// Ancestor projects come before projects that depend on them.
     member this.OpenProjects: FSharpProjectOptions list = 
         let touched = new HashSet<String>()
         let result = new List<FSharpProjectOptions>()
@@ -448,7 +448,8 @@ type ProjectManager(checker: FSharpChecker) =
                 result.Add(options)
         for f in knownProjects do 
             let project = cache.Get(FileInfo(f), analyzeLater)
-            walk(project.resolved.Value.options)
+            if project.resolved.IsValueCreated then
+                walk(project.resolved.Value.options)
         List.ofSeq(result)
     /// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
