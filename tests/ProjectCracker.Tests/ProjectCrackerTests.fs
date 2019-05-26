@@ -159,3 +159,17 @@ let ``build unbuilt project``() =
     if cracked.error.IsSome then Assert.Fail(cracked.error.Value)
     CollectionAssert.AreEquivalent(["NotBuilt.fs"], [for f in cracked.sources do yield f.Name])
     CollectionAssert.IsNotEmpty(cracked.packageReferences)
+
+[<Test>]
+let ``crack a project file with custom IntermediateOutputPath`` () =
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "CustomObjPath"; "CustomObjPath.fsproj" |] |> FileInfo
+    let cracked = ProjectCracker.crack(fsproj)
+    Assert.True(cracked.error.IsNone)
+
+[<Test>]
+let ``crack a project file with custom OutputPath`` () =
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "CustomOutputPath"; "CustomOutputPath.fsproj" |] |> FileInfo
+    let cracked = ProjectCracker.crack(fsproj)
+    Assert.AreEqual("bar", cracked.target.Directory.Name)
+    Assert.AreEqual("foo", cracked.target.Directory.Parent.Name)
+
