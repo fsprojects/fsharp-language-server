@@ -14,6 +14,8 @@ dotnet restore sample/ReferenceCSharp/ReferenceCSharp.fsproj
 dotnet restore sample/Signature/Signature.fsproj
 dotnet restore sample/SlnReferences/ReferencedProject.fsproj
 dotnet restore sample/TemplateParams/TemplateParams.fsproj
+dotnet restore sample/CustomObjPath/CustomObjPath.fsproj
+dotnet restore sample/CustomOutputPath/CustomOutputPath.fsproj
 # These need to be built, not restored
 dotnet build sample/CSharpProject/CSharpProject.csproj
 dotnet build sample/CSharpProject.AssemblyName/CSharpProject.AssemblyName.csproj
