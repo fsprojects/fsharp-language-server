@@ -450,6 +450,7 @@ type ProjectManager(checker: FSharpChecker) as this =
     /// All open projects, in dependency order
     /// Ancestor projects come before projects that depend on them
     member __.OpenProjects: FSharpProjectOptions list = 
+
         let touched = new HashSet<String>()
         let result = new List<FSharpProjectOptions>()
         let rec walk(options: FSharpProjectOptions) = 
@@ -459,7 +460,8 @@ type ProjectManager(checker: FSharpChecker) as this =
                 result.Add(options)
         for f in knownProjects do 
             let project = cache.Get(FileInfo(f), analyzeLater)
-            walk(project.resolved.Value.options)
+            if project.resolved.IsValueCreated then
+                walk(project.resolved.Value.options)
         List.ofSeq(result)
     /// All transitive dependencies of `projectFile`, in dependency order
     member __.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
