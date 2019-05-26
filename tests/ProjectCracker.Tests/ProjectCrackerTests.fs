@@ -170,6 +170,10 @@ let ``crack a project file with custom IntermediateOutputPath`` () =
 let ``crack a project file with custom OutputPath`` () =
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "CustomOutputPath"; "CustomOutputPath.fsproj" |] |> FileInfo
     let cracked = ProjectCracker.crack(fsproj)
-    Assert.AreEqual("bar", cracked.target.Directory.Name)
-    Assert.AreEqual("foo", cracked.target.Directory.Parent.Name)
+    let dir = cracked.target.Directory
+    Assert.AreEqual("netcoreapp2.1", dir.Name)
+    let dir = dir.Parent
+    Assert.AreEqual("bar", dir.Name)
+    let dir = dir.Parent
+    Assert.AreEqual("foo", dir.Name)
 
