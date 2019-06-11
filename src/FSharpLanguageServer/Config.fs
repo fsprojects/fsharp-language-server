@@ -2,7 +2,7 @@ module FSharpLanguageServer.Config
 open FSharp.Data
 
 type FSharpLanguageServerConfig = JsonProvider<"""
-  {
+{
   "fsharp": {
     "trace": {
       "server": "off"
@@ -11,5 +11,5 @@ type FSharpLanguageServerConfig = JsonProvider<"""
       "define": [ "USE_SOME_FLAG" ]
     }
   }
-  }
+}
 """>

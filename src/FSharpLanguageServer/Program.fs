@@ -13,6 +13,7 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Conversions
 open Config
+open FSharp.Compiler.Text
 
 module Ast = FSharp.Compiler.Ast
 
@@ -95,6 +96,7 @@ let private findDeclarations(parse: FSharpParseFileResults) =
         | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> 
             Navigation.getNavigationFromImplFile(modules).Declarations
         | _ -> [||]
+    // XXX why 2 layers?
     [ for i in items do 
         yield i.Declaration, None
         for n in i.Nested do 
@@ -227,6 +229,7 @@ type Server(client: ILanguageClient) =
                 | None ->
                     try
                         let parsingOptions = getParsingOptions(projectOptions)
+                        let sourceText = SourceText.ofString sourceText
                         let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                         return Ok(parse)
                     with e -> 
@@ -250,6 +253,7 @@ type Server(client: ILanguageClient) =
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 let recompile = async {
                     let timeCheck = Stopwatch.StartNew()
+                    let sourceText = SourceText.ofString sourceText
                     let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
                     dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                     match force with 
@@ -409,8 +413,7 @@ type Server(client: ILanguageClient) =
             else 
                 None
 
-    /// Find all uses of a symbol, across all open projects
-    let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
+    let findReferenceK(symbol: FSharpSymbol, K: FSharpSymbolUse -> unit): Async<unit> =
         async {
             // If the symbol is private or internal, we only need to scan 1 file or project
             // TODO this only detects symbols *declared* private, many symbols are implicitly private
@@ -432,7 +435,7 @@ type Server(client: ILanguageClient) =
             if isPrivate then 
                 dprintfn "Symbol %s is private so we will only check declaration file %A" symbol.FullName symbolDeclarationFile
             elif isInternal then 
-                dprintfn "Symbol %s is internal so we will onlcy check declaration project %A" symbol.FullName symbolDeclarationProject
+                dprintfn "Symbol %s is internal so we will only check declaration project %A" symbol.FullName symbolDeclarationProject
             // Is fileName the same file symbol was declared in?
             let isSymbolFile(fileName: string) =
                 match symbolDeclarationFile with None -> false | Some(f) -> f.FullName = fileName
@@ -480,7 +483,6 @@ type Server(client: ILanguageClient) =
             dprintfn "Name %s appears in %s" searchFor candidateNames
             // Check each candidate file
             use progress = new ProgressBar(candidates.Length, sprintf "Search %d files" candidates.Length, client)
-            let all = System.Collections.Generic.List<FSharpSymbolUse>()
             for projectOptions, sourceFile, sourceText in candidates do 
                 try
                     // Send a notification to the client updating the progress indicator
@@ -489,6 +491,7 @@ type Server(client: ILanguageClient) =
                     // Check file
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
                     let timeCheck = Stopwatch.StartNew()
+                    let sourceText = SourceText.ofString sourceText
                     let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, sourceText, projectOptions)
                     dprintfn "Checked %s in %dms" sourceFile.Name timeCheck.ElapsedMilliseconds
                     match maybeCheck with 
@@ -496,9 +499,34 @@ type Server(client: ILanguageClient) =
                     | FSharpCheckFileAnswer.Succeeded(check) -> 
                         let! uses = check.GetUsesOfSymbolInFile(symbol)
                         for u in uses do 
-                            all.Add(u)
+                            K u
                 with e -> 
                     dprintfn "Error checking %s: %s" sourceFile.Name e.Message
+        }
+
+
+    /// Find the number of references to a symbol
+    let findReferenceCount(node: NavigationDeclarationItem) =
+        async {
+            let range = node.Range
+            let! sym  = symbolAt({uri = Uri(range.FileName)}, {line = range.StartLine - 1; character = range.StartColumn})
+            let cnt = ref 0
+            match sym with
+            | Some sym -> do! findReferenceK(sym.Symbol, fun _ -> cnt := !cnt + 1)
+            | _ ->
+                dprintfn "findReferenceCount: symbol resolve fails. node = %A"
+                    (node.Range.FileName, node.Range.StartLine, node.Range.StartColumn,
+                     node.bodyRange.StartLine, node.bodyRange.StartColumn,
+                     node.Glyph, node.Name, node.Kind, node.Access, node.FSharpEnclosingEntityKind
+                    )
+            return !cnt
+        }
+
+    /// Find all uses of a symbol, across all open projects
+    let findAllSymbolUses(symbol: FSharpSymbol): Async<List<FSharpSymbolUse>> = 
+        async {
+            let all = ResizeArray<FSharpSymbolUse>()
+            do! findReferenceK(symbol, all.Add)
             return List.ofSeq(all)
         }
 
@@ -757,6 +785,7 @@ type Server(client: ILanguageClient) =
                                 try
                                     dprintfn "...parse %s" sourceFile.Name
                                     let parsingOptions = getParsingOptions(projectOptions)
+                                    let sourceText = SourceText.ofString sourceText
                                     let! parse = checker.ParseFile(sourceFile.FullName, sourceText, parsingOptions)
                                     for declaration, container in findDeclarations(parse) do 
                                         if matchesQuery(p.query, declaration.Name) then 
@@ -772,20 +801,24 @@ type Server(client: ILanguageClient) =
                 match projects.FindProjectOptions(file), getOrRead(file) with 
                 | Ok(projectOptions), Some(sourceText) -> 
                     let parsingOptions = getParsingOptions(projectOptions)
+                    let sourceText = SourceText.ofString sourceText
                     let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
+                    let lenses = ResizeArray()
+
                     if file.Name.EndsWith(".fs") then 
-                        let fns = testFunctions(parse)
                         let fsproj = FileInfo(projectOptions.ProjectFileName)
-                        return [ for id, bindings in fns do 
-                                    yield asRunTest(fsproj, id, bindings)
-                                    yield asDebugTest(fsproj, id, bindings) ]
-                    else if file.Name.EndsWith(".fsi") then 
-                        return 
-                            [ for name, range in findSignatureDeclarations(parse) do 
-                                yield asGoToImplementation(name, file, range) ]
-                    else 
-                        dprintfn "Don't know how to compute code lenses on extension %s" file.Extension
-                        return []
+                        for id, bindings in testFunctions(parse) do 
+                            lenses.Add <| asRunTest(fsproj, id, bindings)
+
+                    if file.Name.EndsWith(".fsi") then
+                        for name, range in findSignatureDeclarations(parse) do 
+                            lenses.Add <| asGoToImplementation(name, file, range)
+
+                    for decl, inRange in findDeclarations(parse) do
+                        let! nrefs = findReferenceCount(decl)
+                        lenses.Add <| asReferenceCount(decl, inRange, nrefs)
+
+                    return Seq.toList lenses
                 | Error(e), _ -> 
                     dprintfn "Failed to create code lens because project options failed to load: %A" e
                     return []
@@ -804,6 +837,7 @@ type Server(client: ILanguageClient) =
                     match projects.FindProjectOptions(file), getOrRead(file) with 
                     | Ok(projectOptions), Some(sourceText) -> 
                         let parsingOptions = getParsingOptions(projectOptions)
+                        let sourceText = SourceText.ofString sourceText
                         let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
                         match findSignatureImplementation(parse, name) with 
                         | [range] -> 

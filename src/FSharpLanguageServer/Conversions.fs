@@ -241,6 +241,19 @@ let asGoToImplementation(name: string list, file: FileInfo, range: Range.range):
         data=JsonValue.Array([|jsonFile; jsonName|])
     }
 
+/// Convert reference count to code lens
+let asReferenceCount(decl: NavigationDeclarationItem, inRange: NavigationDeclarationItem option, nr: int): CodeLens = 
+    {
+        range=asRange(decl.BodyRange)
+        command=Some {
+            title=sprintf "%d references" nr
+            command=""
+            arguments=[]
+        }
+        data=JsonValue.Null
+    }
+
+
 let goToImplementationData(goTo: CodeLens) = 
     match goTo.data with 
     | JsonValue.Array([|JsonValue.String(file); JsonValue.Array(jsonNames)|]) -> 
@@ -285,11 +298,3 @@ let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBi
         data=JsonValue.Null
     }
 
-let asDebugTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Ast.SynBinding): CodeLens =
-    {
-        range=asRange(test.RangeOfBindingSansRhs)
-        command=Some({  title="Debug Test"
-                        command="fsharp.command.test.debug"
-                        arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
-        data=JsonValue.Null
-    }

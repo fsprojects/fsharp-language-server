@@ -10,6 +10,7 @@ open LSP.Types
 open LSP
 open LSP.Log
 open FSharp.Data
+open FSharp.Compiler.Text
 
 [<SetUp>]
 let setup() = 
@@ -18,7 +19,7 @@ let setup() =
 [<Test>]
 let ``check errors in some text``() = 
     let file = "MyScript.fsx"
-    let input = """
+    let input = SourceText.ofString """
     let foo() = "foo!""
     """
     let checker = FSharpChecker.Create()
