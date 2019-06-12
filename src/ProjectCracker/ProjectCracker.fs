@@ -68,6 +68,45 @@ type private Dep = {
     version: string
 }
 
+[<Literal>]
+let private p_netstandard = "netstandard"
+[<Literal>]
+let private p_netcoreapp = "netcoreapp"
+[<Literal>]
+let private p_netfx = "net"
+
+type private TFM =
+    | NetFX        of uint64
+    | NetCoreApp   of uint64
+    | NetStandard  of uint64
+    | Other
+    with 
+    static member Parse(tfm: string) =
+        let (|FL|INT|STR|) (x: string) =
+            match UInt64.TryParse x with
+            | true, v -> INT v
+            | _ -> 
+            match Double.TryParse x with
+            | true, v -> FL v
+            | _ -> STR x
+        let (|FX|STD|COREAPP|OTHER|) (tfm: string) =
+            if tfm.StartsWith p_netstandard then
+                STD(tfm.Substring p_netstandard.Length)
+            elif tfm.StartsWith p_netcoreapp then
+                COREAPP(tfm.Substring p_netcoreapp.Length)
+            elif tfm.StartsWith p_netfx then
+                FX(tfm.Substring p_netfx.Length)
+            else
+                OTHER
+
+        match tfm with
+        | FX(INT ver)     -> let ver = if ver < 100UL then ver * 10UL else ver
+                             NetFX(ver)
+        | COREAPP(FL ver) -> NetCoreApp(uint64 <| ver*100.0)
+        | STD(FL ver)     -> NetStandard(uint64 <| ver*100.0)
+        | _               -> Other
+
+
 type JsonValue with
     member x.GetCaseInsensitive(propertyName) = 
         let mutable result: Option<JsonValue> = None
@@ -288,6 +327,9 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
     // Search package folders for a .dll
     let absoluteDll(relativeToPackageFolder: string): string option = 
+        if not <| relativeToPackageFolder.EndsWith(".dll") then None
+        else
+
         let mutable found: string option = None
         for packageFolder in packageFolders do 
             let candidate = Path.Combine(packageFolder, relativeToPackageFolder)
@@ -296,43 +338,73 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         if found.IsNone then 
             dprintfn "Couldn't find %s in %A" relativeToPackageFolder packageFolders 
         found
-    // Find .dll files for each dependency
-    // "targets": {
-    //     ".NETCoreApp,Version=v2.0": {
-    //         "FSharp.Core/4.3.4": {
-    //             "type": "package",
-    //             "compile": {
-    //                 "lib/netstandard1.6/FSharp.Core.dll": {}
-    //             },
-    //             "runtime": {
-    //                 "lib/netstandard1.6/FSharp.Core.dll": {}
-    //             },
-    //             "resource": { ... }
-    //             }
-    //         }
-    //     }
-    // }
-    // "libraries": {
-    //     "FSharp.Core/4.3.4": {
-    //         "sha512": "u2UeaUl1pt/Lktdpzq3AsaRmOV1mOiQaSbZgYqQQYuqBSjnILWemetff4xMZIAZi0241jlIkcrJQsU5PlLwIJA==",
-    //         "type": "package",
-    //         "path": "fsharp.core/4.3.4",
-    //         "files": [ ... ]
-    //     },
-    // }
+    (*************************************************************************
+        Find .dll files for each dependency
+        Sample:
+        "targets": {
+            ".NETCoreApp,Version=v2.0": {
+                "FSharp.Core/4.3.4": {
+                    "type": "package",
+                    "compile": {
+                        "lib/netstandard1.6/FSharp.Core.dll": {}
+                    },
+                    "runtime": {
+                        "lib/netstandard1.6/FSharp.Core.dll": {}
+                    },
+                    "resource": { ... }
+                    }
+                }
+            }
+        }
+        "libraries": {
+            "FSharp.Core/4.3.4": {
+                "sha512": "u2UeaUl1pt/Lktdpzq3AsaRmOV1mOiQaSbZgYqQQYuqBSjnILWemetff4xMZIAZi0241jlIkcrJQsU5PlLwIJA==",
+                "type": "package",
+                "path": "fsharp.core/4.3.4",
+                "files": [ ... ]
+            },
+        }
+    *************************************************************************)
+
+    let shortFrameworkTfm = TFM.Parse shortFramework
+    let tfmCompatible lib =
+        let lib = TFM.Parse lib
+        match lib, shortFrameworkTfm with
+        | NetFX v1,       NetFX v2 when v1 <= v2 -> Some lib
+        | NetStandard v1, NetStandard v2 when v1 <= v2 -> Some lib
+        | NetCoreApp v1,  NetCoreApp v2 when v1 <= v2 -> Some lib
+        | NetStandard v1, NetCoreApp v2 when v1 <= v2 -> Some lib
+        | NetStandard v1, NetFX 450UL when v1 <= 110UL -> Some lib
+        | NetStandard v1, NetFX 451UL when v1 <= 120UL -> Some lib
+        | NetStandard v1, NetFX 460UL when v1 <= 130UL -> Some lib
+        | NetStandard v1, NetFX 461UL when v1 <= 200UL -> Some lib
+        | _ -> None
+
     let findDlls(dep: Dep) = 
         let nameVersion = dep.name + "/" + dep.version
         let lib = root?libraries.GetCaseInsensitive(nameVersion).Value
         let prefix = lib?path.AsString()
         // For autoReferenced=true dependencies, we will include all dlls
+        // Note, assemblies in directories other than lib/ may have different
+        // runtime requirements than the current inferred runtime.
         if autoReferenced.Contains(dep.name) then 
-            [ for json in lib?files.AsArray() do 
+            lib?files.AsArray() 
+            |> Seq.choose (fun json ->
                 let f = json.AsString()
-                if f.EndsWith(".dll") then
-                    let relative = Path.Combine(prefix, f)
-                    match absoluteDll(relative) with 
-                    | None -> ()
-                    | Some(f) -> yield f ]
+                match f.Split('/') with
+                | [| "lib"; tfm; dll |] when dll.EndsWith(".dll") -> 
+                    let rel = Path.Combine(prefix, f)
+                    match tfmCompatible tfm, absoluteDll(rel) with 
+                    | Some tfm, Some abs -> Some(tfm, dll, abs)
+                    | _ ->None 
+                | _ -> None) 
+            |> Seq.groupBy (fun (_,dll,_) -> dll)
+            |> Seq.map (fun (_: string, xs) -> 
+                xs
+                |> Seq.sortByDescending (fun (tfm, dll, f) -> match tfm with | NetFX v -> v-400UL | NetStandard v -> v | NetCoreApp v -> v | Other -> 0UL)
+                |> Seq.head)
+            |> Seq.map (fun (_, _, f) -> f)
+            |> List.ofSeq
         // Otherwise, we'll look at the list of "compile" .dlls in "targets"
         else 
             let target = root?targets.[longFramework].GetCaseInsensitive(nameVersion).Value
@@ -432,7 +504,7 @@ let crack(fsproj: FileInfo): CrackedProject =
             let isFsproj(f: FileInfo)  = f.Name.EndsWith(".fsproj")
             let fsProjects, csProjects = List.partition isFsproj assets.projects
             let otherProjects          = [for csproj in csProjects do yield projectTarget(csproj)]
-            dprintfn "Cracked project.assets.json in %dms" timeAssets.ElapsedMilliseconds
+            dprintfn "Cracked %s in %dms" projectAssetsJson.FullName timeAssets.ElapsedMilliseconds
             {
                 fsproj=fsproj
                 target=target
