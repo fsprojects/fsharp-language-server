@@ -81,6 +81,11 @@ type private TFM =
     | NetStandard  of uint64
     | Other
     with 
+    member this.SortIndex =
+        match this with 
+        | NetFX v -> v-400UL 
+        | NetStandard v -> v 
+        | NetCoreApp v -> v | Other -> 0UL
     static member Parse(tfm: string) =
         let (|FL|INT|STR|) (x: string) =
             match UInt64.TryParse x with
@@ -146,35 +151,13 @@ let private frameworkPreference = [
     "net20", ".NETFramework,Version=v2.0";
     "net11", ".NETFramework,Version=v1.1" ]
 
+let private projectAssets = new Dictionary<String, String>()
+
 let private project(fsproj: FileInfo): ProjectAnalyzer = 
     let options = new AnalyzerManagerOptions()
     options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
     let manager = AnalyzerManager(options)
     manager.GetProject(fsproj.FullName)
-
-let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult = 
-    let proj   = project(fsproj)
-    let builds = proj.Build()
-
-    // TODO get target framework from project.assets.json
-    let build_tfms = builds |> Seq.map (fun build -> build, build.TargetFramework)
-    let pref_tfms = frameworkPreference
-
-    Enumerable
-     .Join(build_tfms, pref_tfms, (fun (_, b) -> b), (fun (a, _) -> a), (fun a _ -> fst a))
-     .Concat(builds)
-     .First()
-
-let private absoluteIncludePath(fsproj: FileInfo, i: ProjectItem) = 
-    let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
-    let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
-    let normalizePath = Path.GetFullPath(absolutePath)
-    FileInfo(normalizePath)
-
-let private projectAssets = new Dictionary<String, String>()
-
-let invalidateProjectAssets (fsprojOrFsx: FileInfo) =
-    projectAssets.Remove(fsprojOrFsx.FullName) |> ignore
 
 let getAssets(fsprojOrFsx: FileInfo) =
     if fsprojOrFsx.Extension = ".fsx" then
@@ -200,6 +183,31 @@ let getAssets(fsprojOrFsx: FileInfo) =
 
     projectAssets.[projfile] <- assets.FullName
     assets
+
+
+let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult = 
+    let proj   = project(fsproj)
+    let builds = proj.Build()
+
+    // TODO get target framework from project.assets.json
+    let build_tfms = builds 
+                     |> Seq.sortByDescending (fun build -> (TFM.Parse build.TargetFramework).SortIndex)
+                     |> Seq.map (fun build -> build, build.TargetFramework)
+    let pref_tfms = frameworkPreference
+
+    Enumerable
+     .Join(build_tfms, pref_tfms, (fun (_, b) -> b), (fun (a, _) -> a), (fun a _ -> fst a))
+     .Concat(builds)
+     .First()
+
+let private absoluteIncludePath(fsproj: FileInfo, i: ProjectItem) = 
+    let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
+    let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
+    let normalizePath = Path.GetFullPath(absolutePath)
+    FileInfo(normalizePath)
+
+let invalidateProjectAssets (fsprojOrFsx: FileInfo) =
+    projectAssets.Remove(fsprojOrFsx.FullName) |> ignore
 
 let getProject(assets: FileInfo) =
     seq {
@@ -392,7 +400,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             |> Seq.choose (fun json ->
                 let f = json.AsString()
                 match f.Split('/') with
-                | [| "lib"; tfm; dll |] when dll.EndsWith(".dll") -> 
+                | [| ftype; tfm; dll |] when dll.EndsWith(".dll") && (ftype = "lib" || ftype = "ref") -> 
                     let rel = Path.Combine(prefix, f)
                     match tfmCompatible tfm, absoluteDll(rel) with 
                     | Some tfm, Some abs -> Some(tfm, dll, abs)
@@ -401,7 +409,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             |> Seq.groupBy (fun (_,dll,_) -> dll)
             |> Seq.map (fun (_: string, xs) -> 
                 xs
-                |> Seq.sortByDescending (fun (tfm, dll, f) -> match tfm with | NetFX v -> v-400UL | NetStandard v -> v | NetCoreApp v -> v | Other -> 0UL)
+                |> Seq.sortByDescending (fun (tfm, dll, f) -> tfm.SortIndex )
                 |> Seq.head)
             |> Seq.map (fun (_, _, f) -> f)
             |> List.ofSeq
