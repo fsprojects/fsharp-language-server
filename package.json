@@ -5,7 +5,7 @@
     "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.42",
+    "version": "0.1.43",
     "publisher": "yatli",
     "repository": {
         "type": "git",
@@ -91,6 +91,12 @@
                     },
                     "default": [],
                     "description": "Specifies macro definitions for a F# project."
+                },
+                "fsharp.codelens.references": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Display the number of references for the symbols. Uses more resources and may crash coc.nvim for very large projects."
                 }
             }
         }

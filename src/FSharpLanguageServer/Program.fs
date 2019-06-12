@@ -188,6 +188,7 @@ type Server(client: ILanguageClient) =
     let docs = DocumentStore()
     let checker = FSharpChecker.Create()
     let projects = ProjectManager(checker)
+    let mutable codelensShowReferences = true
 
     /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option = 
@@ -581,8 +582,8 @@ type Server(client: ILanguageClient) =
             async {
                 let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString())
                 projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Fsharp.Project.Define
+                codelensShowReferences <- fsconfig.Fsharp.Codelens.References
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
-                dprintfn "conditionalCompilationDefines = %A" projects.ConditionalCompilationDefines
 
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
@@ -814,9 +815,10 @@ type Server(client: ILanguageClient) =
                         for name, range in findSignatureDeclarations(parse) do 
                             lenses.Add <| asGoToImplementation(name, file, range)
 
-                    for decl, inRange in findDeclarations(parse) do
-                        let! nrefs = findReferenceCount(decl)
-                        lenses.Add <| asReferenceCount(decl, inRange, nrefs)
+                    if codelensShowReferences then
+                        for decl, inRange in findDeclarations(parse) do
+                            let! nrefs = findReferenceCount(decl)
+                            lenses.Add <| asReferenceCount(decl, inRange, nrefs)
 
                     return Seq.toList lenses
                 | Error(e), _ -> 
