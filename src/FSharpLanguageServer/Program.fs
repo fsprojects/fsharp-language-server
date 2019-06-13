@@ -580,11 +580,11 @@ type Server(client: ILanguageClient) =
             async { () }
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
             async {
-                let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString())
-                projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Fsharp.Project.Define
-                projects.OtherCompilerFlags <- List.ofArray fsconfig.Fsharp.Project.OtherFlags
-                codelensShowReferences <- fsconfig.Fsharp.Codelens.References
-                ProjectCracker.includeCompileBeforeItems <- fsconfig.Fsharp.Project.IncludeCompileBefore
+                let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString()).Fsharp
+                projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Project.Define
+                projects.OtherCompilerFlags <- List.ofArray fsconfig.Project.OtherFlags
+                codelensShowReferences <- fsconfig.Codelens.References
+                ProjectCracker.includeCompileBeforeItems <- fsconfig.Project.IncludeCompileBefore
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
 
             }

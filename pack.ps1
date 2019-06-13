@@ -8,8 +8,8 @@ npm install
 npm run compile
 
 foreach($i in $plat) {
-    dotnet publish -f netcoreapp2.1 -c Release --self-contained `
-        -r $i src/FSharpLanguageServer -o ../../out/server/$i
+    dotnet publish -f netcoreapp2.2 -c Release --self-contained `
+        -r $i src/FSharpLanguageServer -o ./out/server/$i
 }
 
 npm pack

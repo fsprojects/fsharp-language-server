@@ -123,12 +123,14 @@ type JsonValue with
         result
 
 let private frameworkPreference = [
+    "netcoreapp3.0", ".NETCoreApp,Version=v3.0";
     "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
     "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
     "netcoreapp1.1", ".NETCoreApp,Version=v1.1";
     "netcoreapp1.0", ".NETCoreApp,Version=v1.0";
 
+    "netstandard2.1", ".NETStandard,Version=v2.1";
     "netstandard2.0", ".NETStandard,Version=v2.0";
     "netstandard1.6", ".NETStandard,Version=v1.6";
     "netstandard1.5", ".NETStandard,Version=v1.5";
@@ -528,7 +530,7 @@ let crack(fsproj: FileInfo): CrackedProject =
     with e -> 
         let baseName = Path.GetFileNameWithoutExtension(fsproj.Name)
         let dllName = baseName + ".dll"
-        let placeholderTarget = FileInfo(Path.Combine [|fsproj.DirectoryName; "bin"; "Debug"; "placeholder"; dllName|])
+        let placeholderTarget = FileInfo(Path.Combine [|Path.GetDirectoryName(fsproj.FullName); "bin"; "Debug"; "placeholder"; dllName|])
         dprintfn "Failed to build %s: %s" fsproj.Name e.Message
         {
             fsproj=fsproj
