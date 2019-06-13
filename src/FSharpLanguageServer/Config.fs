@@ -8,7 +8,9 @@ type FSharpLanguageServerConfig = JsonProvider<"""
       "server": "off"
     },
     "project": {
-      "define": [ "USE_SOME_FLAG" ]
+      "define": [ "USE_SOME_FLAG" ],
+      "includeCompileBefore": false,
+      "otherFlags": [ "--some-compiler-flags" ]
     },
     "codelens": {
       "references": true

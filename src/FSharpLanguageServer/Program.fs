@@ -582,7 +582,9 @@ type Server(client: ILanguageClient) =
             async {
                 let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString())
                 projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Fsharp.Project.Define
+                projects.OtherCompilerFlags <- List.ofArray fsconfig.Fsharp.Project.OtherFlags
                 codelensShowReferences <- fsconfig.Fsharp.Codelens.References
+                ProjectCracker.includeCompileBeforeItems <- fsconfig.Fsharp.Project.IncludeCompileBefore
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
 
             }

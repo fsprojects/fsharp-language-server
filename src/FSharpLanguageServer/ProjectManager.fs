@@ -299,10 +299,19 @@ type ProjectManager(checker: FSharpChecker) as this =
                             yield "-r:" + r.FullName
                             dprintfn "%s" r.FullName
 
-                        dprintfn "--------------------------"
+                        dprintfn "----------- ConditionalCompilationDefines ---------------"
 
                         for d in this.ConditionalCompilationDefines do
                             yield "-d:" + d
+                            dprintfn "%s" d
+
+                        dprintfn "----------- OtherCompilerFlags ---------------"
+
+                        for flag in this.OtherCompilerFlags do
+                            yield flag
+                            dprintfn "%s" flag
+
+                        dprintfn "--------------------------"
                     |]
                 ProjectFileName = fsproj.FullName 
                 ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
@@ -502,3 +511,4 @@ type ProjectManager(checker: FSharpChecker) as this =
                 List.exists containsTarget deps
 
     member val ConditionalCompilationDefines: string list = [] with get,set
+    member val OtherCompilerFlags: string list = [] with get,set

@@ -46,6 +46,8 @@ type CrackedProject = {
     error: string option
 }
 
+let mutable includeCompileBeforeItems = false
+
 /// Read the assembly name and version from a .dll using System.Reflection.Metadata
 let private readAssembly(dll: FileInfo): Result<string * Version, string> = 
     try 
@@ -480,7 +482,7 @@ let crack(fsproj: FileInfo): CrackedProject =
         let project = inferTargetFramework(fsproj)
         let sources = 
             [ for KeyValue(k, v) in project.Items do 
-                if k = "Compile" then 
+                if k = "Compile" || (k = "CompileBefore" && includeCompileBeforeItems) then 
                     for i in v do 
                         yield absoluteIncludePath(fsproj, i) ]
         let directReferences = 

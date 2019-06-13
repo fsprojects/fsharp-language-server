@@ -5,7 +5,7 @@
     "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.43",
+    "version": "0.1.45",
     "publisher": "yatli",
     "repository": {
         "type": "git",
@@ -91,6 +91,21 @@
                     },
                     "default": [],
                     "description": "Specifies macro definitions for a F# project."
+                },
+                "fsharp.project.otherFlags": {
+                    "scope": "resource",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "description": "Specifies other fsc flags."
+                },
+                "fsharp.project.includeCompileBefore": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Treat <CompileBefore ../> items in the project as source files."
                 },
                 "fsharp.codelens.references": {
                     "scope": "resource",
