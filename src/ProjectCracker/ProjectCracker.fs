@@ -404,7 +404,8 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             |> Seq.choose (fun json ->
                 let f = json.AsString()
                 match f.Split('/') with
-                | [| ftype; tfm; dll |] when dll.EndsWith(".dll") && (ftype = "lib" || ftype = "ref") -> 
+                | [| ftype; tfm; dll |] 
+                | [| "runtimes"; _; ftype; tfm; dll |] when dll.EndsWith(".dll") && (ftype = "lib" || ftype = "ref") -> 
                     let rel = Path.Combine(prefix, f)
                     match tfmCompatible tfm, absoluteDll(rel) with 
                     | Some tfm, Some abs -> Some(tfm, dll, abs)

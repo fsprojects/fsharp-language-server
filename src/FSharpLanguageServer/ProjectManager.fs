@@ -339,12 +339,16 @@ type ProjectManager(checker: FSharpChecker) as this =
                 errors=match cracked.error with None -> [] | Some(e) -> [Conversions.errorAtTop(e)]
             }
         // Direct to analyzeFsx or analyzeFsproj, depending on type
+        try
         if fsprojOrFsx.Extension =".fsx" then 
             {file=fsprojOrFsx; resolved=lazy(analyzeFsx(fsprojOrFsx))}
         elif fsprojOrFsx.Name.EndsWith(".fsproj") then 
             {file=fsprojOrFsx; resolved=lazy(analyzeFsproj(fsprojOrFsx))}
         else 
             raise(Exception(sprintf "Don't know how to analyze project %s" fsprojOrFsx.Name))
+        with ex -> 
+            dprintfn "%s" <| ex.ToString()
+            raise ex
 
     /// Invalidate all descendents of a modified .fsproj or .fsx file
     let invalidateDescendents(fsprojOrFsx: FileInfo) = 
