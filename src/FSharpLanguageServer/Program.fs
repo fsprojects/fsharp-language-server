@@ -894,7 +894,6 @@ type Server(client: ILanguageClient) =
                 do! __doworkspace p.event.removed projects.RemoveWorkspaceRoot
             }
 
-
 [<EntryPoint>]
 let main(argv: array<string>): int =
     let read = new BinaryReader(Console.OpenStandardInput())

@@ -78,19 +78,19 @@ let private p_netcoreapp = "netcoreapp"
 let private p_netfx = "net"
 
 type private TFM =
-    | NetFX        of uint64
-    | NetCoreApp   of uint64
-    | NetStandard  of uint64
+    | NetFX        of int
+    | NetCoreApp   of int
+    | NetStandard  of int
     | Other
     with 
     member this.SortIndex =
         match this with 
-        | NetFX v -> v-400UL 
+        | NetFX v -> v-400
         | NetStandard v -> v 
-        | NetCoreApp v -> v | Other -> 0UL
+        | NetCoreApp v -> v | Other -> 0
     static member Parse(tfm: string) =
         let (|FL|INT|STR|) (x: string) =
-            match UInt64.TryParse x with
+            match Int32.TryParse x with
             | true, v -> INT v
             | _ -> 
             match Double.TryParse x with
@@ -107,10 +107,10 @@ type private TFM =
                 OTHER
 
         match tfm with
-        | FX(INT ver)     -> let ver = if ver < 100UL then ver * 10UL else ver
+        | FX(INT ver)     -> let ver = if ver < 100 then ver * 10 else ver
                              NetFX(ver)
-        | COREAPP(FL ver) -> NetCoreApp(uint64 <| ver*100.0)
-        | STD(FL ver)     -> NetStandard(uint64 <| ver*100.0)
+        | COREAPP(FL ver) -> NetCoreApp(int <| ver*100.0)
+        | STD(FL ver)     -> NetStandard(int <| ver*100.0)
         | _               -> Other
 
 
@@ -140,6 +140,7 @@ let private frameworkPreference = [
     "netstandard1.1", ".NETStandard,Version=v1.1";
     "netstandard1.0", ".NETStandard,Version=v1.0";
 
+    "net48", ".NETFramework,Version=v4.8";
     "net472", ".NETFramework,Version=v4.7.2";
     "net471", ".NETFramework,Version=v4.7.1";
     "net47", ".NETFramework,Version=v4.7";
@@ -257,6 +258,21 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         | None -> 
             let keys = Array.map fst root?targets.[longFramework].Properties
             raise(Exception(sprintf "No version of %s found in %A" dependencyName keys))
+
+    let projectTFM = TFM.Parse shortFramework
+    let tfmCompatible lib =
+        let lib = TFM.Parse lib
+        match lib, projectTFM with
+        | NetFX v1,       NetFX v2 when v1 <= v2 -> Some lib
+        | NetStandard v1, NetStandard v2 when v1 <= v2 -> Some lib
+        | NetCoreApp v1,  NetCoreApp v2 when v1 <= v2 -> Some lib
+        | NetStandard v1, NetCoreApp v2 when v1 <= v2 -> Some lib
+        | NetStandard v1, NetFX 450 when v1 <= 110 -> Some lib
+        | NetStandard v1, NetFX 451 when v1 <= 120 -> Some lib
+        | NetStandard v1, NetFX 460 when v1 <= 130 -> Some lib
+        | NetStandard v1, NetFX 461 when v1 <= 200 -> Some lib
+        | _ -> None
+
     // All transitive dependencies of the project 
     // "FSharp.Core/4.3.4" => {FSharp.Core, 4.3.4, false}
     let transitiveDependencies = Dictionary<string, Dep>()
@@ -298,7 +314,8 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                         dprintfn "\t%s <- %s" nameVersion childNameVersion
                     findTransitiveDeps(child)
         | _ -> ()
-    // Find root dependencies by scanning the project section
+
+    // Find root dependencies by scanning the project section.
     // "project": {
     //     "version": "1.0.0",
     //     "restore": { ... },
@@ -319,6 +336,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //         }
     //     }
     // }
+
     let autoReferenced = HashSet<string>()
     for name, dep in root?project?frameworks.[shortFramework]?dependencies.Properties do 
         if dep.TryGetProperty("autoReferenced") = Some(JsonValue.Boolean(true)) then 
@@ -326,6 +344,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let version = chooseVersion(name)
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
+
     // Find projects in libraries section
     for name, value in root?libraries.Properties do 
         if value?``type``.AsString() = "project" then 
@@ -337,6 +356,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 dprintfn "%s doesn't look like name/version" name
     // ["/Users/georgefraser/.nuget/packages/", ...]
     let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
+
     // Search package folders for a .dll
     let absoluteDll(relativeToPackageFolder: string): string option = 
         if not <| relativeToPackageFolder.EndsWith(".dll") then None
@@ -350,62 +370,79 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         if found.IsNone then 
             dprintfn "Couldn't find %s in %A" relativeToPackageFolder packageFolders 
         found
-    (*************************************************************************
-        Find .dll files for each dependency
-        Sample:
-        "targets": {
-            ".NETCoreApp,Version=v2.0": {
-                "FSharp.Core/4.3.4": {
-                    "type": "package",
-                    "compile": {
-                        "lib/netstandard1.6/FSharp.Core.dll": {}
-                    },
-                    "runtime": {
-                        "lib/netstandard1.6/FSharp.Core.dll": {}
-                    },
-                    "resource": { ... }
-                    }
-                }
-            }
-        }
-        "libraries": {
-            "FSharp.Core/4.3.4": {
-                "sha512": "u2UeaUl1pt/Lktdpzq3AsaRmOV1mOiQaSbZgYqQQYuqBSjnILWemetff4xMZIAZi0241jlIkcrJQsU5PlLwIJA==",
-                "type": "package",
-                "path": "fsharp.core/4.3.4",
-                "files": [ ... ]
-            },
-        }
-    *************************************************************************)
 
-    let shortFrameworkTfm = TFM.Parse shortFramework
-    let tfmCompatible lib =
-        let lib = TFM.Parse lib
-        match lib, shortFrameworkTfm with
-        | NetFX v1,       NetFX v2 when v1 <= v2 -> Some lib
-        | NetStandard v1, NetStandard v2 when v1 <= v2 -> Some lib
-        | NetCoreApp v1,  NetCoreApp v2 when v1 <= v2 -> Some lib
-        | NetStandard v1, NetCoreApp v2 when v1 <= v2 -> Some lib
-        | NetStandard v1, NetFX 450UL when v1 <= 110UL -> Some lib
-        | NetStandard v1, NetFX 451UL when v1 <= 120UL -> Some lib
-        | NetStandard v1, NetFX 460UL when v1 <= 130UL -> Some lib
-        | NetStandard v1, NetFX 461UL when v1 <= 200UL -> Some lib
-        | _ -> None
+    let dotnetPackFolders =
+        use proc = Process.Start("dotnet", "--list-sdks")
+        proc.WaitForExit()
+        proc.StandardOutput.ReadToEnd().Split('\r', '\n')
+        |> Seq.map (fun x ->
+            let i  = x.IndexOf('[') + 1
+            let i' = x.LastIndexOf(']')
+            Path.Combine(x.Substring(i, i' - i), "..", "packs") |> Path.GetFullPath
+           )
+        |> Seq.distinct
+        |> List.ofSeq
+
+    // Search packs for *.Ref assemblies
+    let absolutePackRef(name, ver) =
+        packageFolders @ dotnetPackFolders
+        |> List.collect(fun p ->
+            try
+                let p = Path.Combine(p, name, ver, "ref", shortFramework)
+                let di = DirectoryInfo(p)
+                di.EnumerateFiles("*.dll") 
+                |> Seq.map (fun x -> x.FullName)
+                |> List.ofSeq
+            with _ -> [])
+
+    // Find .dll files for each dependency
+    // Additionally, for netcoreapp3.0+ and netstandard2.1+, 
+    // find Microsoft.NETCore.App / NETStandard.Library.Ref assemblies.
+    // Sample:
+    // "targets": {
+    //     ".NETCoreApp,Version=v2.0": {
+    //         "FSharp.Core/4.3.4": {
+    //             "type": "package",
+    //             "compile": {
+    //                 "lib/netstandard1.6/FSharp.Core.dll": {}
+    //             },
+    //             "runtime": {
+    //                 "lib/netstandard1.6/FSharp.Core.dll": {}
+    //             },
+    //             "resource": { ... }
+    //             }
+    //         }
+    //     }
+    // }
+    // "libraries": {
+    //     "FSharp.Core/4.3.4": {
+    //         "sha512": "u2UeaUl1pt/Lktdpzq3AsaRmOV1mOiQaSbZgYqQQYuqBSjnILWemetff4xMZIAZi0241jlIkcrJQsU5PlLwIJA==",
+    //         "type": "package",
+    //         "path": "fsharp.core/4.3.4",
+    //         "files": [ ... ]
+    //     },
+    // }
 
     let findDlls(dep: Dep) = 
         let nameVersion = dep.name + "/" + dep.version
         let lib = root?libraries.GetCaseInsensitive(nameVersion).Value
         let prefix = lib?path.AsString()
+        let autoref = autoReferenced.Contains(dep.name)
+
         // For autoReferenced=true dependencies, we will include all dlls
-        // Note, assemblies in directories other than lib/ may have different
-        // runtime requirements than the current inferred runtime.
-        if autoReferenced.Contains(dep.name) then 
+        // Note, assemblies in directories other than lib/ and ref/ may have different
+        // runtime requirements than the current inferred runtime (e.g. native dlls in runtimes/).
+        match projectTFM, autoref with
+        | (NetCoreApp v), true when v >= 300 ->
+            absolutePackRef(dep.name, dep.version)
+        | (NetStandard v), true when v >= 210 ->
+            absolutePackRef(dep.name, dep.version)
+        | _, true ->
             lib?files.AsArray() 
             |> Seq.choose (fun json ->
                 let f = json.AsString()
                 match f.Split('/') with
-                | [| ftype; tfm; dll |] 
-                | [| "runtimes"; _; ftype; tfm; dll |] when dll.EndsWith(".dll") && (ftype = "lib" || ftype = "ref") -> 
+                | [| ftype; tfm; dll |] when dll.EndsWith(".dll") && (ftype = "lib" || ftype = "ref") -> 
                     let rel = Path.Combine(prefix, f)
                     match tfmCompatible tfm, absoluteDll(rel) with 
                     | Some tfm, Some abs -> Some(tfm, dll, abs)
@@ -414,12 +451,12 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             |> Seq.groupBy (fun (_,dll,_) -> dll)
             |> Seq.map (fun (_: string, xs) -> 
                 xs
-                |> Seq.sortByDescending (fun (tfm, dll, f) -> tfm.SortIndex )
+                |> Seq.sortByDescending (fun (tfm, _, _) -> tfm.SortIndex )
                 |> Seq.head)
             |> Seq.map (fun (_, _, f) -> f)
             |> List.ofSeq
         // Otherwise, we'll look at the list of "compile" .dlls in "targets"
-        else 
+        | _ ->
             let target = root?targets.[longFramework].GetCaseInsensitive(nameVersion).Value
             match target.TryGetProperty("compile") with 
             | None -> 
@@ -431,8 +468,10 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     match absoluteDll(rel) with 
                     | None -> ()
                     | Some(abs) -> yield abs ]
+
     // Find all package dlls
     let packageDlls = [for d in transitiveDependencies.Values do yield! findDlls(d)]
+
     // Resolve conflicts by getting name and version from each DLL, choosing the highest version
     let packageDllsWithoutConflicts =
         let dllNameVersion = 
@@ -450,6 +489,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 let winner, _, _ = List.maxBy aVersion versions
                 dprintfn "Conflict between %A, chose %s" versions winner
                 yield winner ]
+
     // Find all transitive project dependencies by examining libraries
     // Values with "type": "project" are projects
     // All transitive projects will already be included in project.assets.json 
