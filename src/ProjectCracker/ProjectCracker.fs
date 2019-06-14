@@ -122,6 +122,26 @@ type JsonValue with
                 result <- Some(v)
         result
 
+let private dotnetPackFolders =
+    use proc = new Process()
+    proc.StartInfo.UseShellExecute <- false
+    proc.StartInfo.FileName <- "dotnet"
+    proc.StartInfo.CreateNoWindow <- true
+    proc.StartInfo.Arguments <- "--list-sdks"
+    proc.StartInfo.RedirectStandardOutput <- true
+    proc.Start() |> ignore
+    proc.StandardOutput.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)
+    |> Seq.map (fun x ->
+        dprintfn "output: %s" x
+        let i  = x.IndexOf('[') + 1
+        let i' = x.LastIndexOf(']')
+        Path.Combine(x.Substring(i, i' - i), "..", "packs") |> Path.GetFullPath
+       )
+    |> Seq.distinct
+    |> List.ofSeq
+
+dprintfn "dotnet pack folders: %A" dotnetPackFolders
+
 let private frameworkPreference = [
     "netcoreapp3.0", ".NETCoreApp,Version=v3.0";
     "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
@@ -226,7 +246,6 @@ let private projectTarget(csproj: FileInfo) =
     let dllName = project.GetProperty("AssemblyName") + ".dll"
     let dllPath = Path.Combine [|csproj.DirectoryName; project.GetProperty("OutputPath"); dllName |]
     FileInfo(dllPath)
-
 
 let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
     dprintfn "Parsing %s" projectAssetsJson.FullName
@@ -371,29 +390,17 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             dprintfn "Couldn't find %s in %A" relativeToPackageFolder packageFolders 
         found
 
-    let dotnetPackFolders =
-        use proc = Process.Start("dotnet", "--list-sdks")
-        proc.WaitForExit()
-        proc.StandardOutput.ReadToEnd().Split('\r', '\n')
-        |> Seq.map (fun x ->
-            let i  = x.IndexOf('[') + 1
-            let i' = x.LastIndexOf(']')
-            Path.Combine(x.Substring(i, i' - i), "..", "packs") |> Path.GetFullPath
-           )
-        |> Seq.distinct
-        |> List.ofSeq
-
     // Search packs for *.Ref assemblies
     let absolutePackRef(name, ver) =
         packageFolders @ dotnetPackFolders
         |> List.collect(fun p ->
             try
-                let p = Path.Combine(p, name, ver, "ref", shortFramework)
+                let p = Path.Combine(p, name + ".Ref", ver, "ref", shortFramework)
                 let di = DirectoryInfo(p)
                 di.EnumerateFiles("*.dll") 
                 |> Seq.map (fun x -> x.FullName)
                 |> List.ofSeq
-            with _ -> [])
+            with ex -> [])
 
     // Find .dll files for each dependency
     // Additionally, for netcoreapp3.0+ and netstandard2.1+, 
