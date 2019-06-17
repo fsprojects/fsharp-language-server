@@ -309,6 +309,10 @@ type Server(client: ILanguageClient) =
     /// Send diagnostics to the client
     let publishErrors(file: FileInfo, errors: Diagnostic list) = 
         client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
+
+    /// Maps the file paths to the hash code of used symbols
+    let fileSymbolUses = System.Collections.Generic.Dictionary<string, string[]>()
+
     /// Check a file
     let getErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>): Async<Diagnostic list> = 
         async {
@@ -330,6 +334,8 @@ type Server(client: ILanguageClient) =
                 let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(uses, file.Name.EndsWith(".fsx"))
                 let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield diagnostic("Unused declaration", r, DiagnosticSeverity.Hint)]
                 dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
+
+                fileSymbolUses.[file.FullName] <- Array.map (fun (x: FSharpSymbolUse) -> x.Symbol.FullName) uses
                 // Combine
                 // return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
                 return parseErrors@typeErrors@unusedDeclarationErrors
@@ -511,16 +517,21 @@ type Server(client: ILanguageClient) =
         async {
             let range = node.Range
             let! sym  = symbolAt({uri = Uri(range.FileName)}, {line = range.StartLine - 1; character = range.StartColumn})
-            let cnt = ref 0
             match sym with
-            | Some sym -> do! findReferenceK(sym.Symbol, fun _ -> cnt := !cnt + 1)
+            | Some sym ->
+                let sym = sym.Symbol.FullName
+                let mutable cnt = 0
+                for KeyValue(_, v) in fileSymbolUses do
+                    for v in v do
+                        if v = sym then cnt <- cnt + 1
+                return cnt
             | _ ->
                 dprintfn "findReferenceCount: symbol resolve fails. node = %A"
                     (node.Range.FileName, node.Range.StartLine, node.Range.StartColumn,
                      node.bodyRange.StartLine, node.bodyRange.StartColumn,
                      node.Glyph, node.Name, node.Kind, node.Access, node.FSharpEnclosingEntityKind
                     )
-            return !cnt
+                return 0
         }
 
     /// Find all uses of a symbol, across all open projects
