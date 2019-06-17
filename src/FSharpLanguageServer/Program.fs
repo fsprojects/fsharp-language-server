@@ -18,6 +18,7 @@ open FSharp.Compiler.Text
 module Ast = FSharp.Compiler.Ast
 
 let private TODO() = raise (Exception "TODO")
+type private dict<'a, 'b> = System.Collections.Concurrent.ConcurrentDictionary<'a, 'b>
 
 /// Look for a method call like foo.MyMethod() before the cursor
 /// (exposed for testing)
@@ -280,7 +281,7 @@ type Server(client: ILanguageClient) =
         }
 
     /// When did we last check each file on disk?
-    let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
+    let lastCheckedOnDisk = dict<string, DateTime>()
     // TODO there might be a thread safety issue here---is this getting called from a separate thread?
     do checker.BeforeBackgroundFileCheck.Add(fun(fileName, _) -> 
         let file = FileInfo(fileName)
@@ -311,7 +312,7 @@ type Server(client: ILanguageClient) =
         client.PublishDiagnostics({uri=Uri("file://" + file.FullName); diagnostics=errors})
 
     /// Maps the file paths to the hash code of used symbols
-    let fileSymbolUses = System.Collections.Generic.Dictionary<string, string[]>()
+    let fileSymbolUses = dict<string, string[]>()
 
     /// Check a file
     let getErrors(file: FileInfo, check: Result<FSharpParseFileResults * FSharpCheckFileResults, Diagnostic list>): Async<Diagnostic list> = 
