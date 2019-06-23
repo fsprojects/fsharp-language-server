@@ -299,6 +299,13 @@ type ProjectManager(checker: FSharpChecker) as this =
                             yield "-r:" + r.FullName
                             dprintfn "%s" r.FullName
 
+                        dprintfn "----------- systemReferences ---------------"
+
+                        // System references
+                        for r in cracked.systemReferences do 
+                            yield "-r:" + r
+                            dprintfn "%s" r
+
                         dprintfn "----------- ConditionalCompilationDefines ---------------"
 
                         for d in this.ConditionalCompilationDefines do

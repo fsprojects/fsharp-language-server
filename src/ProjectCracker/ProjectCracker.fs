@@ -41,6 +41,8 @@ type CrackedProject = {
     packageReferences: FileInfo list 
     /// .dlls referenced with <Reference Include="..\Foo\Foo.dll" />
     directReferences: FileInfo list 
+    /// System assemblies referenced with <Reference Include="System.Data" />
+    systemReferences: string list
     /// An error was encountered while cracking the project
     /// This message should be displayed at the top of every file
     error: string option
@@ -225,7 +227,7 @@ let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult =
      .Concat(builds)
      .First()
 
-let private absoluteIncludePath(fsproj: FileInfo, i: ProjectItem) = 
+let private absoluteIncludePath (fsproj: FileInfo) (i: ProjectItem) = 
     let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
     let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
     let normalizePath = Path.GetFullPath(absolutePath)
@@ -534,12 +536,16 @@ let crack(fsproj: FileInfo): CrackedProject =
             [ for KeyValue(k, v) in project.Items do 
                 if k = "Compile" || (k = "CompileBefore" && includeCompileBeforeItems) then 
                     for i in v do 
-                        yield absoluteIncludePath(fsproj, i) ]
-        let directReferences = 
+                        yield absoluteIncludePath fsproj i ]
+        let references = 
             [ for KeyValue(k, v) in project.Items do 
-                if k = "Reference" then 
-                    for i in v do 
-                        yield absoluteIncludePath(fsproj, i) ]
+                if k = "Reference" then yield! v ]
+
+        let directReferences, systemReferences =
+            let f, t = List.partition (fun (x: ProjectItem) -> x.ItemSpec.EndsWith(".dll")) references
+            f |> List.map (absoluteIncludePath fsproj),
+            t |> List.map (fun (x: ProjectItem) -> x.ItemSpec)
+
         dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
         let projectAssetsJson = getAssets fsproj
@@ -555,6 +561,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 otherProjectReferences = []
                 packageReferences      = []
                 directReferences       = directReferences
+                systemReferences       = systemReferences
                 error                  = Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
             }
         else
@@ -573,6 +580,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 otherProjectReferences=otherProjects
                 packageReferences=assets.packages
                 directReferences=directReferences
+                systemReferences=systemReferences
                 error=None
             }
     with e -> 
@@ -588,5 +596,6 @@ let crack(fsproj: FileInfo): CrackedProject =
             otherProjectReferences=[]
             packageReferences=[]
             directReferences=[]
+            systemReferences=[]
             error=Some(e.Message)
         }
