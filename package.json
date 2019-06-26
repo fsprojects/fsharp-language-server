@@ -5,7 +5,7 @@
     "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.48",
+    "version": "0.1.49",
     "publisher": "yatli",
     "repository": {
         "type": "git",
@@ -46,7 +46,9 @@
                 "extensions": [
                     ".fs",
                     ".fsx",
-                    ".fsi"
+                    ".fsi",
+                    ".fsl",
+                    ".fsy"
                 ],
                 "configuration": "syntaxes/fsharp.configuration.json"
             }

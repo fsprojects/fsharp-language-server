@@ -1,0 +1,14 @@
+{
+    "name": "fsharp.fsy",
+    "scopeName": "source.fsharp.fsy",
+    "fileTypes": [
+        "fsy"
+    ],
+    "foldingStartMarker": "",
+    "foldingStopMarker": "",
+    "patterns": [
+        {
+            "include": "source.fsharp"
+        }
+    ]
+}
