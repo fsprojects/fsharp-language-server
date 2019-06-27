@@ -123,11 +123,10 @@
         "watch": "tsc -watch -p ./"
     },
     "extensionDependencies": [],
-    "dependencies": {
-        "coc.nvim": "^0.0.67"
-    },
+    "dependencies": {},
     "devDependencies": {
         "@types/node": "^10.3.3",
-        "typescript": "^3.0.3"
+        "typescript": "^3.0.3",
+        "coc.nvim": "^0.0.67"
     }
 }
