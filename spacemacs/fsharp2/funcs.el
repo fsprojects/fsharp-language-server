@@ -18,15 +18,23 @@
    (setq fsharp-ac-intellisense-enabled t))))
 
 (defun spacemacs//fsharp2-setup-backend ()
- "Conditionally setup fsharp backend"
+  "Conditionally setup fsharp backend"
  (pcase fsharp2-backend
   (`lsp
    (require 'lsp)
+   ;; Required to avoid issues with lsp-mode's built-in F# client; even though 
+   ;; we're using our mode instead, lsp-mode can't build the LSP client 
+   ;; without this value defined
+   (setq lsp-fsharp-server-path "")
    (lsp-register-client
     (make-lsp-client
      :new-connection (lsp-stdio-connection fsharp2-lsp-executable)
      :major-modes '(fsharp-mode)
-     :server-id 'fsharp-lsp))
+     :server-id 'fsharp-lsp
+     :notification-handlers (ht ("fsharp/startProgress" #'ignore)
+                                ("fsharp/incrementProgress" #'ignore)
+                                ("fsharp/endProgress" #'ignore))
+     :priority 1))
    (lsp))))
 
 (defun spacemacs//fsharp2-setup-bindings ()
