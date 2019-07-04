@@ -347,6 +347,9 @@ type ProjectManager(checker: FSharpChecker) as this =
             }
         // Direct to analyzeFsx or analyzeFsproj, depending on type
         try
+
+        dprintfn "analyzeLater: %s" fsprojOrFsx.FullName
+
         if fsprojOrFsx.Extension =".fsx" then 
             {file=fsprojOrFsx; resolved=lazy(analyzeFsx(fsprojOrFsx))}
         elif fsprojOrFsx.Name.EndsWith(".fsproj") then 
@@ -463,7 +466,7 @@ type ProjectManager(checker: FSharpChecker) as this =
         let referencedProjects, orphanProjects = List.partition isReferencedBySln notYetCracked
         let crackLazily = seq {
             // If file is an .fsx, return itself 
-            if sourceFile.Name.EndsWith(".fsx") then 
+            if sourceFile.Extension = ".fsx" then 
                 yield cache.Get(sourceFile, analyzeLater)
             // First, look at all projects that have *already* been cracked
             for options in alreadyCracked do 
@@ -516,9 +519,12 @@ type ProjectManager(checker: FSharpChecker) as this =
                 let iFrom = Array.IndexOf(fromProjectOptions.SourceFiles, fromSourceFile.FullName)
                 iFrom >= iTarget
             // Otherwise, check if targetSourceFile is in the transitive dependencies of fromProjectOptions
-            else
+            else 
+                let projname = 
+                    let p =fromProjectOptions.ProjectFileName
+                    if p.EndsWith ".fsx.fsproj" then p.Substring(0, p.Length - 7) else p
                 let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
-                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))
+                let deps = transitiveDeps(FileInfo projname)
                 List.exists containsTarget deps
 
     member val ConditionalCompilationDefines: string list = [] with get,set
