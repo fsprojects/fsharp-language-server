@@ -17,8 +17,8 @@ open Microsoft.Build.Evaluation
 open Microsoft.Build.Utilities
 open Microsoft.Build.Framework
 open Microsoft.Build.Logging
-open Buildalyzer
 open System.Linq
+open Microsoft.Build.Execution
 
 // Other points of reference:
 // Omnisharp-roslyn cracks .csproj files: https://github.com/OmniSharp/omnisharp-roslyn/blob/master/tests/OmniSharp.MSBuild.Tests/ProjectFileInfoTests.cs
@@ -180,18 +180,119 @@ let private frameworkPreference = [
 
 let private projectAssets = new Dictionary<String, String>()
 
-let private project(fsproj: FileInfo): ProjectAnalyzer = 
-    let options = new AnalyzerManagerOptions()
-    options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
-    let manager = AnalyzerManager(options)
-    manager.GetProject(fsproj.FullName)
+type DotnetSdk =
+    {
+        Version: string
+        Path: string
+    }
 
-let getAssets(fsprojOrFsx: FileInfo) =
-    if fsprojOrFsx.Extension = ".fsx" then
-        FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
-    else
+let private dotnetSdks =
+    try
+        use proc = new System.Diagnostics.Process()
+        proc.StartInfo.UseShellExecute <- false
+        proc.StartInfo.FileName <- "dotnet"
+        proc.StartInfo.CreateNoWindow <- true
+        proc.StartInfo.Arguments <- "--list-sdks"
+        proc.StartInfo.RedirectStandardOutput <- true
+        proc.Start() |> ignore
+        proc.StandardOutput.ReadToEnd().Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        |> Seq.map (fun x ->
+            let i  = x.IndexOf('[') + 1
+            let i' = x.LastIndexOf(']')
+            let sdkver = x.Substring(0, i - 1)
+            let basedir = x.Substring(i, i' - i)
+            {
+                Version = sdkver
+                Path = Path.Combine(basedir, sdkver) |> Path.GetFullPath
+            }
+           )
+        |> List.ofSeq
+    with _ -> []
+let private latestSdk = dotnetSdks |> List.sortByDescending (fun x -> x.Version) |> List.tryHead  
 
-    let projfile = fsprojOrFsx.FullName
+type internal HostCompile() =
+  member th.Compile(_:obj, _:obj, _:obj) = 0
+  interface ITaskHost
+
+let private project(fsproj: FileInfo): ProjectInstance = 
+    let fsprojAbsDirectory = Path.GetDirectoryName fsproj.FullName
+
+    use _pwd = 
+        let dir = Directory.GetCurrentDirectory()
+        Directory.SetCurrentDirectory(fsprojAbsDirectory)
+        { new System.IDisposable with
+            member x.Dispose() = Directory.SetCurrentDirectory(dir) }
+
+    let sdk = latestSdk.Value.Path
+    let globalProperties = Map.ofList [
+        // https://daveaglick.com/posts/running-a-design-time-build-with-msbuild-apis
+        ( "SolutionDir", fsprojAbsDirectory )
+        ( "MSBuildExtensionsPath", sdk )
+        ( "MSBuildSDKsPath", Path.Combine(sdk, "Sdks") )
+        ( "RoslynTargetsPath", Path.Combine(sdk, "Roslyn"))
+    ]
+
+    Environment.SetEnvironmentVariable(
+        "MSBuildExtensionsPath",
+        globalProperties.["MSBuildExtensionsPath"])
+    Environment.SetEnvironmentVariable(
+        "MSBuildSDKsPath",
+        globalProperties.["MSBuildSDKsPath"]);
+
+    // not cool!
+    let toolsVersion =
+        if Directory.Exists(Path.Combine(sdk, "Current")) then "Current"
+        else ToolLocationHelper.CurrentToolsVersion
+
+    use engine = new Microsoft.Build.Evaluation.ProjectCollection(globalProperties)
+    engine.AddToolset(Toolset(toolsVersion, sdk, engine, String.Empty))
+    let host = new HostCompile()
+    engine.HostServices.RegisterHostObject(fsproj.FullName, "CoreCompile", "Fsc", host)
+
+    use file = new FileStream(fsproj.FullName, FileMode.Open, FileAccess.Read, FileShare.Read)
+    use stream = new StreamReader(file)
+    use xmlReader = System.Xml.XmlReader.Create(stream)
+
+    let project =
+        try
+            engine.LoadProject(xmlReader, FullPath=fsproj.FullName, toolsVersion=toolsVersion)
+        with
+        | exn -> 
+            let tools = engine.Toolsets |> Seq.map (fun x -> x.ToolsPath) |> Seq.toList
+            raise (new Exception(sprintf "Could not load project %s in ProjectCollection. Available tools: %A. Message: %s" fsproj.FullName tools exn.Message))
+        
+    project.SetGlobalProperty("ShouldUnsetParentConfigurationAndPlatform", "false") |> ignore
+    let projInstance = project.CreateProjectInstance()
+
+    let logger = {
+        new ILogger with 
+        member x.Initialize(src) = src.AnyEventRaised.Add(fun x -> dprintfn "msbuild: %s" x.Message)
+        member x.Shutdown() = ()
+        member x.get_Parameters() = ""
+        member x.set_Parameters(_) = ()
+        member x.get_Verbosity() = LoggerVerbosity.Normal
+        member x.set_Verbosity(_) = ()
+    }
+
+    projInstance.Build([| "Build" |], [logger]) |> ignore
+    projInstance
+
+let private getprop (p: ProjectInstance) s =
+    let v = p.GetPropertyValue s
+    if String.IsNullOrWhiteSpace v then None
+    else Some v
+
+let mkAbsolute dir (v: string) = 
+    if Path.IsPathRooted v then v
+    else Path.Combine(dir, v)
+
+
+let getItems (p: ProjectInstance) s = [ for f in p.GetItems(s) -> mkAbsolute p.Directory f.EvaluatedInclude ]
+
+let getAssets (fsproj: ProjectInstance) =
+
+    //let outFileOpt = getprop projInstance "TargetPath"
+    let projfile = Path.GetFullPath(fsproj.ProjectFileLocation.File)
     let mutable assets = ""
     if projectAssets.TryGetValue(projfile, &assets) then
         FileInfo(assets)
@@ -199,10 +300,10 @@ let getAssets(fsprojOrFsx: FileInfo) =
 
     let msbuildprops =
         try
-            Path.Combine [|fsprojOrFsx.DirectoryName; project(fsprojOrFsx).Build().First().GetProperty("BaseIntermediateOutputPath") |]
+            Path.Combine [|fsproj.Directory; (getprop fsproj "BaseIntermediateOutputPath").Value|]
         with | ex -> 
             dprintfn "ProjectManager: msbuildprops: %s" <| ex.ToString()
-            Path.Combine [| fsprojOrFsx.Directory.FullName; "obj" |]
+            Path.Combine [| fsproj.Directory; "obj" |]
 
     let assets = msbuildprops
                  |> (fun p -> Path.Combine [| p; "project.assets.json" |])
@@ -212,26 +313,20 @@ let getAssets(fsprojOrFsx: FileInfo) =
     assets
 
 
-let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult = 
-    let proj   = project(fsproj)
-    let builds = proj.Build()
+let private inferTargetFramework(fsproj: ProjectInstance): string= 
+    let tfms = getprop fsproj "TargetFrameworks"
+    let tfm = getprop fsproj "TargetFramework"
 
-    // TODO get target framework from project.assets.json
-    let build_tfms = builds 
-                     |> Seq.sortByDescending (fun build -> (TFM.Parse build.TargetFramework).SortIndex)
-                     |> Seq.map (fun build -> build, build.TargetFramework)
-    let pref_tfms = frameworkPreference
+    let tfms = 
+        match tfms, tfm with
+        | Some tfms, _ ->
+            tfms.Split(';')
+        | _, Some tfm -> [| tfm |]
+        | _ -> [|"netcoreapp2.0"|]
 
-    Enumerable
-     .Join(build_tfms, pref_tfms, (fun (_, b) -> b), (fun (a, _) -> a), (fun a _ -> fst a))
-     .Concat(builds)
-     .First()
-
-let private absoluteIncludePath (fsproj: FileInfo) (i: ProjectItem) = 
-    let relativePath = i.ItemSpec.Replace('\\', Path.DirectorySeparatorChar)
-    let absolutePath = Path.Combine(fsproj.DirectoryName, relativePath)
-    let normalizePath = Path.GetFullPath(absolutePath)
-    FileInfo(normalizePath)
+    tfms 
+    |> Seq.sortByDescending (fun x -> (TFM.Parse x).SortIndex)
+    |> Seq.head
 
 let invalidateProjectAssets (fsprojOrFsx: FileInfo) =
     projectAssets.Remove(fsprojOrFsx.FullName) |> ignore
@@ -244,9 +339,9 @@ let getProject(assets: FileInfo) =
     }
 
 let private projectTarget(csproj: FileInfo) = 
-    let project = inferTargetFramework csproj
-    let dllName = project.GetProperty("AssemblyName") + ".dll"
-    let dllPath = Path.Combine [|csproj.DirectoryName; project.GetProperty("OutputPath"); dllName |]
+    let proj = project(csproj)
+    let dllName = (getprop proj "AssemblyName").Value + ".dll"
+    let dllPath = Path.Combine [|csproj.DirectoryName; (getprop proj "OutputPath").Value; dllName |]
     FileInfo(dllPath)
 
 let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets = 
@@ -530,37 +625,37 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 let crack(fsproj: FileInfo): CrackedProject = 
     try 
         // Get source info from .fsproj
+        let proj = project(fsproj)
         let timeProject = Stopwatch.StartNew()
-        let project = inferTargetFramework(fsproj)
+        let tfm = inferTargetFramework(proj)
+        let mkAbsolute = mkAbsolute proj.Directory
+        let infoList = List.map FileInfo
         let sources = 
-            [ for KeyValue(k, v) in project.Items do 
-                if k = "Compile" || (k = "CompileBefore" && includeCompileBeforeItems) then 
-                    for i in v do 
-                        yield absoluteIncludePath fsproj i ]
-        let references = 
-            [ for KeyValue(k, v) in project.Items do 
-                if k = "Reference" then yield! v ]
+            [ for x in getItems proj "Compile" -> mkAbsolute x ]
+            @ if includeCompileBeforeItems then [ for x in getItems proj "CompileBefore" -> mkAbsolute x ]
+              else []
+        let references = [ for x in getItems proj "Reference" -> x ]
 
         let directReferences, systemReferences =
-            let f, t = List.partition (fun (x: ProjectItem) -> x.ItemSpec.EndsWith(".dll")) references
-            f |> List.map (absoluteIncludePath fsproj),
-            t |> List.map (fun (x: ProjectItem) -> x.ItemSpec)
+            let t, f = List.partition (fun (x: string) -> x.EndsWith(".dll")) references
+            t |> List.map (mkAbsolute),
+            f |> List.map (Path.GetFileName)
 
         dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
-        let projectAssetsJson = getAssets fsproj
-        let outputPath        = project.GetProperty("OutputPath")
-        let dllName           = project.GetProperty("AssemblyName") + ".dll"
+        let projectAssetsJson = getAssets proj
+        let outputPath        = (getprop proj "OutputPath").Value
+        let dllName           = (getprop proj "AssemblyName").Value + ".dll"
         let dllTarget         = FileInfo(Path.Combine [|outputPath; dllName|])
         if not(projectAssetsJson.Exists) then
             {
                 fsproj                 = fsproj
                 target                 = dllTarget
-                sources                = sources
+                sources                = infoList sources
                 projectReferences      = []
                 otherProjectReferences = []
                 packageReferences      = []
-                directReferences       = directReferences
+                directReferences       = infoList directReferences
                 systemReferences       = systemReferences
                 error                  = Some(sprintf "%s does not exist; maybe you need to build your project?" projectAssetsJson.FullName)
             }
@@ -575,11 +670,11 @@ let crack(fsproj: FileInfo): CrackedProject =
             {
                 fsproj=fsproj
                 target=target
-                sources=sources
+                sources=infoList sources
                 projectReferences=fsProjects
                 otherProjectReferences=otherProjects
                 packageReferences=assets.packages
-                directReferences=directReferences
+                directReferences=infoList directReferences
                 systemReferences=systemReferences
                 error=None
             }

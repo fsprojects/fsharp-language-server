@@ -67,11 +67,7 @@ type ProjectManager(checker: FSharpChecker) as this =
     /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) = 
-        let assets = ProjectCracker.getAssets fsprojOrFsx
-        if assets.Exists then 
-            max fsprojOrFsx.LastWriteTime assets.LastWriteTime
-        else 
-            fsprojOrFsx.LastWriteTime
+        fsprojOrFsx.LastWriteTime
 
     /// Find base dlls
     /// Workaround of https://github.com/fsharp/FSharp.Compiler.Service/issues/847

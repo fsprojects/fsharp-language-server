@@ -4,14 +4,114 @@
  * ------------------------------------------------------------------------------------------ */
 'use strict';
 
-import * as path from 'path';
-import { workspace, ExtensionContext, commands, StatusBarItem } from 'coc.nvim';
-import { TerminalResult } from 'coc.nvim/lib/types';
+import * as path from 'path'
+import { FsiProcess } from './process'
+import { workspace, ExtensionContext, commands, StatusBarItem, TerminalResult } from 'coc.nvim';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'coc.nvim';
-import { NotificationType } from 'vscode-languageserver-protocol';
-import { Range } from 'vscode-languageserver-types';
+import { NotificationType } from 'vscode-jsonrpc';
+import { Range } from 'vscode-languageserver-protocol';
 
-export function activate(context: ExtensionContext) {
+
+async function getCurrentSelection(mode: string) {
+    let doc = await workspace.document
+
+    if (mode === "v" || mode === "V") {
+        let [from, _ ] = await doc.buffer.mark("<")
+        let [to, __  ] = await doc.buffer.mark(">")
+        let result: string[] = []
+        for(let i = from; i <= to; ++i)
+        {
+            result.push(doc.getline(i - 1))
+        }
+        return result
+    }
+    else if (mode === "n") {
+        let line = await workspace.nvim.call('line', '.')
+        return [doc.getline(line - 1)]
+    }
+    else if (mode === "i") {
+        // TODO what to do in insert mode?
+    }
+    else if (mode === "t") {
+        //TODO what to do in terminal mode?
+    }
+
+    return []
+}
+
+let currentREPL: FsiProcess = undefined
+async function createREPL () {
+    if(currentREPL) {
+        currentREPL.dispose()
+        currentREPL = undefined
+    }
+    currentREPL = new FsiProcess("F# REPL") 
+    currentREPL.onExited(() => {
+        currentREPL = undefined
+    })
+    await currentREPL.start()
+    return currentREPL.onExited
+}
+
+
+async function doEval(mode: string) {
+
+    let document = await workspace.document
+    if (!document || document.filetype !== 'fsharp') {
+        return
+    }
+
+    if(!currentREPL) {
+        await createREPL()
+    }
+
+    // TODO: move to workspace.getCurrentSelection when we get an answer:
+    // https://github.com/neoclide/coc.nvim/issues/933
+    const content = await getCurrentSelection(mode)
+    for(let line of content){
+        await currentREPL.eval(line)
+    }
+    await currentREPL.eval(";;")
+    // see :help feedkeys
+    await workspace.nvim.call('eval', `feedkeys("\\<esc>${content.length}j", "in")`)
+    // await currentREPL.scrollToBottom()
+}
+
+
+function registerREPL(context: ExtensionContext, __: string) { 
+
+    let cmdEvalLine = commands.registerCommand("fsharp.evaluateLine", async () => doEval('n'));
+    let cmdEvalSelection = commands.registerCommand("fsharp.evaluateSelection", async () => doEval('v'));
+    let cmdExecFile = commands.registerCommand("fsharp.run", async (...args: any[]) => {
+        let root = workspace.rootPath
+
+        let argStrs = args
+            ? args.map(x => `${x}`)
+            : []
+
+        if (currentREPL) {
+            currentREPL.log.appendLine(`executing F# project...`)
+        }
+
+        let term = await workspace.createTerminal({
+            name: `F# console`,
+            shellPath: "dotnet",
+            cwd: root,
+            shellArgs: ['run'].concat(argStrs)
+        })
+
+        // switch to the terminal and steal focus
+        term.show(false)
+    })
+
+    // Push the disposable to the context's subscriptions so that the 
+    // client can be deactivated on extension deactivation
+    context.subscriptions.push(cmdExecFile, cmdEvalLine, cmdEvalSelection);
+    return createREPL
+}
+
+
+export async function activate(context: ExtensionContext) {
 
 	// The server is packaged as a standalone command
 	let serverMain = context.asAbsolutePath(binName());
@@ -55,6 +155,8 @@ export function activate(context: ExtensionContext) {
 	// Register test-runner
     commands.registerCommand('fsharp.command.test.run', runTest);
     commands.registerCommand('fsharp.command.goto', goto);
+
+    registerREPL(context, "F# REPL")
 }
 
 function goto(file: string, startLine: number, startColumn: number, _endLine: number, _endColumn: number) {
