@@ -5,11 +5,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ProjectCrackerOptions.fs" />
+    <Compile Include="ProjectCrackerTool.fs" />
     <Compile Include="ProjectCracker.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Buildalyzer" Version="2.3.0" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="30.0.0" />
     <!-- Fix warnings from Buildalyzer indirect refs to old versions -->
     <PackageReference Include="System.Threading.ThreadPool" Version="4.3.0" />
     <PackageReference Include="System.Net.NameResolution" Version="4.3.0" />

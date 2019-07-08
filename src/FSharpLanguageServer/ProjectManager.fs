@@ -11,13 +11,11 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open LSP.Types
 open FSharp.Compiler.SourceCodeServices
-open ProjectCracker
 open FSharp.Compiler.Text
 
 type private ResolvedProject = {
     sources: FileInfo list
     options: FSharpProjectOptions
-    target: FileInfo
     errors: Diagnostic list 
 }
 
@@ -31,7 +29,7 @@ type private ProjectCache() =
 
     member __.Invalidate(fsprojOrFsx: FileInfo) = 
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
-        ProjectCracker.invalidateProjectAssets fsprojOrFsx
+        //ProjectCracker.invalidateProjectAssets fsprojOrFsx
     member __.Get(fsprojOrFsx: FileInfo, analyzeLater: FileInfo -> LazyProject): LazyProject = 
         if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then 
             knownProjects.Add(fsprojOrFsx.FullName, analyzeLater(fsprojOrFsx))
@@ -67,11 +65,7 @@ type ProjectManager(checker: FSharpChecker) as this =
     /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) = 
-        let assets = ProjectCracker.getAssets fsprojOrFsx
-        if assets.Exists then 
-            max fsprojOrFsx.LastWriteTime assets.LastWriteTime
-        else 
-            fsprojOrFsx.LastWriteTime
+        fsprojOrFsx.LastWriteTime
 
     /// Find base dlls
     /// Workaround of https://github.com/fsharp/FSharp.Compiler.Service/issues/847
@@ -252,98 +246,40 @@ type ProjectManager(checker: FSharpChecker) as this =
             {
                 sources=[for f in inferred.SourceFiles do yield FileInfo(f)]
                 options=options
-                target=FileInfo("NoOutputForFsx")
                 errors=Conversions.asDiagnostics(errors)
             }
         /// Analyze a project
         let analyzeFsproj(fsproj: FileInfo) = 
             dprintfn "Analyzing %s" fsproj.Name
-            let cracked = ProjectCracker.crack(fsproj)
+            let cracked, logs = ProjectCracker.GetProjectOptionsFromProjectFileLogged(fsproj.FullName)
             // Convert to FSharpProjectOptions
-            let options = {
-                ExtraProjectInfo = None 
-                IsIncompleteTypeCheckEnvironment = false 
-                LoadTime = lastModified(fsproj)
-                OriginalLoadReferences = []
-                OtherOptions = 
-                    [|
-                        // Dotnet framework should be specified explicitly
-                        yield "--noframework"
-
-                        dprintfn "--------- Project references -----------------"
-
-                        // Reference output of other projects
-                        for r in cracked.projectReferences do 
-                            let options = cache.Get(r, analyzeLater)
-                            yield "-r:" + options.resolved.Value.target.FullName
-                            dprintfn "%s" options.resolved.Value.target.FullName
-
-                        dprintfn "---------- otherProjectReferences ----------------"
-
-                        // Reference target .dll for .csproj proejcts
-                        for r in cracked.otherProjectReferences do 
-                            yield "-r:" + r.FullName
-                            dprintfn "%s" r.FullName
-
-                        dprintfn "----------- packageReferences ---------------"
-
-                        // Reference packages
-                        for r in cracked.packageReferences do 
-                            yield "-r:" + r.FullName
-                            dprintfn "%s" r.FullName
-
-                        dprintfn "----------- directReferences ---------------"
-
-                        // Direct dll references
-                        for r in cracked.directReferences do 
-                            yield "-r:" + r.FullName
-                            dprintfn "%s" r.FullName
-
-                        dprintfn "----------- systemReferences ---------------"
-
-                        // System references
-                        for r in cracked.systemReferences do 
-                            yield "-r:" + r
-                            dprintfn "%s" r
-
-                        dprintfn "----------- ConditionalCompilationDefines ---------------"
-
-                        for d in this.ConditionalCompilationDefines do
-                            yield "-d:" + d
-                            dprintfn "%s" d
-
-                        dprintfn "----------- OtherCompilerFlags ---------------"
-
-                        for flag in this.OtherCompilerFlags do
-                            yield flag
-                            dprintfn "%s" flag
-
-                        dprintfn "--------------------------"
-                    |]
-                ProjectFileName = fsproj.FullName 
-                ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
-                ReferencedProjects = 
-                    [|
-                        for r in cracked.projectReferences do 
-                            let options = cache.Get(r, analyzeLater)
-                            yield options.resolved.Value.target.FullName, options.resolved.Value.options
-                    |]
-                SourceFiles = 
-                    [|
-                        for f in cracked.sources do 
-                            yield f.FullName
-                    |]
-                Stamp = None 
-                UnresolvedReferences = None 
-                UseScriptResolutionRules = false
+            let options = { 
+                cracked 
+                with OtherOptions = 
+                        Array.append cracked.OtherOptions [| 
+                            dprintfn "----------- ConditionalCompilationDefines ---------------"
+                            for d in this.ConditionalCompilationDefines do
+                                yield "-d:" + d
+                                dprintfn "%s" d
+                            dprintfn "----------- OtherCompilerFlags ---------------"
+                            for flag in this.OtherCompilerFlags do
+                                yield flag
+                                dprintfn "%s" flag
+                            dprintfn "--------------------------"
+                        |]
             }
             // Log what we inferred
             printOptions(options)
             {
-                sources=cracked.sources
+                sources=options.SourceFiles |> Seq.map FileInfo |> List.ofSeq
                 options=options 
-                target=cracked.target
-                errors=match cracked.error with None -> [] | Some(e) -> [Conversions.errorAtTop(e)]
+                errors= logs |> Map.toList |> List.map (fun (proj, log) -> {
+                    range={start = {line=0; character=0}; ``end`` = {line=0; character=1}}
+                    severity=Some DiagnosticSeverity.Information
+                    code=None
+                    source=Some proj
+                    message=log
+                })
             }
         // Direct to analyzeFsx or analyzeFsproj, depending on type
         try
@@ -441,8 +377,6 @@ type ProjectManager(checker: FSharpChecker) as this =
         knownSolutions.Remove(sln.FullName) |> ignore
     member __.UpdateSlnFile(sln: FileInfo) = 
         knownSolutions.[sln.FullName] <- slnProjectReferences(sln)
-    member __.UpdateAssetsJson(assets: FileInfo) = 
-        for fsproj in ProjectCracker.getProject(assets) do invalidateDescendents(fsproj)
     member __.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> = 
         let isSourceFile(f: FileInfo) = f.FullName = sourceFile.FullName
         // Does `p` contain a reference to `sourceFile`?
