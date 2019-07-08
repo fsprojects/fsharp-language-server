@@ -141,8 +141,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
         | _ -> false
     let isTestFunction(binding: Ast.SynBinding): bool = 
         let attrs = match binding with Ast.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
-        let pred (xs: Ast.SynAttributeList) = List.exists isTestAttribute xs.Attributes
-        List.exists pred attrs
+        List.exists isTestAttribute attrs
     let name(binding: Ast.SynBinding): string list = 
         match binding with 
         | Ast.Binding(_, _, _, _, _, _, _, Ast.SynPat.LongIdent(Ast.LongIdentWithDots(ids, _), _, _, _, _, _), _, _, _, _) -> 
@@ -597,8 +596,7 @@ type Server(client: ILanguageClient) =
                 projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Project.Define
                 projects.OtherCompilerFlags <- List.ofArray fsconfig.Project.OtherFlags
                 codelensShowReferences <- fsconfig.Codelens.References
-
-                ProjectCracker.SetIncludeCompileBefore fsconfig.Project.IncludeCompileBefore
+                ProjectCracker.includeCompileBeforeItems <- fsconfig.Project.IncludeCompileBefore
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
 
             }
@@ -662,6 +660,8 @@ type Server(client: ILanguageClient) =
                             projects.UpdateSlnFile(file)
                         | FileChangeType.Deleted ->
                             projects.DeleteSlnFile(file)
+                    elif file.Name = "project.assets.json" then 
+                        projects.UpdateAssetsJson(file)
                 // Re-check all open files
                 // In theory we could optimize this by only re-checking descendents of changed projects, 
                 // but in practice that will make little difference
