@@ -5,6 +5,7 @@
 'use strict';
 
 import * as path from 'path'
+import * as fs from 'fs'
 import { FsiProcess } from './process'
 import { workspace, ExtensionContext, commands, StatusBarItem, TerminalResult } from 'coc.nvim';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'coc.nvim';
@@ -115,7 +116,10 @@ export async function activate(context: ExtensionContext) {
 
 	// The server is packaged as a standalone command
 	let serverMain = context.asAbsolutePath(binName());
-	
+
+    // Make sure the server is executable
+    fs.chmodSync(serverMain, "+x")
+
 	let serverOptions: ServerOptions = { 
 		command: serverMain, 
 		args: [], 

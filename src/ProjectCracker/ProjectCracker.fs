@@ -226,10 +226,10 @@ let private project(fsproj: FileInfo): ProjectInstance =
     let sdk = latestSdk.Value.Path
     let globalProperties = Map.ofList [
         // https://daveaglick.com/posts/running-a-design-time-build-with-msbuild-apis
-        ( "SolutionDir", fsprojAbsDirectory )
-        ( "MSBuildExtensionsPath", sdk )
-        ( "MSBuildSDKsPath", Path.Combine(sdk, "Sdks") )
-        ( "RoslynTargetsPath", Path.Combine(sdk, "Roslyn"))
+        "SolutionDir", fsprojAbsDirectory
+        "MSBuildExtensionsPath", sdk
+        "MSBuildSDKsPath", Path.Combine(sdk, "Sdks")
+        "RoslynTargetsPath", Path.Combine(sdk, "Roslyn")
     ]
 
     Environment.SetEnvironmentVariable(
