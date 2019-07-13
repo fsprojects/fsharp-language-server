@@ -199,8 +199,8 @@ let private dotnetSdks =
         |> Seq.map (fun x ->
             let i  = x.IndexOf('[') + 1
             let i' = x.LastIndexOf(']')
-            let sdkver = x.Substring(0, i - 1)
-            let basedir = x.Substring(i, i' - i)
+            let sdkver = x.Substring(0, i - 1).Trim()
+            let basedir = x.Substring(i, i' - i).Trim()
             {
                 Version = sdkver
                 Path = Path.Combine(basedir, sdkver) |> Path.GetFullPath
@@ -259,7 +259,7 @@ let private project(fsproj: FileInfo): ProjectInstance =
         with
         | exn -> 
             let tools = engine.Toolsets |> Seq.map (fun x -> x.ToolsPath) |> Seq.toList
-            raise (new Exception(sprintf "Could not load project %s in ProjectCollection. Available tools: %A. Message: %s" fsproj.FullName tools exn.Message))
+            raise (new Exception(sprintf "Could not load project %s in ProjectCollection. Available tools: %A. ToolsVersion: %s. Message: %s" fsproj.FullName tools toolsVersion exn.Message))
         
     project.SetGlobalProperty("ShouldUnsetParentConfigurationAndPlatform", "false") |> ignore
     let projInstance = project.CreateProjectInstance()
