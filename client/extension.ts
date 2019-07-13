@@ -114,49 +114,48 @@ function registerREPL(context: ExtensionContext, __: string) {
 
 export async function activate(context: ExtensionContext) {
 
-	// The server is packaged as a standalone command
-	let serverMain = context.asAbsolutePath(binName());
+    // The server is packaged as a standalone command
+    let serverMain = context.asAbsolutePath(binName());
 
     // Make sure the server is executable
     fs.chmodSync(serverMain, "+x")
 
-	let serverOptions: ServerOptions = { 
-		command: serverMain, 
-		args: [], 
-		transport: TransportKind.stdio
-	}
+    let serverOptions: ServerOptions = { 
+        command: serverMain, 
+        args: [], 
+        transport: TransportKind.stdio
+    }
 
     workspace.addRootPatterns('fsharp', ['*.fsproj', '*.fsx', 'projects.assets.json', '.vim', '.git', '.hg'])
-	
-	// Options to control the language client
-	let clientOptions: LanguageClientOptions = {
-		// Register the server for F# documents
-		documentSelector: [{scheme: 'file', language: 'fsharp'}],
-		synchronize: {
-			// Synchronize the setting section 'fsharp' to the server
-			configurationSection: 'fsharp',
-			// Notify the server about file changes to F# project files contain in the workspace
-			// TODO: is there a way to configure this via the language server protocol?
-			fileEvents: [
-				workspace.createFileSystemWatcher('**/*.fsproj'),
-				workspace.createFileSystemWatcher('**/*.fsx'),
-				workspace.createFileSystemWatcher('**/project.assets.json')
-			]
-		}
-	}
-	
-	// Create the language client and start the client.
-	let client = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions);
-	let disposable = client.start();
-	
-	// Push the disposable to the context's subscriptions so that the 
-	// client can be deactivated on extension deactivation
-	context.subscriptions.push(disposable);
 
-	// When the language client activates, register a progress-listener
+    // Options to control the language client
+    let clientOptions: LanguageClientOptions = {
+        // Register the server for F# documents
+        documentSelector: [{scheme: 'file', language: 'fsharp'}],
+        synchronize: {
+            // Synchronize the setting section 'fsharp' to the server
+            configurationSection: 'fsharp',
+            // Notify the server about file changes to F# project files contain in the workspace
+            fileEvents: [
+                workspace.createFileSystemWatcher('**/*.fsproj'),
+                workspace.createFileSystemWatcher('**/*.fsx'),
+                workspace.createFileSystemWatcher('**/project.assets.json')
+            ]
+        }
+    }
+
+    // Create the language client and start the client.
+    let client = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions);
+    let disposable = client.start();
+
+    // Push the disposable to the context's subscriptions so that the 
+    // client can be deactivated on extension deactivation
+    context.subscriptions.push(disposable);
+
+    // When the language client activates, register a progress-listener
     client.onReady().then(() => createProgressListeners(client));
 
-	// Register test-runner
+    // Register test-runner
     commands.registerCommand('fsharp.command.test.run', runTest);
     commands.registerCommand('fsharp.command.goto', goto);
 
@@ -164,7 +163,7 @@ export async function activate(context: ExtensionContext) {
 }
 
 function goto(file: string, startLine: number, startColumn: number, _endLine: number, _endColumn: number) {
-	let selection = Range.create(startLine, startColumn, startLine, startColumn);
+    let selection = Range.create(startLine, startColumn, startLine, startColumn);
     workspace.jumpTo(file, selection.start);
 }
 
@@ -174,9 +173,9 @@ function runTest(projectPath: string, fullyQualifiedName: string): Thenable<Term
 
     // !TODO parse the results coming back...
     //let kind: FSharpTestTask = {
-        //type: 'fsharp.task.test',
-        //projectPath: projectPath,
-        //fullyQualifiedName: fullyQualifiedName
+    //type: 'fsharp.task.test',
+    //projectPath: projectPath,
+    //fullyQualifiedName: fullyQualifiedName
     //}
     //let task = workspace.createTask(`fsharp.task.test`);
     //let shell = new ShellExecution('dotnet', args)
@@ -198,7 +197,7 @@ function createProgressListeners(client: LanguageClient) {
         nFiles = 0
         title: string = ""
         statusBarItem: StatusBarItem = null;
-        
+
         startProgress(start: StartProgress) {
             // TODO implement user cancellation (???)
             this.title =  start.title
@@ -241,25 +240,25 @@ function createProgressListeners(client: LanguageClient) {
 }
 
 function binName(): string {
-	var baseParts = ['out', 'server'];
-	var pathParts = getPathParts(process.platform);
-	var fullParts = baseParts.concat(pathParts);
+    var baseParts = ['out', 'server'];
+    var pathParts = getPathParts(process.platform);
+    var fullParts = baseParts.concat(pathParts);
 
-	return path.join(...fullParts);
+    return path.join(...fullParts);
 }
 
 function getPathParts(platform: string): string[] {
-	switch (platform) {
-		case 'win32':
-			return ['win10-x64', 'FSharpLanguageServer.exe'];
+    switch (platform) {
+        case 'win32':
+            return ['win10-x64', 'FSharpLanguageServer.exe'];
 
-		case 'linux':
-			return ['linux-x64', 'FSharpLanguageServer'];
+        case 'linux':
+            return ['linux-x64', 'FSharpLanguageServer'];
 
-		case 'darwin':
-			return ['osx.10.11-x64', 'FSharpLanguageServer'];
-	}
+        case 'darwin':
+            return ['osx.10.11-x64', 'FSharpLanguageServer'];
+    }
 
-	throw `unsupported platform: ${platform}`;
+    throw `unsupported platform: ${platform}`;
 }
 
