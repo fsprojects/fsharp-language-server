@@ -118,7 +118,7 @@ export async function activate(context: ExtensionContext) {
     let serverMain = context.asAbsolutePath(binName());
 
     // Make sure the server is executable
-    fs.chmodSync(serverMain, "+x")
+    fs.chmodSync(serverMain, '755') 
 
     let serverOptions: ServerOptions = { 
         command: serverMain, 
