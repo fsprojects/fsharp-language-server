@@ -9,7 +9,7 @@ Remove-Item publish/* -Recurse -Force
 
 npm install
 npm run compile
-npm pack
+npm pack --silent
 Move-Item *.tgz publish/
 
 # server
