@@ -126,8 +126,6 @@ export async function activate(context: ExtensionContext) {
         transport: TransportKind.stdio
     }
 
-    workspace.addRootPatterns('fsharp', ['*.fsproj', '*.fsx', 'projects.assets.json', '.vim', '.git', '.hg'])
-
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
         // Register the server for F# documents
@@ -138,6 +136,8 @@ export async function activate(context: ExtensionContext) {
             // Notify the server about file changes to F# project files contain in the workspace
             fileEvents: [
                 workspace.createFileSystemWatcher('**/*.fsproj'),
+                workspace.createFileSystemWatcher('**/*.fs'),
+                workspace.createFileSystemWatcher('**/*.fsi'),
                 workspace.createFileSystemWatcher('**/*.fsx'),
                 workspace.createFileSystemWatcher('**/project.assets.json')
             ]

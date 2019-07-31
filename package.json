@@ -116,7 +116,22 @@
                     "description": "Display the number of references for the symbols. Uses more resources and may crash coc.nvim for very large projects."
                 }
             }
-        }
+        },
+        "rootPatterns": [
+            {
+                "filetype": "fsharp",
+                "patterns": [
+                    "*.fsproj",
+                    "*.sln",
+                    "*.fsx",
+                    "projects.assets.json",
+                    ".vim",
+                    ".git",
+                    ".hg"
+                ]
+            }
+        ]
+
     },
     "scripts": {
         "compile": "tsc -p ./",
