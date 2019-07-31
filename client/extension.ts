@@ -11,6 +11,7 @@ import { workspace, ExtensionContext, commands, StatusBarItem, TerminalResult } 
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'coc.nvim';
 import { NotificationType } from 'vscode-jsonrpc';
 import { Range } from 'vscode-languageserver-protocol';
+import {OperatingSystem, currentPlatform, languageServerExe, downloadLanguageServer} from './platform'
 
 
 async function getCurrentSelection(mode: string) {
@@ -115,18 +116,26 @@ function registerREPL(context: ExtensionContext, __: string) {
 export async function activate(context: ExtensionContext) {
 
     // The server is packaged as a standalone command
-    let serverMain = context.asAbsolutePath(binName());
+    let serverMain = context.asAbsolutePath(languageServerExe);
+
+    if (!fs.existsSync(serverMain)) {
+        let item = workspace.createStatusBarItem(0, {progress: true})
+        item.text = "Downloading F# Language Server"
+        item.show()
+        await downloadLanguageServer()
+        item.dispose()
+    }
 
     // Make sure the server is executable
-    fs.chmodSync(serverMain, '755') 
+    if (currentPlatform.operatingSystem !== OperatingSystem.Windows) {
+        fs.chmodSync(serverMain, "755")
+    }
 
     let serverOptions: ServerOptions = { 
         command: serverMain, 
         args: [], 
         transport: TransportKind.stdio
     }
-
-    workspace.addRootPatterns('fsharp', ['*.fsproj', '*.fsx', 'projects.assets.json', '.vim', '.git', '.hg'])
 
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
@@ -138,6 +147,8 @@ export async function activate(context: ExtensionContext) {
             // Notify the server about file changes to F# project files contain in the workspace
             fileEvents: [
                 workspace.createFileSystemWatcher('**/*.fsproj'),
+                workspace.createFileSystemWatcher('**/*.fs'),
+                workspace.createFileSystemWatcher('**/*.fsi'),
                 workspace.createFileSystemWatcher('**/*.fsx'),
                 workspace.createFileSystemWatcher('**/project.assets.json')
             ]
@@ -227,38 +238,16 @@ function createProgressListeners(client: LanguageClient) {
             this.statusBarItem = null
         }
     }
+
     // Use custom notifications to drive progressListener
-    client.onNotification(new NotificationType('fsharp/startProgress'), (start: StartProgress) => {
+    client.onNotification('fsharp/startProgress', (start: StartProgress) => {
         progressListener.startProgress(start);
     });
-    client.onNotification(new NotificationType('fsharp/incrementProgress'), (fileName: string) => {
+    client.onNotification('fsharp/incrementProgress', (fileName: string) => {
         progressListener.incrementProgress(fileName);
     });
-    client.onNotification(new NotificationType('fsharp/endProgress'), () => {
+    client.onNotification('fsharp/endProgress', () => {
         progressListener.endProgress();
     });
-}
-
-function binName(): string {
-    var baseParts = ['out', 'server'];
-    var pathParts = getPathParts(process.platform);
-    var fullParts = baseParts.concat(pathParts);
-
-    return path.join(...fullParts);
-}
-
-function getPathParts(platform: string): string[] {
-    switch (platform) {
-        case 'win32':
-            return ['win10-x64', 'FSharpLanguageServer.exe'];
-
-        case 'linux':
-            return ['linux-x64', 'FSharpLanguageServer'];
-
-        case 'darwin':
-            return ['osx.10.11-x64', 'FSharpLanguageServer'];
-    }
-
-    throw `unsupported platform: ${platform}`;
 }
 

@@ -5,7 +5,7 @@
     "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.53",
+    "version": "0.1.56",
     "publisher": "yatli",
     "repository": {
         "type": "git",
@@ -116,7 +116,21 @@
                     "description": "Display the number of references for the symbols. Uses more resources and may crash coc.nvim for very large projects."
                 }
             }
-        }
+        },
+        "rootPatterns": [
+            {
+                "filetype": "fsharp",
+                "patterns": [
+                    "*.fsproj",
+                    "*.sln",
+                    "*.fsx",
+                    "projects.assets.json",
+                    ".vim",
+                    ".git",
+                    ".hg"
+                ]
+            }
+        ]
     },
     "scripts": {
         "compile": "tsc -p ./",
@@ -124,12 +138,16 @@
     },
     "extensionDependencies": [],
     "dependencies": {
-        "vscode-jsonrpc": "*",
-        "vscode-languageserver-protocol": "*"
+        "vscode-jsonrpc": ">=4.0.0",
+        "vscode-languageserver-protocol": ">=3.14.0",
+        "extract-zip": "^1.6.7",
+        "follow-redirects": "^1.7.0",
+        "rimraf": "^2.6.3",
+        "tunnel": "0.0.6"
     },
     "devDependencies": {
         "@types/node": "^10.3.3",
         "typescript": "^3.0.3",
-        "coc.nvim": "^0.0.71"
+        "coc.nvim": ">=0.0.71"
     }
 }
