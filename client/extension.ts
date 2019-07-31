@@ -116,9 +116,8 @@ function registerREPL(context: ExtensionContext, __: string) {
 export async function activate(context: ExtensionContext) {
 
     // The server is packaged as a standalone command
-    let serverMain = context.asAbsolutePath(languageServerExe);
 
-    if (!fs.existsSync(serverMain)) {
+    if (!fs.existsSync(languageServerExe)) {
         let item = workspace.createStatusBarItem(0, {progress: true})
         item.text = "Downloading F# Language Server"
         item.show()
@@ -128,11 +127,11 @@ export async function activate(context: ExtensionContext) {
 
     // Make sure the server is executable
     if (currentPlatform.operatingSystem !== OperatingSystem.Windows) {
-        fs.chmodSync(serverMain, "755")
+        fs.chmodSync(languageServerExe, "755")
     }
 
     let serverOptions: ServerOptions = { 
-        command: serverMain, 
+        command: languageServerExe, 
         args: [], 
         transport: TransportKind.stdio
     }
