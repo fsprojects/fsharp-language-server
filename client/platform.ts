@@ -74,7 +74,7 @@ export async function downloadLanguageServer() {
             case OperatingSystem.MacOS: return URL_Osx
             default: throw "Unsupported operating system"
         }
-    })().replace("RELEASE", "v0.2.0")
+    })().replace("RELEASE", "nightly")
 
     fs.mkdirSync(languageServerDirectory)
 
