@@ -1,4 +1,5 @@
-# coc-fsharp: F# Language Server for coc.nvim
+# coc-fsharp: F# Language Server for coc.nvim [![Build Status](https://dev.azure.com/v-yadli/coc-fsharp/_apis/build/status/yatli.coc-fsharp?branchName=master)](https://dev.azure.com/v-yadli/coc-fsharp/_build/latest?definitionId=3&branchName=master)
+
 This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
 
 Original project: https://github.com/fsprojects/fsharp-language-server
