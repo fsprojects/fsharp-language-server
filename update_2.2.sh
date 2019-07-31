@@ -7,4 +7,4 @@ do
         -r $i src/FSharpLanguageServer -o ./out/server/$i
 done
  
-cp -r ./src/FSharpLanguageServer/out/server/linux-x64/* ~/.config/coc/extensions/node_modules/coc-fsharp/out/server/linux-x64/
+cp -r ./src/FSharpLanguageServer/out/server/linux-x64/* ~/.config/coc/extensions/node_modules/coc-fsharp/out/server/

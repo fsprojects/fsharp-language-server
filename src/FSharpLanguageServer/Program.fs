@@ -572,6 +572,7 @@ type Server(client: ILanguageClient) =
                             completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
                             signatureHelpProvider = Some({triggerCharacters=['('; ',']})
                             documentSymbolProvider = true
+                            codeActionProvider = true
                             codeLensProvider = Some({resolveProvider=true})
                             workspaceSymbolProvider = true
                             definitionProvider = true
@@ -809,8 +810,55 @@ type Server(client: ILanguageClient) =
                                     dprintfn "Error parsing %s: %s" sourceFile.Name e.Message
                 return List.ofSeq(all)
             }
-        member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
-        member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> = 
+        member this.CodeActions(p: CodeActionParams): Async<Command list> = 
+            // TODO match: [fsharp 39: typecheck] [E] The value, namespace, type or module 'Thread' is not defined.
+            //      then:  1. search a reflection-based cache for a matching entry. if found, suggest opening a module/namespace
+            //             2. search for nuget packages
+            //             3. search for workspace symbol. if found, suggest opening a module/namespace
+            // TODO match: [fsharp] [H] Unused declaration
+            //      then:  1. offer refactoring to _
+            //             2. offer refactoring to __
+            // TODO match: [fsharp 39: typecheck] [E] The value or constructor 'fancy' is not defined.
+            //      then:  1. offer create binding
+            //             2. offer create class
+            // TODO match: [fsharp 39: typecheck] [E] The field, constructor or member 'Gah' is not defined.
+            //      then:  1. offer create field
+            //             2. offer create member
+            // TODO match: [fsharp 366: typecheck] [E] No implementation was given for 'IDisposable.Dispose() : unit'. 
+            //             Note that all interface members must be implemented and listed under an appropriate 'interface' declaration, e.g. 'interface ... with member ...'.
+            //      then:  1. offer implement interface
+            // TODO match: [fsharp 855: typecheck] [E] No abstract or interface member was found that corresponds to this override
+            //      then:  1. offer adding it to the interface
+            async {
+                let dbg = sprintf "codeactions: %s %A %A" p.textDocument.uri.LocalPath p.range p.context.diagnostics
+                return [ { title = dbg; command = p.ToString(); arguments = [] } ]
+            }
+
+(*
+            async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+                match! checkOpenFile(file, true, false) with 
+                | Error(errors) -> 
+                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
+                    return []
+                | Ok(parseResult, checkResult) -> 
+                    dprintfn "Code action over %s" <| p.ToString()
+
+                    dprintfn "parseResult errors: %A" parseResult.Errors
+                    dprintfn "checkResult errors: %A" checkResult.Errors
+
+                    let errors = 
+                        Array.append parseResult.Errors checkResult.Errors
+                        |> Array.filter (fun e -> FileInfo(e.FileName).FullName = file.FullName)
+                        |> Array.filter (fun e -> e.StartLineAlternate
+
+                    for e in errors do
+                        Uri(e.FileName) = p.textDocument.uri
+
+                    return []
+            }
+*)
+        member this.CodeLens(p: CodeLensParams): Async<CodeLens list> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 match projects.FindProjectOptions(file), getOrRead(file) with 
