@@ -5,7 +5,7 @@
     "author": "Yatao Li",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.52",
+    "version": "0.1.54",
     "publisher": "yatli",
     "repository": {
         "type": "git",
@@ -131,7 +131,6 @@
                 ]
             }
         ]
-
     },
     "scripts": {
         "compile": "tsc -p ./",
