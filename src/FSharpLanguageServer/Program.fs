@@ -810,11 +810,12 @@ type Server(client: ILanguageClient) =
                                     dprintfn "Error parsing %s: %s" sourceFile.Name e.Message
                 return List.ofSeq(all)
             }
-        member this.CodeActions(p: CodeActionParams): Async<Command list> = 
+        member this.CodeActions(p: CodeActionParams): Async<CodeAction list> = 
             // TODO match: [fsharp 39: typecheck] [E] The value, namespace, type or module 'Thread' is not defined.
             //      then:  1. search a reflection-based cache for a matching entry. if found, suggest opening a module/namespace
             //             2. search for nuget packages
             //             3. search for workspace symbol. if found, suggest opening a module/namespace
+            //             4. off-by-one corrections
             // TODO match: [fsharp] [H] Unused declaration
             //      then:  1. offer refactoring to _
             //             2. offer refactoring to __
@@ -829,9 +830,62 @@ type Server(client: ILanguageClient) =
             //      then:  1. offer implement interface
             // TODO match: [fsharp 855: typecheck] [E] No abstract or interface member was found that corresponds to this override
             //      then:  1. offer adding it to the interface
+
+            let searchDiags (ds: Diagnostic seq) (r_message: string) =
+                let r_message = Regex(r_message)
+                ds 
+                |> Seq.choose(fun (d: Diagnostic) -> 
+                    let _match = r_message.Match(d.message)
+                    if _match.Success then Some _match
+                    else None
+                )
+                |> List.ofSeq
+
             async {
-                let dbg = sprintf "codeactions: %s %A %A" p.textDocument.uri.LocalPath p.range p.context.diagnostics
-                return [ { title = dbg; command = p.ToString(); arguments = [] } ]
+                let s_diags = searchDiags p.context.diagnostics
+                let c_diags r_message = s_diags r_message |> List.map (fun m -> m.Groups.[1].Captures.[0].Value) |> List.tryHead
+                let e_diags r_message = s_diags r_message |> List.isEmpty |> not
+                let no_name                  = c_diags @"The value, namespace, type or module '(.*)' is not defined"
+                let unused_declarations      = e_diags @"Unused declaration"
+                let no_binding               = c_diags @"The value or constructor '(.*)' is not defined"
+                let no_member                = c_diags @"The field, constructor or member '(.*)' is not defined"
+                let interface_notimplemented = c_diags @"No implementation was given for '(.*)'"
+                let interface_nomember       = e_diags @"No abstract or interface member was found that corresponds to this override"
+
+                let cmds = [
+                    if no_name.IsSome then
+                        yield { 
+                            QuickFixAction 
+                            with title = "open namespace for " + no_name.Value
+                        }
+                    if unused_declarations then
+                        yield { 
+                            QuickFixAction 
+                            with title = "rename symbol to '_'"
+                        }
+                    if no_binding.IsSome then
+                        yield { 
+                            QuickFixAction 
+                            with title = "create local binding " + no_binding.Value
+                        }
+                    if no_member.IsSome then
+                        yield { 
+                            QuickFixAction 
+                            with title = "create member " + no_member.Value
+                        }
+                    if interface_notimplemented.IsSome then
+                        yield { 
+                            QuickFixAction 
+                            with title = "implement members of " + interface_notimplemented.Value
+                        }
+                    if interface_nomember then
+                        yield { 
+                            QuickFixAction 
+                            with title = "add as an interface member"
+                        }
+                ]
+
+                return cmds
             }
 
 (*

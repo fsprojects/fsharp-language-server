@@ -349,6 +349,43 @@ type CodeActionParams = {
     context: CodeActionContext
 }
 
+[<RequireQualifiedAccess>]
+type CodeActionKind = 
+| QuickFix
+| Refactor
+| RefactorExtract
+| RefactorInline
+| RefactorRewrite
+| Source
+| SourceOrganizeImports
+
+let writeCodeActionKind (k: CodeActionKind) =
+    match k with
+    | CodeActionKind.QuickFix -> "quickfix"
+    | CodeActionKind.Refactor -> "refactor"
+    | CodeActionKind.RefactorExtract -> "refactor.extract"
+    | CodeActionKind.RefactorInline -> "refactor.inline"
+    | CodeActionKind.RefactorRewrite -> "refactor.rewrite"
+    | CodeActionKind.Source -> "source"
+    | CodeActionKind.SourceOrganizeImports -> "source.organizeImports"
+
+type CodeAction = {
+    title: string
+    kind: CodeActionKind option
+    diagnostics: Diagnostic[] option
+    edit: WorkspaceEdit option
+    command: Command option
+}
+
+let QuickFixAction = 
+    {
+        title = ""
+        kind = None
+        diagnostics = None
+        edit = None
+        command = None
+    }
+
 type CodeLensParams = {
     textDocument: TextDocumentIdentifier
 }
@@ -678,7 +715,7 @@ type ILanguageServer =
     abstract member DocumentHighlight: TextDocumentPositionParams -> Async<DocumentHighlight list>
     abstract member DocumentSymbols: DocumentSymbolParams -> Async<SymbolInformation list>
     abstract member WorkspaceSymbols: WorkspaceSymbolParams -> Async<SymbolInformation list>
-    abstract member CodeActions: CodeActionParams -> Async<Command list>
+    abstract member CodeActions: CodeActionParams -> Async<CodeAction list>
     abstract member CodeLens: CodeLensParams -> Async<CodeLens list>
     abstract member ResolveCodeLens: CodeLens -> Async<CodeLens>
     abstract member DocumentLink: DocumentLinkParams -> Async<DocumentLink list>

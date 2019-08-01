@@ -26,7 +26,8 @@ let private jsonWriteOptions =
               writeSymbolKind;
               writeRegisterCapability;
               writeMessageType;
-              writeMarkupKind ] }
+              writeMarkupKind;
+              writeCodeActionKind] }
 
 let private serializeInitializeResult = serializerFactory<InitializeResult> jsonWriteOptions
 let private serializeTextEditList = serializerFactory<TextEdit list> jsonWriteOptions
@@ -40,7 +41,7 @@ let private serializeSignatureHelpOption = Option.map serializeSignatureHelp
 let private serializeLocationList = serializerFactory<Location list> jsonWriteOptions
 let private serializeDocumentHighlightList = serializerFactory<DocumentHighlight list> jsonWriteOptions
 let private serializeSymbolInformationList = serializerFactory<SymbolInformation list> jsonWriteOptions
-let private serializeCommandList = serializerFactory<Command list> jsonWriteOptions
+let private serializeCodeActionList = serializerFactory<CodeAction list> jsonWriteOptions
 let private serializeCodeLensList = serializerFactory<CodeLens list> jsonWriteOptions
 let private serializeCodeLens = serializerFactory<CodeLens> jsonWriteOptions
 let private serializeDocumentLinkList = serializerFactory<DocumentLink list> jsonWriteOptions
@@ -134,7 +135,7 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
         | WorkspaceSymbols(p) -> 
             server.WorkspaceSymbols(p) |> thenMap serializeSymbolInformationList |> thenSome
         | CodeActions(p) -> 
-            server.CodeActions(p) |> thenMap serializeCommandList |> thenSome
+            server.CodeActions(p) |> thenMap serializeCodeActionList |> thenSome
         | CodeLens(p) -> 
             server.CodeLens(p) |> thenMap serializeCodeLensList |> thenSome
         | ResolveCodeLens(p) -> 
