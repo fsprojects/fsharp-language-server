@@ -15,6 +15,7 @@ open Conversions
 open Config
 open FSharp.Compiler.Text
 
+
 module Ast = FSharp.Compiler.Ast
 
 let private TODO() = raise (Exception "TODO")
@@ -25,7 +26,7 @@ type private dict<'a, 'b> = System.Collections.Concurrent.ConcurrentDictionary<'
 let findMethodCallBeforeCursor(lineContent: string, cursor: int): int option = 
     let mutable found = -1
     let mutable parenDepth = 0
-    for i in (min (cursor-1) lineContent.Length) .. -1 .. 0 do 
+    for i in (min (cursor-1) lineContent.Length-1) .. -1 .. 0 do 
         match lineContent.[i] with 
         | ')' -> parenDepth <- parenDepth + 1
         | '(' when parenDepth > 0 -> parenDepth <- parenDepth - 1
@@ -97,7 +98,6 @@ let private findDeclarations(parse: FSharpParseFileResults) =
         | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> 
             Navigation.getNavigationFromImplFile(modules).Declarations
         | _ -> [||]
-    // XXX why 2 layers?
     [ for i in items do 
         yield i.Declaration, None
         for n in i.Nested do 
@@ -187,7 +187,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
                 if isTestFunction(b) then 
                     yield ctx, b ]
 
-type Server(client: ILanguageClient) = 
+type Server(client: ILanguageClient) as this = 
     let docs = DocumentStore()
     let checker = FSharpChecker.Create()
     let projects = ProjectManager(checker)
@@ -360,7 +360,7 @@ type Server(client: ILanguageClient) =
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
             match c, maybeId with 
             | Error(errors), _ -> 
-                dprintfn "Check failed, ignored %d errors" (List.length errors)
+                dprintfn "symbol at: Check failed, ignored %d errors" (List.length errors)
                 return None
             | _, None -> 
                 dprintfn "No identifier at %d in line '%s'" position.character line 
@@ -376,11 +376,11 @@ type Server(client: ILanguageClient) =
 
     /// Find the exact location of a symbol within a fully-qualified name.
     /// For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`.
-    let refineRenameRange(s: FSharpSymbol, file: FileInfo, range: Range.range): Range = 
-        let line = range.End.Line - 1
+    let refineRange(s: FSharpSymbol, file: FileInfo, range: Range.range): Range = 
+        let line = if range.EndColumn = 0 then range.End.Line - 2 else range.End.Line - 1
+        let lineText = lineContent(file, line)
         let startColumn = if range.Start.Line - 1 < line then 0 else range.Start.Column
-        let endColumn = range.End.Column
-        let lineText = lineContent(file, line )
+        let endColumn = if range.EndColumn = 0 then lineText.Length else range.End.Column
         let find = lineText.LastIndexOf(s.DisplayName, endColumn, endColumn - startColumn)
         if find = -1 then
             dprintfn "Couldn't find '%s' in line '%s'" s.DisplayName lineText 
@@ -396,7 +396,7 @@ type Server(client: ILanguageClient) =
         let version = docs.GetVersion(file) |> Option.defaultValue 0
         let edits = [
             for u in usages do 
-                let range = refineRenameRange(u.Symbol, FileInfo(u.FileName), u.RangeAlternate)
+                let range = refineRange(u.Symbol, FileInfo(u.FileName), u.RangeAlternate)
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
@@ -560,7 +560,7 @@ type Server(client: ILanguageClient) =
     let mutable deferredInitialize = async { () }
 
     interface ILanguageServer with 
-        member this.Initialize(p: InitializeParams) =
+        member __.Initialize(p: InitializeParams) =
             async {
                 match p.rootUri with 
                 | Some root -> 
@@ -589,11 +589,11 @@ type Server(client: ILanguageClient) =
                         }
                 }
             }
-        member this.Initialized(): Async<unit> = 
+        member __.Initialized(): Async<unit> = 
             deferredInitialize
-        member this.Shutdown(): Async<unit> = 
+        member __.Shutdown(): Async<unit> = 
             async { () }
-        member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
+        member __.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
             async {
                 let fsconfig = FSharpLanguageServerConfig.Parse(p.settings.ToString()).Fsharp
                 projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Project.Define
@@ -603,7 +603,7 @@ type Server(client: ILanguageClient) =
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
 
             }
-        member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
+        member __.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 // Store text in docs
@@ -614,15 +614,15 @@ type Server(client: ILanguageClient) =
                 use increment = checker.BeforeBackgroundFileCheck.Subscribe(fun (fileName, _) -> progress.Increment(FileInfo(fileName)))
                 do! doCheck(file)
             }
-        member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
+        member __.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Change(p)
                 backgroundCheck.CheckLater(file)
             }
-        member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
-        member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
-        member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
+        member __.WillSaveTextDocument(p: WillSaveTextDocumentParams): Async<unit> = TODO()
+        member __.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
+        member __.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> = 
             async {
                 let targetFile = FileInfo(p.textDocument.uri.LocalPath)
                 let todo = [ for fromFile in docs.OpenFiles() do 
@@ -635,14 +635,14 @@ type Server(client: ILanguageClient) =
                     let! errors = getErrors(file, check)
                     publishErrors(file, errors)
             }
-        member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
+        member __.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 docs.Close(p)
                 // Only show errors for open files
                 publishErrors(file, [])
             }
-        member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
+        member __.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> = 
             async {
                 for change in p.changes do 
                     let file = FileInfo(change.uri.LocalPath)
@@ -671,7 +671,7 @@ type Server(client: ILanguageClient) =
                 for f in docs.OpenFiles() do 
                     backgroundCheck.CheckLater(f)
             }
-        member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
+        member __.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
@@ -694,7 +694,7 @@ type Server(client: ILanguageClient) =
                         dprintfn "Found %d completions" declarations.Items.Length
                         return Some(asCompletionList(declarations))
             }
-        member this.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
+        member __.Hover(p: TextDocumentPositionParams): Async<Hover option> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, true, false)
@@ -715,7 +715,7 @@ type Server(client: ILanguageClient) =
             }
         // Add documentation to a completion item
         // Generating documentation is an expensive step, so we want to defer it until the user is actually looking at it
-        member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = 
+        member __.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> = 
             async {
                 let mutable result = p
                 if lastCompletion.IsSome then 
@@ -726,7 +726,7 @@ type Server(client: ILanguageClient) =
                             result <- resolved
                 return result
             }
-        member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
+        member __.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, true, true)
@@ -756,14 +756,14 @@ type Server(client: ILanguageClient) =
                             dprintfn "Found %d overloads" overloads.Methods.Length
                             return Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
             }
-        member this.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> = 
+        member __.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> = 
             async {
                 let! maybeSymbol = symbolAt(p.textDocument, p.position)
                 match maybeSymbol with 
                 | None -> return []
                 | Some s -> return declarationLocation s.Symbol |> Option.toList
             }
-        member this.FindReferences(p: ReferenceParams): Async<Location list> = 
+        member __.FindReferences(p: ReferenceParams): Async<Location list> = 
             async {
                 let! maybeSymbol = symbolAt(p.textDocument, p.position)
                 match maybeSymbol with 
@@ -772,8 +772,8 @@ type Server(client: ILanguageClient) =
                     let! uses = findAllSymbolUses(s.Symbol)
                     return List.map useLocation uses
             }
-        member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
-        member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
+        member __.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
+        member __.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 let! maybeParse = parseFile(file)
@@ -785,7 +785,7 @@ type Server(client: ILanguageClient) =
                     let flat = findDeclarations(parse)
                     return List.map asSymbolInformation flat
             }
-        member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
+        member __.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> = 
             async {
                 dprintfn "Looking for symbols matching `%s`" p.query
                 // Read open projects until we find at least 50 symbols that match query
@@ -812,35 +812,35 @@ type Server(client: ILanguageClient) =
                                     dprintfn "Error parsing %s: %s" sourceFile.Name e.Message
                 return List.ofSeq(all)
             }
-        member this.CodeActions(p: CodeActionParams): Async<CodeAction list> = 
-            // TODO match: [fsharp 39: typecheck] [E] The value, namespace, type or module 'Thread' is not defined.
-            //      then:  1. search a reflection-based cache for a matching entry. if found, suggest opening a module/namespace
-            //             2. search for nuget packages
-            //             3. search for workspace symbol. if found, suggest opening a module/namespace
-            //             4. off-by-one corrections
-            // TODO match: [fsharp] [H] Unused declaration
-            //      then:  1. offer refactoring to _
-            //             2. offer refactoring to __
-            // TODO match: [fsharp 39: typecheck] [E] The value or constructor 'fancy' is not defined.
-            //      then:  1. offer create binding
-            //             2. offer create class
-            // TODO match: [fsharp 39: typecheck] [E] The field, constructor or member 'Gah' is not defined.
-            //      then:  1. offer create field
-            //             2. offer create member
-            // TODO match: [fsharp 366: typecheck] [E] No implementation was given for 'IDisposable.Dispose() : unit'. 
-            //             Note that all interface members must be implemented and listed under an appropriate 'interface' declaration, e.g. 'interface ... with member ...'.
-            //      then:  1. offer implement interface
-            // TODO match: [fsharp 855: typecheck] [E] No abstract or interface member was found that corresponds to this override
-            //      then:  1. offer adding it to the interface
 
+        /// <summary>
+        /// TODO match: [fsharp 39: typecheck] [E] The value, namespace, type or module 'Thread' is not defined.
+        ///      then:  1. search a reflection-based cache for a matching entry. if found, suggest opening a module/namespace
+        ///             2. search for workspace symbol. if found, suggest opening a module/namespace
+        ///             3. search for nuget packages
+        ///             4. off-by-one corrections
+        /// TODO match: [fsharp] [H] Unused declaration
+        ///      then:  1. offer refactoring to _
+        ///             2. offer refactoring to __
+        /// TODO match: [fsharp 39: typecheck] [E] The value or constructor 'fancy' is not defined.
+        ///      then:  1. offer create binding
+        ///             2. offer create class
+        /// TODO match: [fsharp 39: typecheck] [E] The field, constructor or member 'Gah' is not defined.
+        ///      then:  1. offer create field
+        ///             2. offer create member
+        /// TODO match: [fsharp 366: typecheck] [E] No implementation was given for 'IDisposable.Dispose() : unit'. 
+        ///             Note that all interface members must be implemented and listed under an appropriate 'interface' declaration, e.g. 'interface ... with member ...'.
+        ///      then:  1. offer implement interface
+        /// TODO match: [fsharp 855: typecheck] [E] No abstract or interface member was found that corresponds to this override
+        ///      then:  1. offer adding it to the interface
+        /// </summary>
+        member __.CodeActions(p: CodeActionParams): Async<CodeAction list> = 
             let searchDiags (ds: Diagnostic seq) (r_message: string) =
                 let r_message = Regex(r_message)
-                ds 
-                |> Seq.choose(fun (d: Diagnostic) -> 
+                ds |> Seq.choose(fun (d: Diagnostic) -> 
                     let _match = r_message.Match(d.message)
                     if _match.Success then Some _match
-                    else None
-                )
+                    else None) 
                 |> List.ofSeq
             let s_diags = searchDiags p.context.diagnostics
             let c_diags r_message = s_diags r_message |> List.map (fun m -> m.Groups.[1].Captures.[0].Value) |> List.tryHead
@@ -852,45 +852,98 @@ type Server(client: ILanguageClient) =
             let no_member                = c_diags @"The field, constructor or member '(.*)' is not defined"
             let interface_notimplemented = c_diags @"No implementation was given for '(.*)'"
             let interface_nomember       = e_diags @"No abstract or interface member was found that corresponds to this override"
+            let file = FileInfo(p.textDocument.uri.LocalPath)
+            let proj = projects.FindProjectOptions(file)
+            let version = docs.GetVersion(file) |> Option.defaultValue 0
+            let vdoc = {uri=p.textDocument.uri; version=version}
+
+            let openUse (range: Range) symbolName (check: Async<Result<_,_>>) (actions: ResizeArray<_>) = 
+                async {
+                    let! symquery = (this:>ILanguageServer).WorkspaceSymbols({query = symbolName})
+                    let! symquery = 
+                        List.filter (fun i -> i.name = symbolName) symquery
+                        |> List.filter (fun i -> projects.IsVisible(FileInfo(i.location.uri.LocalPath), file))
+                        |> List.map (fun {location = {uri = uri; range = range}} -> 
+                            // open the target file so as to check
+                            let targetFile = FileInfo(uri.LocalPath)
+                            if docs.Get(targetFile).IsNone then
+                                let content = getOrRead(targetFile)
+                                docs.Open({textDocument={uri=uri; languageId="fsharp"; version=0; text=content.Value}})
+                            symbolAt({uri = uri}, range.start))
+                        |> Async.Parallel
+
+                    let symquery = Array.choose id symquery // XXX accessibility?
+
+                    dprintfn "symbol query result: %A" symquery
+
+                    for (sym: FSharpSymbolUse) in symquery do
+                        let fullname = sym.Symbol.FullName
+                        let partials, _ = QuickParse.GetPartialLongName(fullname, fullname.Length - 1)
+
+                        actions.Add { 
+                            QuickFixAction 
+                            with title = sprintf "open %s" <| FSharp.Core.String.concat "." partials
+                                 edit = Some {documentChanges = [ ]}
+                        }
+
+                        dprintfn "range = %A" range
+                        dprintfn "fsRange = %A" (asFsRange file.FullName range)
+
+                        actions.Add { 
+                            QuickFixAction 
+                            with title = sprintf "Fully-qualified form: '%s'" fullname
+                                 edit = Some { documentChanges = [ { 
+                                            textDocument = vdoc
+                                            edits = [{ range = refineRange(sym.Symbol, file, asFsRange file.FullName range); newText = fullname }]  } ]} }
+
+                    let! chkquery = check
+                    ()
+                }
+
+            match proj with
+            | Error _ -> async { return [] }
+            | Ok _ ->
 
             async {
-                let cmds = [
-                    if no_name.IsSome then
-                        yield { 
-                            QuickFixAction 
-                            with title = "open namespace for " + no_name.Value
-                        }
-                    if unused_declarations then
-                        yield { 
-                            QuickFixAction 
-                            with title = "rename symbol to '_'"
-                        }
-                    if no_binding.IsSome then
-                        yield { 
-                            QuickFixAction 
-                            with title = "create local binding " + no_binding.Value
-                        }
-                    if no_member.IsSome then
-                        yield { 
-                            QuickFixAction 
-                            with title = "create member " + no_member.Value
-                        }
-                    if interface_notimplemented.IsSome then
-                        yield { 
-                            QuickFixAction 
-                            with title = "implement members of " + interface_notimplemented.Value
-                        }
-                    if interface_nomember then
-                        yield { 
-                            QuickFixAction 
-                            with title = "add as an interface member"
-                        }
-                ]
+                let check = checkOpenFile(file, true, false)
+                let actions = ResizeArray()
 
-                return cmds
+                match no_name, no_binding with
+                | Some symbolName, _
+                | _, Some symbolName ->
+                    do! openUse p.range symbolName check actions
+                | _ -> ()
+
+                if unused_declarations then
+                    actions.Add { 
+                        QuickFixAction 
+                        with title = "rename symbol to '_'"
+                    }
+                if no_binding.IsSome then
+                    actions.Add { 
+                        QuickFixAction 
+                        with title = "create local binding " + no_binding.Value
+                    }
+                if no_member.IsSome then
+                    actions.Add { 
+                        QuickFixAction 
+                        with title = "create member " + no_member.Value
+                    }
+                if interface_notimplemented.IsSome then
+                    actions.Add { 
+                        QuickFixAction 
+                        with title = "implement members of " + interface_notimplemented.Value
+                    }
+                if interface_nomember then
+                    actions.Add { 
+                        QuickFixAction 
+                        with title = "add as an interface member"
+                    }
+
+                return List.ofSeq actions
             }
 
-        member this.CodeLens(p: CodeLensParams): Async<CodeLens list> = 
+        member __.CodeLens(p: CodeLensParams): Async<CodeLens list> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 match projects.FindProjectOptions(file), getOrRead(file) with 
@@ -922,7 +975,7 @@ type Server(client: ILanguageClient) =
                     dprintfn "Failed to create code lens because file %s does not exist" file.FullName
                     return []
             }
-        member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> = 
+        member __.ResolveCodeLens(p: CodeLens): Async<CodeLens> = 
             async {
                 if p.data <> JsonValue.Null then 
                     dprintfn "Resolving %A" p.data
@@ -955,12 +1008,12 @@ type Server(client: ILanguageClient) =
                         return p
                 else return p
             }
-        member this.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
-        member this.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
-        member this.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = TODO()
-        member this.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = TODO()
-        member this.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
-        member this.Rename(p: RenameParams): Async<WorkspaceEdit> =
+        member __.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
+        member __.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
+        member __.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = TODO()
+        member __.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = TODO()
+        member __.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
+        member __.Rename(p: RenameParams): Async<WorkspaceEdit> =
             async {
                 let! maybeSymbol = symbolAt(p.textDocument, p.position)
                 match maybeSymbol with 
@@ -973,8 +1026,8 @@ type Server(client: ILanguageClient) =
                     let renames = [for fileName, uses in byFile do yield renameTo(p.newName, FileInfo(fileName), uses)]
                     return {documentChanges=List.ofSeq(renames)}
             }
-        member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
-        member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
+        member __.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
+        member __.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = 
             let __doworkspace (xs: WorkspaceFolder list) fn = 
                 async {
                     for root in xs do 

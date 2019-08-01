@@ -25,12 +25,20 @@ let private asPosition(p: Range.pos): Position =
         character=p.Column
     }
 
+/// Convert an LSP `Position` to an F# `Range.pos`
+let private asFsPosition(p: Position): Range.pos = 
+    Range.mkPos (p.line+1) p.character
+
 /// Convert an F# `Range.range` to an LSP `Range`
 let asRange(r: Range.range): Range = 
     {
         start=asPosition r.Start
         ``end``=asPosition r.End
     }
+
+/// Convert an LSP `Range` to an F# `Range.range`
+let asFsRange (filename: string) (r: Range): Range.range = 
+    Range.mkRange filename (asFsPosition r.start) (asFsPosition r.``end``)
 
 /// Convert an F# `Range.range` to an LSP `Location`
 let private asLocation(l: Range.range): Location = 
