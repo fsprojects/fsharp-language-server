@@ -372,7 +372,7 @@ let writeCodeActionKind (k: CodeActionKind) =
 type CodeAction = {
     title: string
     kind: CodeActionKind option
-    diagnostics: Diagnostic[] option
+    diagnostics: Diagnostic list option
     edit: WorkspaceEdit option
     command: Command option
 }

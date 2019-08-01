@@ -1,5 +1,7 @@
 module LSP.Json.Ser
 
+open LSP.Log
+
 open System
 open System.Reflection
 open Microsoft.FSharp.Reflection

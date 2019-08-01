@@ -141,7 +141,9 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
         | _ -> false
     let isTestFunction(binding: Ast.SynBinding): bool = 
         let attrs = match binding with Ast.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
-        List.exists isTestAttribute attrs
+        attrs 
+        |> Seq.map (fun l -> l.Attributes)
+        |> Seq.exists (List.exists isTestAttribute)
     let name(binding: Ast.SynBinding): string list = 
         match binding with 
         | Ast.Binding(_, _, _, _, _, _, _, Ast.SynPat.LongIdent(Ast.LongIdentWithDots(ids, _), _, _, _, _, _), _, _, _, _) -> 
@@ -840,18 +842,18 @@ type Server(client: ILanguageClient) =
                     else None
                 )
                 |> List.ofSeq
+            let s_diags = searchDiags p.context.diagnostics
+            let c_diags r_message = s_diags r_message |> List.map (fun m -> m.Groups.[1].Captures.[0].Value) |> List.tryHead
+            let e_diags r_message = s_diags r_message |> List.isEmpty |> not
+
+            let no_name                  = c_diags @"The value, namespace, type or module '(.*)' is not defined"
+            let unused_declarations      = e_diags @"Unused declaration"
+            let no_binding               = c_diags @"The value or constructor '(.*)' is not defined"
+            let no_member                = c_diags @"The field, constructor or member '(.*)' is not defined"
+            let interface_notimplemented = c_diags @"No implementation was given for '(.*)'"
+            let interface_nomember       = e_diags @"No abstract or interface member was found that corresponds to this override"
 
             async {
-                let s_diags = searchDiags p.context.diagnostics
-                let c_diags r_message = s_diags r_message |> List.map (fun m -> m.Groups.[1].Captures.[0].Value) |> List.tryHead
-                let e_diags r_message = s_diags r_message |> List.isEmpty |> not
-                let no_name                  = c_diags @"The value, namespace, type or module '(.*)' is not defined"
-                let unused_declarations      = e_diags @"Unused declaration"
-                let no_binding               = c_diags @"The value or constructor '(.*)' is not defined"
-                let no_member                = c_diags @"The field, constructor or member '(.*)' is not defined"
-                let interface_notimplemented = c_diags @"No implementation was given for '(.*)'"
-                let interface_nomember       = e_diags @"No abstract or interface member was found that corresponds to this override"
-
                 let cmds = [
                     if no_name.IsSome then
                         yield { 
@@ -888,30 +890,6 @@ type Server(client: ILanguageClient) =
                 return cmds
             }
 
-(*
-            async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
-                match! checkOpenFile(file, true, false) with 
-                | Error(errors) -> 
-                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
-                    return []
-                | Ok(parseResult, checkResult) -> 
-                    dprintfn "Code action over %s" <| p.ToString()
-
-                    dprintfn "parseResult errors: %A" parseResult.Errors
-                    dprintfn "checkResult errors: %A" checkResult.Errors
-
-                    let errors = 
-                        Array.append parseResult.Errors checkResult.Errors
-                        |> Array.filter (fun e -> FileInfo(e.FileName).FullName = file.FullName)
-                        |> Array.filter (fun e -> e.StartLineAlternate
-
-                    for e in errors do
-                        Uri(e.FileName) = p.textDocument.uri
-
-                    return []
-            }
-*)
         member this.CodeLens(p: CodeLensParams): Async<CodeLens list> = 
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
