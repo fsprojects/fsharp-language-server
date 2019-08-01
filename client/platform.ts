@@ -2,7 +2,7 @@
  * Copyright (C) Microsoft Corporation. All rights reserved.
  *--------------------------------------------------------*/
 
-import { workspace } from 'coc.nvim'
+import { workspace, extensions, ExtensionContext } from 'coc.nvim'
 import {sleep} from "./utils"
 import fs = require("fs");
 import path = require("path");
@@ -47,57 +47,126 @@ export function getPlatformDetails(): IPlatformDetails {
     };
 }
 
-export const currentPlatform = getPlatformDetails()
-export const languageServerDirectory = path.join(__dirname, "..", "server")
-const languageServerZip  = languageServerDirectory + ".zip"
-const URL_Windows        = "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-win10-x64.zip"
-const URL_Osx            = "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-osx.10.11-x64.zip"
-const URL_Linux          = "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-linux-x64.zip"
+export function getPlatformSignature(): string
+{
+    const plat = getPlatformDetails()
 
-export const languageServerExe = (() => {
-    if (currentPlatform.operatingSystem === OperatingSystem.Windows)
-        return path.join(languageServerDirectory, "FSharpLanguageServer.exe")
-    else
-        return path.join(languageServerDirectory, "FSharpLanguageServer")
-})()
+    const os_sig = (()=>{
+        switch(plat.operatingSystem){
+            case OperatingSystem.Windows: return "win"
+            case OperatingSystem.Linux: return "linux"
+            case OperatingSystem.MacOS: return "osx"
+            default: return "unknown"
+        }
+    })()
 
-export async function downloadLanguageServer() {
+    const arch_sig = (()=>{
+        if(plat.isProcess64Bit) return "x64"
+        else return "x86"
+    })()
 
-    if(fs.existsSync(languageServerDirectory)){
-        rimraf.sync(languageServerDirectory)
+    return `${os_sig}-${arch_sig}`
+}
+
+export interface ILanguageServerPackage
+{
+    executable: string
+    downloadUrl: string
+}
+
+export interface ILanguageServerRepository
+{
+    [platform:string]: ILanguageServerPackage 
+}
+
+export type LanguageServerDownloadChannel =
+    | { type: "nightly" }
+    | { type: "latest" }
+    | { type: "specific-tag" }
+
+export class LanguageServerProvider
+{
+    private extensionStoragePath: string
+    private languageServerDirectory: string
+    private languageServerZip: string
+    private languageServerExe: string
+    private languageServerPackage: ILanguageServerPackage
+
+    constructor(private extension: ExtensionContext, private repo: ILanguageServerRepository, private channel: LanguageServerDownloadChannel)
+    {
+        const platsig = getPlatformSignature()
+        this.extensionStoragePath = extension.storagePath
+        this.languageServerPackage = repo[platsig]
+
+        if(!this.languageServerPackage) { throw "Platform not supported" }
+
+        this.languageServerDirectory = path.join(this.extensionStoragePath, "server")
+        this.languageServerZip = this.languageServerDirectory + ".zip"
+        this.languageServerExe = path.join(this.languageServerDirectory, this.languageServerPackage.executable)
     }
 
-    let url = (()=>{
-        switch(currentPlatform.operatingSystem) {
-            case OperatingSystem.Windows: return URL_Windows 
-            case OperatingSystem.Linux: return URL_Linux
-            case OperatingSystem.MacOS: return URL_Osx
-            default: throw "Unsupported operating system"
+    private async downloadLanguageServer(): Promise<void> {
+
+        if(!fs.existsSync(this.extensionStoragePath)) {
+            fs.mkdirSync(this.extensionStoragePath)
         }
-    })().replace("RELEASE", "nightly")
 
-    fs.mkdirSync(languageServerDirectory)
+        if(fs.existsSync(this.languageServerDirectory)){
+            rimraf.sync(this.languageServerDirectory)
+        }
 
-    await new Promise<void>((resolve, reject) => {
-        const req = followRedirects.https.request(url, (res: IncomingMessage) => {
-          if (res.statusCode != 200) {
-            reject(new Error(`Invalid response from ${url}: ${res.statusCode}`))
-            return
-          }
-          let file = fs.createWriteStream(languageServerZip)
-          let stream = res.pipe(file)
-          stream.on('finish', resolve)
+        let url = this.languageServerPackage.downloadUrl
+
+        if(this.channel.type === "nightly")
+        {
+            url = url.replace("RELEASE", "nightly")
+        }
+
+        fs.mkdirSync(this.languageServerDirectory)
+
+        await new Promise<void>((resolve, reject) => {
+            const req = followRedirects.https.request(url, (res: IncomingMessage) => {
+              if (res.statusCode != 200) {
+                reject(new Error(`Invalid response from ${url}: ${res.statusCode}`))
+                return
+              }
+              let file = fs.createWriteStream(this.languageServerZip)
+              let stream = res.pipe(file)
+              stream.on('finish', resolve)
+            })
+            req.on('error', reject)
+            req.end()
         })
-        req.on('error', reject)
-        req.end()
-    })
 
-    await new Promise<void>((resolve, reject) => {
-        unzip(languageServerZip, {dir: languageServerDirectory}, (err: any) => {
-            if(err) reject(err)
-            else resolve()
+        await new Promise<void>((resolve, reject) => {
+            unzip(this.languageServerZip, {dir: this.languageServerDirectory}, (err: any) => {
+                if(err) reject(err)
+                else resolve()
+            })
         })
-    })
 
-    fs.unlinkSync(languageServerZip)
+        fs.unlinkSync(this.languageServerZip)
+    }
+
+    // returns the full path to the language server executable
+    public async getLanguageServer(): Promise<string> {
+
+        const plat = getPlatformDetails()
+
+        if (!fs.existsSync(this.languageServerExe)) {
+            let item = workspace.createStatusBarItem(0, {progress: true})
+            item.text = "Downloading F# Language Server"
+            item.show()
+            await this.downloadLanguageServer()
+            item.dispose()
+        }
+
+        // Make sure the server is executable
+        if (plat.operatingSystem !== OperatingSystem.Windows) {
+            fs.chmodSync(this.languageServerExe, "755")
+        }
+
+        return this.languageServerExe
+    }
 }
+

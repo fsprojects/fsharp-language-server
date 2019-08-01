@@ -11,7 +11,7 @@ import { workspace, ExtensionContext, commands, StatusBarItem, TerminalResult } 
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'coc.nvim';
 import { NotificationType } from 'vscode-jsonrpc';
 import { Range } from 'vscode-languageserver-protocol';
-import {OperatingSystem, currentPlatform, languageServerExe, downloadLanguageServer} from './platform'
+import {OperatingSystem, LanguageServerProvider, ILanguageServerRepository} from './platform'
 
 
 async function getCurrentSelection(mode: string) {
@@ -115,20 +115,24 @@ function registerREPL(context: ExtensionContext, __: string) {
 
 export async function activate(context: ExtensionContext) {
 
+    const cocfs_repo: ILanguageServerRepository = {
+        "win-x64": {
+            executable: "FSharpLanguageServer.exe",
+            downloadUrl: "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-win10-x64.zip"
+        },
+        "linux-x64": {
+            executable: "FSharpLanguageServer",
+            downloadUrl: "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-linux-x64.zip"
+        },
+        "osx-x64": {
+            executable: "FSharpLanguageServer",
+            downloadUrl: "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-osx.10.11-x64.zip"
+        }
+    }
+
     // The server is packaged as a standalone command
-
-    if (!fs.existsSync(languageServerExe)) {
-        let item = workspace.createStatusBarItem(0, {progress: true})
-        item.text = "Downloading F# Language Server"
-        item.show()
-        await downloadLanguageServer()
-        item.dispose()
-    }
-
-    // Make sure the server is executable
-    if (currentPlatform.operatingSystem !== OperatingSystem.Windows) {
-        fs.chmodSync(languageServerExe, "755")
-    }
+    const lsprovider = new LanguageServerProvider(context, cocfs_repo, {type:"nightly"})
+    const languageServerExe = await lsprovider.getLanguageServer()
 
     let serverOptions: ServerOptions = { 
         command: languageServerExe, 
