@@ -114,6 +114,12 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Display the number of references for the symbols. Uses more resources and may crash coc.nvim for very large projects."
+                },
+                "fsharp.analysis.unusedDeclaration": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable diagnostic information about unused declarations."
                 }
             }
         },

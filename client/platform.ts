@@ -105,7 +105,11 @@ export class LanguageServerProvider
         this.languageServerExe = path.join(this.languageServerDirectory, this.languageServerPackage.executable)
     }
 
-    private async downloadLanguageServer(): Promise<void> {
+    public async downloadLanguageServer(): Promise<void> {
+
+        let item = workspace.createStatusBarItem(0, {progress: true})
+        item.text = "Downloading F# Language Server"
+        item.show()
 
         if(!fs.existsSync(this.extensionStoragePath)) {
             fs.mkdirSync(this.extensionStoragePath)
@@ -146,6 +150,7 @@ export class LanguageServerProvider
         })
 
         fs.unlinkSync(this.languageServerZip)
+        item.dispose()
     }
 
     // returns the full path to the language server executable
@@ -154,11 +159,7 @@ export class LanguageServerProvider
         const plat = getPlatformDetails()
 
         if (!fs.existsSync(this.languageServerExe)) {
-            let item = workspace.createStatusBarItem(0, {progress: true})
-            item.text = "Downloading F# Language Server"
-            item.show()
             await this.downloadLanguageServer()
-            item.dispose()
         }
 
         // Make sure the server is executable

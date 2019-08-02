@@ -12,6 +12,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } f
 import { NotificationType } from 'vscode-jsonrpc';
 import { Range } from 'vscode-languageserver-protocol';
 import {OperatingSystem, LanguageServerProvider, ILanguageServerRepository} from './platform'
+import {sleep} from './utils';
 
 
 async function getCurrentSelection(mode: string) {
@@ -112,7 +113,6 @@ function registerREPL(context: ExtensionContext, __: string) {
     return createREPL
 }
 
-
 export async function activate(context: ExtensionContext) {
 
     const cocfs_repo: ILanguageServerRepository = {
@@ -169,9 +169,21 @@ export async function activate(context: ExtensionContext) {
     // When the language client activates, register a progress-listener
     client.onReady().then(() => createProgressListeners(client));
 
-    // Register test-runner
-    commands.registerCommand('fsharp.command.test.run', runTest);
-    commands.registerCommand('fsharp.command.goto', goto);
+    // Register commands
+    context.subscriptions.push(
+        commands.registerCommand('fsharp.command.test.run', runTest),
+        commands.registerCommand('fsharp.command.goto', goto),
+        commands.registerCommand('fsharp.downloadLanguageServer', async () => {
+            if (client.started) {
+                await client.stop()
+                disposable.dispose()
+                await sleep(1000)
+            }
+            await lsprovider.downloadLanguageServer();
+            disposable = client.start()
+            context.subscriptions.push(disposable);
+        }),
+    )
 
     registerREPL(context, "F# REPL")
 }

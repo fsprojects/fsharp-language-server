@@ -14,6 +14,9 @@ type FSharpLanguageServerConfig = JsonProvider<"""
         },
         "codelens": {
           "references": true
+        },
+        "analysis": {
+          "unusedDeclaration": true
         }
       }
 }]""", SampleIsList=true>

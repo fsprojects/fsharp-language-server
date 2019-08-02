@@ -211,6 +211,7 @@ type Server(client: ILanguageClient) as this =
     let checker = FSharpChecker.Create()
     let projects = ProjectManager(checker)
     let mutable codelensShowReferences = true
+    let mutable showUnusedDeclarations = true
 
     /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option = 
@@ -303,7 +304,6 @@ type Server(client: ILanguageClient) as this =
 
     /// When did we last check each file on disk?
     let lastCheckedOnDisk = dict<string, DateTime>()
-    // TODO there might be a thread safety issue here---is this getting called from a separate thread?
     do checker.BeforeBackgroundFileCheck.Add(fun(fileName, _) -> 
         let file = FileInfo(fileName)
         lastCheckedOnDisk.[file.FullName] <- file.LastWriteTime)
@@ -344,23 +344,28 @@ type Server(client: ILanguageClient) as this =
             | Ok(parseResult, checkResult) -> 
                 let parseErrors = asDiagnostics(parseResult.Errors)
                 let typeErrors = asDiagnostics(checkResult.Errors)
+                let! uses = checkResult.GetAllUsesOfAllSymbolsInFile()
+                fileSymbolUses.[file.FullName] <- Array.map (fun (x: FSharpSymbolUse) -> x.Symbol.FullName) uses
                 // This is just too slow. Also, it's sometimes wrong.
                 // Find unused opens
                 // let timeUnusedOpens = Stopwatch.StartNew()
                 // let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
                 // let unusedOpenErrors = [for r in unusedOpenRanges do yield diagnostic("Unused open", r, DiagnosticSeverity.Information)]
                 // dprintfn "Found %d unused opens in %dms" unusedOpenErrors.Length timeUnusedOpens.ElapsedMilliseconds
-                // Find unused declarations
-                let timeUnusedDeclarations = Stopwatch.StartNew()
-                let! uses = checkResult.GetAllUsesOfAllSymbolsInFile()
-                let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(uses, file.Name.EndsWith(".fsx"))
-                let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield diagnostic("Unused declaration", r, DiagnosticSeverity.Hint)]
-                dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
+                let unusedOpenErrors = []
 
-                fileSymbolUses.[file.FullName] <- Array.map (fun (x: FSharpSymbolUse) -> x.Symbol.FullName) uses
+                // Find unused declarations
+                let unusedDeclarationErrors = 
+                    if showUnusedDeclarations then
+                        let timeUnusedDeclarations = Stopwatch.StartNew()
+                        let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(uses, file.Name.EndsWith(".fsx"))
+                        let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield diagnostic("Unused declaration", r, DiagnosticSeverity.Hint)]
+                        dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
+                        unusedDeclarationErrors
+                    else []
+
                 // Combine
-                // return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
-                return parseErrors@typeErrors@unusedDeclarationErrors
+                return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
         }
     let doCheck(file: FileInfo): Async<unit> = 
         async {
@@ -618,6 +623,7 @@ type Server(client: ILanguageClient) as this =
                 projects.ConditionalCompilationDefines <- List.ofArray fsconfig.Project.Define
                 projects.OtherCompilerFlags <- List.ofArray fsconfig.Project.OtherFlags
                 codelensShowReferences <- fsconfig.Codelens.References
+                showUnusedDeclarations <- fsconfig.Analysis.UnusedDeclaration
                 ProjectCracker.includeCompileBeforeItems <- fsconfig.Project.IncludeCompileBefore
                 dprintfn "New configuration %O" (fsconfig.JsonValue)
 
@@ -833,11 +839,11 @@ type Server(client: ILanguageClient) as this =
             }
 
         /// <summary>
-        /// TODO match: [fsharp 39: typecheck] [E] The value, namespace, type or module 'Thread' is not defined.
+        ///      match: [fsharp 39: typecheck] [E] The value, namespace, type or module 'Thread' is not defined.
         ///      then:  1. search a reflection-based cache for a matching entry. if found, suggest opening a module/namespace
         ///             2. search for workspace symbol. if found, suggest opening a module/namespace
-        ///             3. search for nuget packages
-        ///             4. off-by-one corrections
+        ///       TODO  3. search for nuget packages 
+        ///       TODO  4. off-by-one corrections 
         /// TODO match: [fsharp] [H] Unused declaration
         ///      then:  1. offer refactoring to _
         ///             2. offer refactoring to __
