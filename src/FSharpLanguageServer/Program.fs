@@ -14,7 +14,6 @@ open FSharp.Data.JsonExtensions
 open Conversions
 open Config
 open FSharp.Compiler.Text
-open FSharpLanguageServer.Conversions.Foo
 
 
 module Ast = FSharp.Compiler.Ast
