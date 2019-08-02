@@ -14,6 +14,7 @@ open FSharp.Data.JsonExtensions
 open Conversions
 open Config
 open FSharp.Compiler.Text
+open FSharpLanguageServer.Conversions.Foo
 
 
 module Ast = FSharp.Compiler.Ast
@@ -88,6 +89,25 @@ let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGr
         if result = -1 && (activeParameter = 0 || activeParameter < methods.[i].Parameters.Length) then 
             result <- i 
     if result = -1 then None else Some result
+
+/// Find top-level open directives that appear at the top of the top-level modules
+let private findOpenDirectives(parse: FSharpParseFileResults) =
+    match parse.ParseTree with
+    | Some(Ast.ParsedInput.SigFile(Ast.ParsedSigFileInput(_, _, _, _, modules))) ->
+        modules 
+        |> List.collect (fun (Ast.SynModuleOrNamespaceSig(_, _, _, decls, _, _, _, _)) -> decls)
+        |> List.choose(
+            function
+            | Ast.SynModuleSigDecl.Open(longId, range) -> Some(longId, range)
+            | _ -> None)
+    | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) ->
+        modules 
+        |> List.collect (fun (Ast.SynModuleOrNamespace(_, _, _, decls, _, _, _, _)) -> decls)
+        |> List.choose(
+            function
+            | Ast.SynModuleDecl.Open(longId, range) -> Some(longId.Lid (*??*), range)
+            | _ -> None)
+    | _ -> []
 
 /// Find searchable declarations
 let private findDeclarations(parse: FSharpParseFileResults) = 
@@ -855,10 +875,64 @@ type Server(client: ILanguageClient) as this =
             let file = FileInfo(p.textDocument.uri.LocalPath)
             let proj = projects.FindProjectOptions(file)
             let version = docs.GetVersion(file) |> Option.defaultValue 0
-            let vdoc = {uri=p.textDocument.uri; version=version}
+            let vdoc = {uri=p.textDocument.uri; version=version} 
 
-            let openUse (range: Range) symbolName (check: Async<Result<_,_>>) (actions: ResizeArray<_>) = 
-                async {
+            let openQuickFixAction openInsertRange openTarget =
+                let _open = sprintf "open %s" openTarget
+                {   defaultQuickFixAction 
+                    with title = _open
+                         edit = Some { documentChanges = [ { 
+                            textDocument = vdoc
+                            edits = [{ range = openInsertRange; newText = _open + "\n" }]  } ]} }
+
+            let useFullyQualifiedQuickFix fullname range =
+                {   defaultQuickFixAction 
+                    with title = sprintf "Fully-qualified form: '%s'" fullname
+                         edit = Some { documentChanges = [ { 
+                                    textDocument = vdoc
+                                    edits = [{ range = range; newText = fullname }]  } ]} }
+
+            let openOrUseFullyQualifiedQuickFix (range: Range) (symquery: seq<_>) (check: Result<(FSharpParseFileResults*FSharpCheckFileResults),_>) (actions: ResizeArray<_>) = 
+                let fsRange = asFsRange file.FullName range
+                let openInsertionPoint = 
+                    match check with
+                    | Ok(rparse, _) -> 
+                        let openDirectives = 
+                            findOpenDirectives rparse
+                            |> List.filter (fun (_, od_range) -> od_range.EndLine < fsRange.StartLine)
+                        match openDirectives.Length with
+                        | 0 -> None
+                        | _ -> 
+                            let (_, last_od_range) = List.last openDirectives
+                            let line = last_od_range.EndLine + 1
+                            Some <| Range.mkRange file.FullName (Range.mkPos line 0) (Range.mkPos line 0)
+                    | _ -> None
+                    |>
+                    function
+                    | Some r -> r
+                    | None -> Range.mkRange file.FullName (Range.mkPos 2 0) (Range.mkPos 2 0)
+                    |> asRange
+                let openQuickFixAction = openQuickFixAction openInsertionPoint
+                for (sym: FSharpSymbolUse) in symquery do
+                    let fullname = sym.Symbol.FullName
+                    let partials, _ = QuickParse.GetPartialLongName(fullname, fullname.Length - 1)
+                    let replaceRange = refineRange(sym.Symbol, file, fsRange)
+                    actions.Add <| openQuickFixAction (FSharp.Core.String.concat "." partials )
+                    actions.Add <| useFullyQualifiedQuickFix fullname replaceRange
+
+            match proj with
+            | Error _ -> async { return [] }
+            | Ok _ ->
+
+            async {
+                let check = checkOpenFile(file, true, false)
+                let actions = ResizeArray()
+
+                match no_name, no_binding with
+                | Some symbolName, _
+                | _, Some symbolName ->
+
+                    let! chkquery = check
                     let! symquery = (this:>ILanguageServer).WorkspaceSymbols({query = symbolName})
                     let! symquery = 
                         List.filter (fun i -> i.name = symbolName) symquery
@@ -873,70 +947,33 @@ type Server(client: ILanguageClient) as this =
                         |> Async.Parallel
 
                     let symquery = Array.choose id symquery // XXX accessibility?
-
                     dprintfn "symbol query result: %A" symquery
-
-                    for (sym: FSharpSymbolUse) in symquery do
-                        let fullname = sym.Symbol.FullName
-                        let partials, _ = QuickParse.GetPartialLongName(fullname, fullname.Length - 1)
-
-                        actions.Add { 
-                            QuickFixAction 
-                            with title = sprintf "open %s" <| FSharp.Core.String.concat "." partials
-                                 edit = Some {documentChanges = [ ]}
-                        }
-
-                        dprintfn "range = %A" range
-                        dprintfn "fsRange = %A" (asFsRange file.FullName range)
-
-                        actions.Add { 
-                            QuickFixAction 
-                            with title = sprintf "Fully-qualified form: '%s'" fullname
-                                 edit = Some { documentChanges = [ { 
-                                            textDocument = vdoc
-                                            edits = [{ range = refineRange(sym.Symbol, file, asFsRange file.FullName range); newText = fullname }]  } ]} }
-
-                    let! chkquery = check
-                    ()
-                }
-
-            match proj with
-            | Error _ -> async { return [] }
-            | Ok _ ->
-
-            async {
-                let check = checkOpenFile(file, true, false)
-                let actions = ResizeArray()
-
-                match no_name, no_binding with
-                | Some symbolName, _
-                | _, Some symbolName ->
-                    do! openUse p.range symbolName check actions
+                    openOrUseFullyQualifiedQuickFix p.range symquery chkquery actions
                 | _ -> ()
 
                 if unused_declarations then
                     actions.Add { 
-                        QuickFixAction 
+                        defaultQuickFixAction 
                         with title = "rename symbol to '_'"
                     }
                 if no_binding.IsSome then
                     actions.Add { 
-                        QuickFixAction 
+                        defaultQuickFixAction 
                         with title = "create local binding " + no_binding.Value
                     }
                 if no_member.IsSome then
                     actions.Add { 
-                        QuickFixAction 
+                        defaultQuickFixAction 
                         with title = "create member " + no_member.Value
                     }
                 if interface_notimplemented.IsSome then
                     actions.Add { 
-                        QuickFixAction 
+                        defaultQuickFixAction 
                         with title = "implement members of " + interface_notimplemented.Value
                     }
                 if interface_nomember then
                     actions.Add { 
-                        QuickFixAction 
+                        defaultQuickFixAction 
                         with title = "add as an interface member"
                     }
 

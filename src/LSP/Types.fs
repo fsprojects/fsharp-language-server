@@ -377,7 +377,7 @@ type CodeAction = {
     command: Command option
 }
 
-let QuickFixAction = 
+let defaultQuickFixAction = 
     {
         title = ""
         kind = None
