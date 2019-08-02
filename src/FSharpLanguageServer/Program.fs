@@ -395,19 +395,19 @@ type Server(client: ILanguageClient) as this =
 
     /// Find the exact location of a symbol within a fully-qualified name.
     /// For example, if we have `let b = Foo.bar`, and we want to find the symbol `bar` in the range `let b = [Foo.bar]`.
-    let refineRange(s: FSharpSymbol, file: FileInfo, range: Range.range): Range = 
+    let refineRange(s: string, file: FileInfo, range: Range.range): Range = 
         let line = if range.EndColumn = 0 then range.End.Line - 2 else range.End.Line - 1
         let lineText = lineContent(file, line)
         let startColumn = if range.Start.Line - 1 < line then 0 else range.Start.Column
         let endColumn = if range.EndColumn = 0 then lineText.Length else range.End.Column
-        let find = lineText.LastIndexOf(s.DisplayName, endColumn, endColumn - startColumn)
+        let find = lineText.LastIndexOf(s, endColumn, endColumn - startColumn)
         if find = -1 then
-            dprintfn "Couldn't find '%s' in line '%s'" s.DisplayName lineText 
+            dprintfn "Couldn't find '%s' in line '%s'" s lineText 
             asRange range
         else 
             {
                 start={line=line; character=find}
-                ``end``={line=line; character=find + s.DisplayName.Length}
+                ``end``={line=line; character=find + s.Length}
             }
     /// Rename one usage of a symbol
     let renameTo(newName: string, file: FileInfo, usages: FSharpSymbolUse seq): TextDocumentEdit = 
@@ -415,7 +415,7 @@ type Server(client: ILanguageClient) as this =
         let version = docs.GetVersion(file) |> Option.defaultValue 0
         let edits = [
             for u in usages do 
-                let range = refineRange(u.Symbol, FileInfo(u.FileName), u.RangeAlternate)
+                let range = refineRange(u.Symbol.DisplayName, FileInfo(u.FileName), u.RangeAlternate)
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
@@ -891,7 +891,7 @@ type Server(client: ILanguageClient) as this =
                                     textDocument = vdoc
                                     edits = [{ range = range; newText = fullname }]  } ]} }
 
-            let openOrUseFullyQualifiedQuickFix (range: Range) (symquery: seq<_>) (check: Result<(FSharpParseFileResults*FSharpCheckFileResults),_>) (actions: ResizeArray<_>) = 
+            let openOrUseFullyQualifiedQuickFix (range: Range) (symquery: seq<_>) (check: Result<(FSharpParseFileResults*FSharpCheckFileResults),_>) (asmquery: FSharpEntity list) (actions: ResizeArray<_>) = 
                 let fsRange = asFsRange file.FullName range
                 let openInsertionPoint = 
                     match check with
@@ -911,13 +911,22 @@ type Server(client: ILanguageClient) as this =
                     | Some r -> r
                     | None -> Range.mkRange file.FullName (Range.mkPos 2 0) (Range.mkPos 2 0)
                     |> asRange
+
                 let openQuickFixAction = openQuickFixAction openInsertionPoint
                 for (sym: FSharpSymbolUse) in symquery do
                     let fullname = sym.Symbol.FullName
                     let partials, _ = QuickParse.GetPartialLongName(fullname, fullname.Length - 1)
-                    let replaceRange = refineRange(sym.Symbol, file, fsRange)
+                    let replaceRange = refineRange(sym.Symbol.DisplayName, file, fsRange)
                     actions.Add <| openQuickFixAction (FSharp.Core.String.concat "." partials )
                     actions.Add <| useFullyQualifiedQuickFix fullname replaceRange
+
+                for (ent: FSharpEntity) in asmquery do
+                    let replaceRange = refineRange(ent.DisplayName, file, fsRange)
+                    actions.Add <| openQuickFixAction ent.AccessPath
+                    actions.Add <| useFullyQualifiedQuickFix (sprintf "%s.%s" ent.AccessPath ent.DisplayName) replaceRange
+                    (*ent.DisplayName*)
+                    (*asm.Contents.TryGetEntities*)
+                    ()
 
             match proj with
             | Error _ -> async { return [] }
@@ -944,10 +953,18 @@ type Server(client: ILanguageClient) as this =
                                 docs.Open({textDocument={uri=uri; languageId="fsharp"; version=0; text=content.Value}})
                             symbolAt({uri = uri}, range.start))
                         |> Async.Parallel
-
                     let symquery = Array.choose id symquery // XXX accessibility?
+                    let asmrefs = 
+                        match chkquery with
+                        | Ok(_, rcheck) -> rcheck.ProjectContext.GetReferencedAssemblies()
+                        | _ -> []
+                        |> Seq.collect (fun asm -> asm.Contents.TryGetEntities())
+                        |> Seq.filter (fun ent -> ent.DisplayName = symbolName)
+                        |> List.ofSeq
+
+
                     dprintfn "symbol query result: %A" symquery
-                    openOrUseFullyQualifiedQuickFix p.range symquery chkquery actions
+                    openOrUseFullyQualifiedQuickFix p.range symquery chkquery asmrefs actions
                 | _ -> ()
 
                 if unused_declarations then
