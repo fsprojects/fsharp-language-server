@@ -14,6 +14,7 @@ open FSharp.Data.JsonExtensions
 open Conversions
 open Config
 open FSharp.Compiler.Text
+open Fantomas
 
 
 module Ast = FSharp.Compiler.Ast
@@ -604,6 +605,8 @@ type Server(client: ILanguageClient) as this =
                             definitionProvider = true
                             referencesProvider = true
                             renameProvider = true
+                            documentFormattingProvider = true
+                            documentRangeFormattingProvider = true
                             textDocumentSync = 
                                 { defaultTextDocumentSyncOptions with 
                                     openClose = true 
@@ -930,8 +933,6 @@ type Server(client: ILanguageClient) as this =
                     let replaceRange = refineRange(ent.DisplayName, file, fsRange)
                     actions.Add <| openQuickFixAction ent.AccessPath
                     actions.Add <| useFullyQualifiedQuickFix (sprintf "%s.%s" ent.AccessPath ent.DisplayName) replaceRange
-                    (*ent.DisplayName*)
-                    (*asm.Contents.TryGetEntities*)
                     ()
 
             match proj with
@@ -1069,8 +1070,80 @@ type Server(client: ILanguageClient) as this =
             }
         member __.DocumentLink(p: DocumentLinkParams): Async<DocumentLink list> = TODO()
         member __.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
-        member __.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = TODO()
-        member __.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = TODO()
+
+        member __.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = 
+            async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+
+                if docs.Get(file).IsNone then
+                    let content = getOrRead(file)
+                    docs.Open({textDocument={uri=p.textDocument.uri; languageId="fsharp"; version=0; text=content.Value}})
+
+                let opts    = p.options
+                let opts_ex = p.optionsMap
+
+                match! checkOpenFile(file, true, false) with
+                | Error _ -> return []
+                | Ok(rparse, rcheck) ->
+
+                let ast = rparse.ParseTree.Value
+
+                // TODO config
+                let fmtOpts = { FormatConfig.FormatConfig.Default with
+                                IndentSpaceNum = opts.tabSize
+                                PageWidth = 120
+                                (*PreserveEndOfLine = false*)
+                                SemicolonAtEndOfLine = false
+                                SpaceBeforeArgument = false 
+                                SpaceBeforeColon = false
+                                SpaceAfterComma = true
+                                SpaceAfterSemicolon = true 
+                                IndentOnTryWith = false}
+
+                try
+                    let! doc_formatted = CodeFormatter.FormatASTAsync(ast, rparse.FileName, None, fmtOpts)
+                    return [ { range = asRange ast.Range; newText = doc_formatted } ]
+                with ex -> 
+                    dprintfn "DocumentFormatting: %O" ex
+                    return []
+            }
+
+        member __.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = 
+            async {
+                let file = FileInfo(p.textDocument.uri.LocalPath)
+
+                match projects.FindProjectOptions(file), getOrRead(file) with
+                | Error _, _
+                | _, None _ -> return []
+                | Ok(proj), Some content ->
+
+                let proj = getParsingOptions proj
+
+                let opts    = p.options
+                let opts_ex = p.optionsMap
+                let range   = p.range
+                let is_fsi  = file.Extension = ".fsi"
+
+                // TODO config
+                let fmtOpts = { FormatConfig.FormatConfig.Default with
+                                IndentSpaceNum = opts.tabSize
+                                PageWidth = 120
+                                (*PreserveEndOfLine = false*)
+                                SemicolonAtEndOfLine = false
+                                SpaceBeforeArgument = false 
+                                SpaceBeforeColon = false
+                                SpaceAfterComma = true
+                                SpaceAfterSemicolon = true 
+                                IndentOnTryWith = false }
+
+                try
+                    let! range_formatted = CodeFormatter.FormatSelectionAsync(file.FullName, (asFsRange file.FullName p.range), SourceOrigin.SourceString content, fmtOpts, proj, checker)
+                    return [ { range = p.range; newText = range_formatted } ]
+                with ex -> 
+                    dprintfn "DocumentFormatting: %O" ex
+                    return []
+            }
+
         member __.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
         member __.Rename(p: RenameParams): Async<WorkspaceEdit> =
             async {
