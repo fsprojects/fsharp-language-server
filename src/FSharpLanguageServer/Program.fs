@@ -1075,18 +1075,16 @@ type Server(client: ILanguageClient) as this =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
 
-                if docs.Get(file).IsNone then
-                    let content = getOrRead(file)
-                    docs.Open({textDocument={uri=p.textDocument.uri; languageId="fsharp"; version=0; text=content.Value}})
+                match projects.FindProjectOptions(file), getOrRead(file) with
+                | Error _, _
+                | _, None _ -> return []
+                | Ok(proj), Some content ->
+
+                let proj = getParsingOptions proj
 
                 let opts    = p.options
                 let opts_ex = p.optionsMap
-
-                match! checkOpenFile(file, true, false) with
-                | Error _ -> return []
-                | Ok(rparse, rcheck) ->
-
-                let ast = rparse.ParseTree.Value
+                let is_fsi  = file.Extension = ".fsi"
 
                 // TODO config
                 let fmtOpts = { FormatConfig.FormatConfig.Default with
@@ -1098,11 +1096,13 @@ type Server(client: ILanguageClient) as this =
                                 SpaceBeforeColon = false
                                 SpaceAfterComma = true
                                 SpaceAfterSemicolon = true 
-                                IndentOnTryWith = false}
+                                IndentOnTryWith = false }
+
+                let nlines = Seq.fold (fun n c -> if c = '\n' then n+1 else n) 0 content
 
                 try
-                    let! doc_formatted = CodeFormatter.FormatASTAsync(ast, rparse.FileName, None, fmtOpts)
-                    return [ { range = asRange ast.Range; newText = doc_formatted } ]
+                    let! range_formatted = CodeFormatter.FormatDocumentAsync(file.FullName, SourceOrigin.SourceString content, fmtOpts, proj, checker)
+                    return [ { range = {start={line=0; character=0}; ``end``={line=nlines; character=0}}; newText = range_formatted } ]
                 with ex -> 
                     dprintfn "DocumentFormatting: %O" ex
                     return []
