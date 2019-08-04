@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fantomas" Version="3.0.0-beta-002" />
+    <PackageReference Include="Fantomas" Version="3.0.0-beta-002-alpha-418" />
     <PackageReference Include="FSharp.Compiler.Service" Version="30.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.12" />
   </ItemGroup>

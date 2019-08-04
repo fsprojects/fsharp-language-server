@@ -1090,7 +1090,6 @@ type Server(client: ILanguageClient) as this =
                 let fmtOpts = { FormatConfig.FormatConfig.Default with
                                 IndentSpaceNum = opts.tabSize
                                 PageWidth = 120
-                                (*PreserveEndOfLine = false*)
                                 SemicolonAtEndOfLine = false
                                 SpaceBeforeArgument = false 
                                 SpaceBeforeColon = false
