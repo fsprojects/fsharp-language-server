@@ -361,18 +361,22 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 found <- Some(short, long)
         found.Value
     dprintfn "Chose framework %s / %s" shortFramework longFramework
+
+    let projectFrameworks = root?project?frameworks.[shortFramework]
+    let targets = root?targets.[longFramework]
+
     // Choose a version of a dependency by scanning targets
     let chooseVersion(dependencyName: string): string = 
         let prefix = dependencyName + "/"
         let mutable found: string option = None 
-        for dependencyVersion, _ in root?targets.[longFramework].Properties do 
+        for dependencyVersion, _ in targets.Properties do 
             if dependencyVersion.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && found.IsNone then 
                 let version = dependencyVersion.Substring(prefix.Length)
                 found <- Some(version)
         match found with 
         | Some(d) -> d
         | None -> 
-            let keys = Array.map fst root?targets.[longFramework].Properties
+            let keys = Array.map fst targets.Properties
             raise(Exception(sprintf "No version of %s found in %A" dependencyName keys))
 
     let projectTFM = TFM.Parse shortFramework
@@ -392,6 +396,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // All transitive dependencies of the project 
     // "FSharp.Core/4.3.4" => {FSharp.Core, 4.3.4, false}
     let transitiveDependencies = Dictionary<string, Dep>()
+
     // Find transitive dependencies by scanning the targets section
     // "targets": {
     //     ".NETStandard,Version=v2.0": {
@@ -413,7 +418,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // }
     let rec findTransitiveDeps(parent: Dep) = 
         let nameVersion = parent.name + "/" + parent.version
-        match root?targets.[longFramework].GetCaseInsensitive(nameVersion) with 
+        match targets.GetCaseInsensitive(nameVersion) with 
         | None ->
             dprintfn "Couldn't find %s in targets" nameVersion
         | Some (lib) when transitiveDependencies.TryAdd(nameVersion, parent) ->
@@ -454,7 +459,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // }
 
     let autoReferenced = HashSet<string>()
-    for name, dep in root?project?frameworks.[shortFramework]?dependencies.Properties do 
+    for name, dep in projectFrameworks?dependencies.Properties do 
         if dep.TryGetProperty("autoReferenced") = Some(JsonValue.Boolean(true)) then 
             autoReferenced.Add(name) |> ignore
         let version = chooseVersion(name)
@@ -489,10 +494,31 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 
     // Search packs for *.Ref assemblies
     let absolutePackRef(name, ver) =
-        packageFolders @ dotnetPackFolders
+        dprintfn "absolutePackRef: name=%s ver=%s" name ver
+
+        let packDirs = packageFolders @ dotnetPackFolders
+        let getRefDir (pdir: string) = Path.Combine(pdir, name + ".Ref")
+        let refDirs =
+            if ver = "*" then
+                packDirs 
+                |> List.collect (fun pdir -> 
+                    try
+                        let dir = DirectoryInfo(getRefDir pdir)
+                        if not dir.Exists then []
+                        else
+
+                        dir.EnumerateDirectories()
+                        |> Seq.map (fun (v: DirectoryInfo) -> Path.Combine(v.FullName, "ref", shortFramework))
+                        |> List.ofSeq
+                    with _ -> []
+                )
+            else
+                packDirs
+                |> List.map (fun pdir -> Path.Combine(getRefDir pdir, ver, "ref", shortFramework))
+
+        refDirs
         |> List.collect(fun p ->
             try
-                let p = Path.Combine(p, name + ".Ref", ver, "ref", shortFramework)
                 let di = DirectoryInfo(p)
                 di.EnumerateFiles("*.dll") 
                 |> Seq.map (fun x -> x.FullName)
@@ -501,7 +527,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 
     // Find .dll files for each dependency
     // Additionally, for netcoreapp3.0+ and netstandard2.1+, 
-    // find Microsoft.NETCore.App / NETStandard.Library.Ref assemblies.
+    // find Microsoft.NETCore.App.Ref / NETStandard.Library.Ref assemblies.
     // Sample:
     // "targets": {
     //     ".NETCoreApp,Version=v2.0": {
@@ -561,7 +587,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             |> List.ofSeq
         // Otherwise, we'll look at the list of "compile" .dlls in "targets"
         | _ ->
-            let target = root?targets.[longFramework].GetCaseInsensitive(nameVersion).Value
+            let target = targets.GetCaseInsensitive(nameVersion).Value
             match target.TryGetProperty("compile") with 
             | None -> 
                 dprintfn "%s has no compile-time dependencies" nameVersion
@@ -573,8 +599,38 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     | None -> ()
                     | Some(abs) -> yield abs ]
 
+    // netcore 3.0.100-preview8-013656 and above: 
+    // Find frameworkReferences and reference the Ref packs
+    // "project": {
+    //     "version": "1.0.0",
+    //     "restore": { ... },
+    //     "frameworks": {
+    //         "netcoreapp3.0": {
+    //             "frameworkReferences": {
+    //                 "Microsoft.NETCore.App": {
+    //                   "privateAssets": "all"
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    let frameworkReferences = 
+        match projectFrameworks.TryGetProperty("frameworkReferences"), projectFrameworks.TryGetProperty("runtimeIdentifierGraphPath") with
+        | Some refs, Some runtimeIdentifierGraphPath -> 
+            let rid_ver = (runtimeIdentifierGraphPath.AsString()) |> Path.GetDirectoryName |> Path.GetFileName
+            [ for frameworkReference, _ in refs.Properties do 
+                dprintfn "frameworkReference: %s %A" frameworkReference rid_ver
+                yield frameworkReference ]
+        | _ -> []
+
     // Find all package dlls
-    let packageDlls = [for d in transitiveDependencies.Values do yield! findDlls(d)]
+    let packageDlls = seq {
+        for d in transitiveDependencies.Values do 
+            yield! findDlls(d)
+        for f in frameworkReferences do
+            yield! absolutePackRef(f, "*")
+    }
+
 
     // Resolve conflicts by getting name and version from each DLL, choosing the highest version
     let packageDllsWithoutConflicts =
