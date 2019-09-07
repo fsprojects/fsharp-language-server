@@ -99,26 +99,22 @@ let private findDeclarations(parse: FSharpParseFileResults) =
         for n in i.Nested do 
             yield n, Some(i.Declaration) ]
 
-let private findSignatureDeclarations(parse: FSharpParseFileResults) = 
-    match parse.ParseTree with 
-    | Some(Ast.ParsedInput.SigFile(Ast.ParsedSigFileInput(_, _, _, _, modules))) -> 
-        let items = Navigation.getNavigationFromSigFile(modules)
-        [ for i in items.Declarations do 
-            for n in i.Nested do 
-                yield [i.Declaration.Name; n.Name], n.Range ]
-    | _ -> []
+let private findSignatureDeclarations(parse: Ast.ParsedSigFileInput) = 
+    let (Ast.ParsedSigFileInput(_, _, _, _, modules)) = parse
+    let items = Navigation.getNavigationFromSigFile(modules)
+    [ for i in items.Declarations do 
+        for n in i.Nested do 
+            yield [i.Declaration.Name; n.Name], n.Range ]
 
-let private findSignatureImplementation(parse: FSharpParseFileResults, name: string list) = 
-    match parse.ParseTree with 
-    | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> 
-        let items = Navigation.getNavigationFromImplFile(modules)
-        [ for i in items.Declarations do 
-            for n in i.Nested do 
-                if [i.Declaration.Name; n.Name] = name then yield n.Range ]
-    | _ -> []
+let private findSignatureImplementation(parse: Ast.ParsedImplFileInput, name: string list) = 
+    let (Ast.ParsedImplFileInput(_, _, _, _, _, modules, _)) = parse
+    let items = Navigation.getNavigationFromImplFile(modules)
+    [ for i in items.Declarations do 
+        for n in i.Nested do 
+            if [i.Declaration.Name; n.Name] = name then yield n.Range ]
 
 /// Find functions annotated with [<Test>]
-let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.SynBinding) list = 
+let private testFunctions(parse: Ast.ParsedImplFileInput): (string list * Ast.SynBinding) list = 
     let (|XunitTest|_|) str =
         match str with
         | "Fact" | "Xunit.FactAttribute"
@@ -169,10 +165,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
                             | _ -> ()
             | _ -> ()
         }
-    let modules = 
-        match parse.ParseTree with 
-        | Some(Ast.ParsedInput.ImplFile(Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> modules
-        | _ -> []
+    let ((Ast.ParsedImplFileInput(_, _, _, _, _, modules, _))) = parse
     [ for m in modules do 
         let ids, decls = match m with Ast.SynModuleOrNamespace(ids, _, _, decls, _, _, _, _) -> ids, decls
         let name = [for i in ids do yield i.idText]
@@ -308,12 +301,6 @@ type Server(client: ILanguageClient) =
             | Ok(parseResult, checkResult) -> 
                 let parseErrors = asDiagnostics(parseResult.Errors)
                 let typeErrors = asDiagnostics(checkResult.Errors)
-                // This is just too slow. Also, it's sometimes wrong.
-                // Find unused opens
-                // let timeUnusedOpens = Stopwatch.StartNew()
-                // let! unusedOpenRanges = UnusedOpens.getUnusedOpens(checkResult, fun(line) -> lineContent(file, line))
-                // let unusedOpenErrors = [for r in unusedOpenRanges do yield diagnostic("Unused open", r, DiagnosticSeverity.Information)]
-                // dprintfn "Found %d unused opens in %dms" unusedOpenErrors.Length timeUnusedOpens.ElapsedMilliseconds
                 // Find unused declarations
                 let timeUnusedDeclarations = Stopwatch.StartNew()
                 let! uses = checkResult.GetAllUsesOfAllSymbolsInFile()
@@ -762,21 +749,22 @@ type Server(client: ILanguageClient) =
                 let file = FileInfo(p.textDocument.uri.LocalPath)
                 match projects.FindProjectOptions(file), getOrRead(file) with 
                 | Ok(projectOptions), Some(sourceText) -> 
-                    let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                    let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
-                    if file.Name.EndsWith(".fs") then 
-                        let fns = testFunctions(parse)
+                    let! (parse, check) = checker.ParseAndCheckFileInProject(file.FullName, 0, sourceText, projectOptions)
+                    match parse.ParseTree with
+                    | Some(Ast.ParsedInput.ImplFile(input)) ->
+                        let signatures = SignatureLens.getAll file.FullName check
+                        let fns = testFunctions(input)
                         let fsproj = FileInfo(projectOptions.ProjectFileName)
                         return [ for id, bindings in fns do 
                                     yield asRunTest(fsproj, id, bindings)
-                                    yield asDebugTest(fsproj, id, bindings) ]
-                    else if file.Name.EndsWith(".fsi") then 
+                                    yield asDebugTest(fsproj, id, bindings) ] @ signatures
+                    | Some(Ast.ParsedInput.SigFile(input)) ->
                         return 
-                            [ for name, range in findSignatureDeclarations(parse) do 
+                            [ for name, range in findSignatureDeclarations(input) do 
                                 yield asGoToImplementation(name, file, range) ]
-                    else 
-                        dprintfn "Don't know how to compute code lenses on extension %s" file.Extension
-                        return []
+                    | _ ->
+                      dprintfn "Don't know how to compute code lenses on extension %s" file.Extension
+                      return []
                 | Error(e), _ -> 
                     dprintfn "Failed to create code lens because project options failed to load: %A" e
                     return []
@@ -796,18 +784,22 @@ type Server(client: ILanguageClient) =
                     | Ok(projectOptions), Some(sourceText) -> 
                         let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                         let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
-                        match findSignatureImplementation(parse, name) with 
-                        | [range] -> 
-                            return resolveGoToImplementation(p, file, range)
-                        | [] -> 
-                            dprintfn "Signature %A has no implementation in %s" name file.Name
-                            return resolveMissingGoToImplementation(p, fsi)
-                        | many ->
-                            dprintfn "Signature %A has multiple implementations in %s: %A" name file.Name many
-                            // Go to the first overload
-                            // This is wrong but still useful
-                            let range = many.Head
-                            return resolveGoToImplementation(p, file, range)
+                        match parse.ParseTree with
+                        | Some (Ast.ParsedInput.ImplFile(parse)) ->
+                            match findSignatureImplementation(parse, name) with 
+                            | [range] -> 
+                                return resolveGoToImplementation(p, file, range)
+                            | [] -> 
+                                dprintfn "Signature %A has no implementation in %s" name file.Name
+                                return resolveMissingGoToImplementation(p, fsi)
+                            | many ->
+                                dprintfn "Signature %A has multiple implementations in %s: %A" name file.Name many
+                                // Go to the first overload
+                                // This is wrong but still useful
+                                let range = many.Head
+                                return resolveGoToImplementation(p, file, range)
+                        | _ ->
+                            return raise(Exception(sprintf "Signature file %s should end with .fsi" fsi.Name))
                     | Error(e), _ -> 
                         dprintfn "Failed to resolve code lens because project options failed to load: %A" e
                         return p
