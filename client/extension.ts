@@ -4,97 +4,31 @@
  * ------------------------------------------------------------------------------------------ */
 'use strict';
 
-import * as path from 'path'
-import * as fs from 'fs'
-import { FsiProcess } from './process'
 import { workspace, ExtensionContext, commands, StatusBarItem, TerminalResult } from 'coc.nvim';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'coc.nvim';
-import { NotificationType } from 'vscode-jsonrpc';
 import { Range } from 'vscode-languageserver-protocol';
-import {OperatingSystem, LanguageServerProvider, ILanguageServerRepository} from './platform'
-import {sleep} from './utils';
+import {LanguageServerProvider, LanguageServerRepository, ILanguageServerPackages} from 'coc-utils'
+import { REPLProvider } from 'coc-utils';
+import {sleep, getCurrentSelection} from 'coc-utils';
 
+function registerREPL(context: ExtensionContext, title: string) { 
 
-async function getCurrentSelection(mode: string) {
-    let doc = await workspace.document
-
-    if (mode === "v" || mode === "V") {
-        let [from, _ ] = await doc.buffer.mark("<")
-        let [to, __  ] = await doc.buffer.mark(">")
-        let result: string[] = []
-        for(let i = from; i <= to; ++i)
-        {
-            result.push(doc.getline(i - 1))
-        }
-        return result
-    }
-    else if (mode === "n") {
-        let line = await workspace.nvim.call('line', '.')
-        return [doc.getline(line - 1)]
-    }
-    else if (mode === "i") {
-        // TODO what to do in insert mode?
-    }
-    else if (mode === "t") {
-        //TODO what to do in terminal mode?
-    }
-
-    return []
-}
-
-let currentREPL: FsiProcess = undefined
-async function createREPL () {
-    if(currentREPL) {
-        currentREPL.dispose()
-        currentREPL = undefined
-    }
-    currentREPL = new FsiProcess("F# REPL") 
-    currentREPL.onExited(() => {
-        currentREPL = undefined
+    let replProvider = new REPLProvider({
+        title: title,
+        command: "dotnet",
+        args: ['fsi', '--readline+', '--utf8output', '--nologo'],
+        commit: ';;',
+        filetype: 'fs'
     })
-    await currentREPL.start()
-    return currentREPL.onExited
-}
 
-
-async function doEval(mode: string) {
-
-    let document = await workspace.document
-    if (!document || document.filetype !== 'fsharp') {
-        return
-    }
-
-    if(!currentREPL) {
-        await createREPL()
-    }
-
-    // TODO: move to workspace.getCurrentSelection when we get an answer:
-    // https://github.com/neoclide/coc.nvim/issues/933
-    const content = await getCurrentSelection(mode)
-    for(let line of content){
-        await currentREPL.eval(line)
-    }
-    await currentREPL.eval(";;")
-    // see :help feedkeys
-    await workspace.nvim.call('eval', `feedkeys("\\<esc>${content.length}j", "in")`)
-    // await currentREPL.scrollToBottom()
-}
-
-
-function registerREPL(context: ExtensionContext, __: string) { 
-
-    let cmdEvalLine = commands.registerCommand("fsharp.evaluateLine", async () => doEval('n'));
-    let cmdEvalSelection = commands.registerCommand("fsharp.evaluateSelection", async () => doEval('v'));
+    let cmdEvalLine = commands.registerCommand("fsharp.evaluateLine", async () => await replProvider.eval('n'));
+    let cmdEvalSelection = commands.registerCommand("fsharp.evaluateSelection", async () => await replProvider.eval('v'));
     let cmdExecFile = commands.registerCommand("fsharp.run", async (...args: any[]) => {
         let root = workspace.rootPath
 
         let argStrs = args
             ? args.map(x => `${x}`)
             : []
-
-        if (currentREPL) {
-            currentREPL.log.appendLine(`executing F# project...`)
-        }
 
         let term = await workspace.createTerminal({
             name: `F# console`,
@@ -109,29 +43,35 @@ function registerREPL(context: ExtensionContext, __: string) {
 
     // Push the disposable to the context's subscriptions so that the 
     // client can be deactivated on extension deactivation
+    // TODO push the repl provider
     context.subscriptions.push(cmdExecFile, cmdEvalLine, cmdEvalSelection);
-    return createREPL
 }
 
 export async function activate(context: ExtensionContext) {
 
-    const cocfs_repo: ILanguageServerRepository = {
+    const cocfs_pkgs: ILanguageServerPackages = {
         "win-x64": {
             executable: "FSharpLanguageServer.exe",
-            downloadUrl: "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-win10-x64.zip"
+            platformPath: "coc-fsharp-win10-x64.zip"
         },
         "linux-x64": {
             executable: "FSharpLanguageServer",
-            downloadUrl: "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-linux-x64.zip"
+            platformPath: "coc-fsharp-linux-x64.zip"
         },
         "osx-x64": {
             executable: "FSharpLanguageServer",
-            downloadUrl: "https://github.com/yatli/coc-fsharp/releases/download/RELEASE/coc-fsharp-osx.10.11-x64.zip"
+            platformPath: "coc-fsharp-osx.10.11-x64.zip"
         }
     }
 
+    const cocfs_repo: LanguageServerRepository = {
+        kind: "github",
+        repo: "coc-extensions/coc-fsharp",
+        channel: "latest"
+    }
+
     // The server is packaged as a standalone command
-    const lsprovider = new LanguageServerProvider(context, cocfs_repo, {type:"nightly"})
+    const lsprovider = new LanguageServerProvider(context, "cocfs server", cocfs_pkgs, cocfs_repo)
     const languageServerExe = await lsprovider.getLanguageServer()
 
     let serverOptions: ServerOptions = { 
