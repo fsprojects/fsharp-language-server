@@ -18,7 +18,7 @@ function registerREPL(context: ExtensionContext, title: string) {
         command: "dotnet",
         args: ['fsi', '--readline+', '--utf8output', '--nologo'],
         commit: ';;',
-        filetype: 'fs'
+        filetype: 'fsharp'
     })
 
     let cmdEvalLine = commands.registerCommand("fsharp.evaluateLine", async () => await replProvider.eval('n'));
