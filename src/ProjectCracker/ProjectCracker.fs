@@ -76,12 +76,14 @@ type JsonValue with
         result
 
 let private frameworkPreference = [
+    "netcoreapp3.0", ".NETCoreApp,Version=v3.0";
     "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
     "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
     "netcoreapp1.1", ".NETCoreApp,Version=v1.1";
     "netcoreapp1.0", ".NETCoreApp,Version=v1.0";
 
+    "netstandard2.1", ".NETStandard,Version=v2.1";
     "netstandard2.0", ".NETStandard,Version=v2.0";
     "netstandard1.6", ".NETStandard,Version=v1.6";
     "netstandard1.5", ".NETStandard,Version=v1.5";
@@ -112,6 +114,58 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())  
     // Find the assembly base name
     let projectName = root?project?restore?projectName.AsString()
+    // Checks that a 3-part semver version fits within the given range. Ignores
+    // the patch level portion of the version.
+    let versionInRange(version: string, min: string option, max: string option): bool =
+        let [| vsn_major; vsn_minor; _ |] = version.Split('.')
+        let min_ok =
+            match min with
+            | Some min_bound ->
+                let [| min_major; min_minor; _ |] = min_bound.Split('.')
+                int vsn_major > int min_major
+                || (int vsn_minor >= int min_minor && int vsn_major = int min_major)
+            | None ->
+                true
+        let max_ok =
+            match max with
+            | Some max_bound ->
+                let [| max_major; max_minor; _ |] = max_bound.Split('.')
+                int vsn_major < int max_major
+                || (int vsn_minor <= int max_minor && int vsn_major = int max_major)
+            | None ->
+                true
+        min_ok && max_ok
+    // Determines the location of a Core runtime which matches the given version
+    // range. Need to invoke `dotnet --info` here which gives this output:
+    //
+    //   ...
+    //     Microsoft.NETCore.App 2.2.8 [/usr/share/dotnet/shared/...]
+    //     Microsoft.NETCore.App 3.0.1 [/usr/share/dotnet/shared/...]
+    //
+    // The path returned here will have framework DLLs which we need, but which may
+    // not be explicitly referenced elsewhere
+    let findRuntimePath(runtime: string, minVersion: string option, maxVersion: string option): string =
+        let dotnetProcess = new Process()
+        dotnetProcess.StartInfo <- new ProcessStartInfo(FileName="dotnet",
+                                                        Arguments="--info",
+                                                        CreateNoWindow=true,
+                                                        UseShellExecute=false,
+                                                        RedirectStandardOutput=true)
+        dotnetProcess.Start()
+        dotnetProcess.WaitForExit(5000)
+        let stdoutRaw = dotnetProcess.StandardOutput.ReadToEnd()
+        let stdout = stdoutRaw.Split('\n')
+        let mutable found: string option = None
+        for line in stdout do
+            if line.Trim().StartsWith(runtime) then
+                let [| _; version; bracket_path |] = line.Trim().Split()
+                if versionInRange(version, minVersion, maxVersion) then
+                    dprintfn "Found valid framework %s %s in range (%A, %A)" runtime version minVersion maxVersion
+                    let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
+                    found <- Some(Path.Combine(base_path, version))
+                else
+                    dprintfn "Framework %s %s out of range (%A, %A)" runtime version minVersion maxVersion
+        found.Value
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
     let shortFramework, longFramework = 
@@ -194,7 +248,15 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //                     "version": "[2.0.1, )",
     //                     "autoReferenced": true
     //                 }
-    //             }
+    //             },
+    //
+    //             // Only present for projects built in dotnet Core 3.
+    //             "downloadDependencies": [
+    //                 {
+    //                     "name": "Microsoft.NETCore.App.Ref",
+    //                     "version": "[3.0.0, 3.0.0]"
+    //                 }
+    //             ]
     //         }
     //     }
     // }
@@ -205,6 +267,37 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let version = chooseVersion(name)
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
+    let mutable runtimeDir: string option = None
+    let downloadDependencies = root?project?frameworks.[shortFramework].TryGetProperty("downloadDependencies")
+    match downloadDependencies with
+    | Some downloadDeps ->
+        for dep in downloadDeps.AsArray() do
+            let fullName = dep?name.AsString()
+            let fullVersion = dep?version.AsString()
+            let runtimeName =
+                if fullName.EndsWith(".Ref") then
+                    fullName.Substring(0, fullName.Length - 4)
+                else
+                    fullName
+            let [| minVersionStr; maxVersionStr |] = fullVersion.Trim().Substring(1, fullVersion.Length - 2).Split(',')
+            let minVersion =
+                if minVersionStr = "" then
+                    None
+                else
+                    Some(minVersionStr.Trim())
+            let maxVersion =
+                if maxVersionStr = "" then
+                    None
+                else
+                    Some(maxVersionStr.Trim())
+            runtimeDir <- Some(findRuntimePath(runtimeName, minVersion, maxVersion))
+    | None -> ()
+    // The runtime directory contains all of the framework DLLs that are implicitly 
+    // required, like System.Core.dll
+    let runtimeAssemblies =
+        match runtimeDir with
+        | Some runtimePath -> List.ofArray(Directory.GetFiles(runtimePath, "*.dll"))
+        | None -> []
     // Find projects in libraries section
     for name, value in root?libraries.Properties do 
         if value?``type``.AsString() = "project" then 
@@ -281,7 +374,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // Resolve conflicts by getting name and version from each DLL, choosing the highest version
     let packageDllsWithoutConflicts =
         let dllNameVersion = 
-            [ for d in packageDlls do 
+            [ for d in packageDlls @ runtimeAssemblies do 
                 match readAssembly(FileInfo(d)) with 
                 | Error(e) -> dprintfn "Failed loading %s with error %s" d e
                 | Ok(name, version) -> yield d, name, version ]
