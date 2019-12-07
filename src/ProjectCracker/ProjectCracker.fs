@@ -67,6 +67,12 @@ type private Dep = {
     version: string
 }
 
+type private CoreRuntime = {
+    name: string
+    version: string
+    path: string
+}
+
 type JsonValue with
     member x.GetCaseInsensitive(propertyName) = 
         let mutable result: Option<JsonValue> = None
@@ -114,27 +120,6 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())  
     // Find the assembly base name
     let projectName = root?project?restore?projectName.AsString()
-    // Checks that a 3-part semver version fits within the given range. Ignores
-    // the patch level portion of the version.
-    let versionInRange(version: string, min: string option, max: string option): bool =
-        let [| vsn_major; vsn_minor; _ |] = version.Split('.')
-        let min_ok =
-            match min with
-            | Some min_bound ->
-                let [| min_major; min_minor; _ |] = min_bound.Split('.')
-                int vsn_major > int min_major
-                || (int vsn_minor >= int min_minor && int vsn_major = int min_major)
-            | None ->
-                true
-        let max_ok =
-            match max with
-            | Some max_bound ->
-                let [| max_major; max_minor; _ |] = max_bound.Split('.')
-                int vsn_major < int max_major
-                || (int vsn_minor <= int max_minor && int vsn_major = int max_major)
-            | None ->
-                true
-        min_ok && max_ok
     // Determines the location of a Core runtime which matches the given version
     // range. Need to invoke `dotnet --info` here which gives this output:
     //
@@ -144,7 +129,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //
     // The path returned here will have framework DLLs which we need, but which may
     // not be explicitly referenced elsewhere
-    let findRuntimePath(runtime: string, minVersion: string option, maxVersion: string option): string option =
+    let findRuntimePaths(): HashSet<CoreRuntime> =
         let dotnetProcess = new Process()
         dotnetProcess.StartInfo <- new ProcessStartInfo(FileName="dotnet",
                                                         Arguments="--info",
@@ -155,17 +140,21 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         dotnetProcess.WaitForExit(5000)
         let stdoutRaw = dotnetProcess.StandardOutput.ReadToEnd()
         let stdout = stdoutRaw.Split('\n')
-        let mutable found: string option = None
-        for line in stdout do
-            if line.Trim().StartsWith(runtime) then
-                let [| _; version; bracket_path |] = line.Trim().Split()
-                if versionInRange(version, minVersion, maxVersion) then
-                    dprintfn "Found valid framework %s %s in range (%A, %A)" runtime version minVersion maxVersion
-                    let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
-                    found <- Some(Path.Combine(base_path, version))
-                else
-                    dprintfn "Framework %s %s out of range (%A, %A)" runtime version minVersion maxVersion
-        found
+        let runtimePaths = HashSet<CoreRuntime>()
+        let mutable inRuntimeBlock = false
+        for rawLine in stdout do
+            let line = rawLine.Trim()
+            if line = ".NET Core runtimes installed:" then
+                inRuntimeBlock <- true
+            elif line = "" then
+                inRuntimeBlock <- false
+            elif inRuntimeBlock then
+                let [| name; version; bracket_path |] = line.Trim().Split()
+                let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
+                dprintfn "Discovered framework: %s v%s at %s" name version base_path
+                runtimePaths.Add({name=name; version=version; path=Path.Combine(base_path, version)})
+                ()
+        runtimePaths
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
     let shortFramework, longFramework = 
@@ -268,38 +257,19 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
     let mutable runtimeDir: string option = None
-    let downloadDependencies = root?project?frameworks.[shortFramework].TryGetProperty("downloadDependencies")
-    match downloadDependencies with
-    | Some downloadDeps ->
-        for dep in downloadDeps.AsArray() do
-            let fullName = dep?name.AsString()
-            let fullVersion = dep?version.AsString()
-            let runtimeName =
-                if fullName.EndsWith(".Ref") then
-                    fullName.Substring(0, fullName.Length - 4)
-                else
-                    fullName
-            let [| minVersionStr; maxVersionStr |] = fullVersion.Trim().Substring(1, fullVersion.Length - 2).Split(',')
-            let minVersion =
-                if minVersionStr = "" then
-                    None
-                else
-                    Some(minVersionStr.Trim())
-            let maxVersion =
-                if maxVersionStr = "" then
-                    None
-                else
-                    Some(maxVersionStr.Trim())
-            match findRuntimePath(runtimeName, minVersion, maxVersion) with
-            | Some dir -> runtimeDir <- Some(dir)
-            | None -> ()
-    | None -> ()
+    let [| _; longFrameworkVersion |] = longFramework.Split("Version=v")
+    let runtimeDirs = HashSet<string>()
+    let runtimes = findRuntimePaths()
+    for frameworkRef, _ in root?project?frameworks.[shortFramework]?frameworkReferences.Properties do
+        for runtime in runtimes do
+            if frameworkRef = runtime.name && runtime.version.StartsWith(longFrameworkVersion) then
+                dprintfn "Found valid runtime for %s version %s at %s" frameworkRef longFrameworkVersion runtime.path
+                runtimeDirs.Add(runtime.path) |> ignore
     // The runtime directory contains all of the framework DLLs that are implicitly 
     // required, like System.Core.dll
     let runtimeAssemblies =
-        match runtimeDir with
-        | Some runtimePath -> List.ofArray(Directory.GetFiles(runtimePath, "*.dll"))
-        | None -> []
+        [ for runtimeDir in runtimeDirs do yield! Directory.GetFiles(runtimeDir, "*.dll")]
+    dprintfn "Discovered runtime assemblies %A" runtimeAssemblies
     // Find projects in libraries section
     for name, value in root?libraries.Properties do 
         if value?``type``.AsString() = "project" then 
