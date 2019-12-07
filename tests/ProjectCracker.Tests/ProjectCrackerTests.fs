@@ -159,3 +159,9 @@ let ``build unbuilt project``() =
     if cracked.error.IsSome then Assert.Fail(cracked.error.Value)
     CollectionAssert.AreEquivalent(["NotBuilt.fs"], [for f in cracked.sources do yield f.Name])
     CollectionAssert.IsNotEmpty(cracked.packageReferences)
+
+[<Test>]
+let ``find implicit references woth netcoreapp3``() =
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NetCoreApp3"; "NetCoreApp3.fsproj"|] |> FileInfo
+    let cracked = ProjectCracker.crack(fsproj)
+    CollectionAssert.Contains([for f in cracked.packageReferences do yield f.Name], "System.Core.dll")
