@@ -260,11 +260,15 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let [| _; longFrameworkVersion |] = longFramework.Split("Version=v")
     let runtimeDirs = HashSet<string>()
     let runtimes = findRuntimePaths()
-    for frameworkRef, _ in root?project?frameworks.[shortFramework]?frameworkReferences.Properties do
-        for runtime in runtimes do
-            if frameworkRef = runtime.name && runtime.version.StartsWith(longFrameworkVersion) then
-                dprintfn "Found valid runtime for %s version %s at %s" frameworkRef longFrameworkVersion runtime.path
-                runtimeDirs.Add(runtime.path) |> ignore
+    match root?project?frameworks.[shortFramework].TryGetProperty("frameworkReferences") with
+    | Some frameworkRefs ->
+        for frameworkRef, _ in frameworkRefs.Properties do
+            for runtime in runtimes do
+                if frameworkRef = runtime.name && runtime.version.StartsWith(longFrameworkVersion) then
+                    dprintfn "Found valid runtime for %s version %s at %s" frameworkRef longFrameworkVersion runtime.path
+                    runtimeDirs.Add(runtime.path) |> ignore
+    | None -> 
+        ()
     // The runtime directory contains all of the framework DLLs that are implicitly 
     // required, like System.Core.dll
     let runtimeAssemblies =
