@@ -148,8 +148,8 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 inRuntimeBlock <- true
             elif line = "" then
                 inRuntimeBlock <- false
-            elif inRuntimeBlock then
-                let [| name; version; bracket_path |] = line.Trim().Split()
+            elif inRuntimeBlock the:
+                let [| name; version; bracket_path |] = line.Trim().Split([| ' ' |], 3)
                 let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
                 dprintfn "Discovered framework: %s v%s at %s" name version base_path
                 runtimePaths.Add({name=name; version=version; path=Path.Combine(base_path, version)})
