@@ -152,8 +152,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 let [| name; version; bracket_path |] = line.Trim().Split([| ' ' |], 3)
                 let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
                 dprintfn "Discovered framework: %s v%s at %s" name version base_path
-                runtimePaths.Add({name=name; version=version; path=Path.Combine(base_path, version)})
-                ()
+                runtimePaths.Add({name=name; version=version; path=Path.Combine(base_path, version)}) |> ignore
         runtimePaths
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
@@ -238,14 +237,11 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //                     "autoReferenced": true
     //                 }
     //             },
-    //
-    //             // Only present for projects built in dotnet Core 3.
-    //             "downloadDependencies": [
-    //                 {
-    //                     "name": "Microsoft.NETCore.App.Ref",
-    //                     "version": "[3.0.0, 3.0.0]"
-    //                 }
-    //             ]
+    //             "frameworkReferences": {
+    //                 "Microsoft.NETCore.App": {
+    //                     "privateAssets": "all"
+    //                  }
+    //             }
     //         }
     //     }
     // }
@@ -256,7 +252,6 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let version = chooseVersion(name)
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
-    let mutable runtimeDir: string option = None
     let [| _; longFrameworkVersion |] = longFramework.Split("Version=v")
     let runtimeDirs = HashSet<string>()
     let runtimes = findRuntimePaths()
