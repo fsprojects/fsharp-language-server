@@ -216,7 +216,7 @@ function createProgressListeners(client: LanguageClient) {
 }
 
 function binName(): string {
-	var baseParts = ['src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp2.0'];
+	var baseParts = ['src', 'FSharpLanguageServer', 'bin', 'Release', 'netcoreapp3.0'];
 	var pathParts = getPathParts(process.platform);
 	var fullParts = baseParts.concat(pathParts);
 
