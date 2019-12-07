@@ -144,7 +144,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //
     // The path returned here will have framework DLLs which we need, but which may
     // not be explicitly referenced elsewhere
-    let findRuntimePath(runtime: string, minVersion: string option, maxVersion: string option): string =
+    let findRuntimePath(runtime: string, minVersion: string option, maxVersion: string option): string option =
         let dotnetProcess = new Process()
         dotnetProcess.StartInfo <- new ProcessStartInfo(FileName="dotnet",
                                                         Arguments="--info",
@@ -165,7 +165,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     found <- Some(Path.Combine(base_path, version))
                 else
                     dprintfn "Framework %s %s out of range (%A, %A)" runtime version minVersion maxVersion
-        found.Value
+        found
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
     let shortFramework, longFramework = 
@@ -290,7 +290,9 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     None
                 else
                     Some(maxVersionStr.Trim())
-            runtimeDir <- Some(findRuntimePath(runtimeName, minVersion, maxVersion))
+            match findRuntimePath(runtimeName, minVersion, maxVersion) with
+            | Some dir -> runtimeDir <- Some(dir)
+            | None -> ()
     | None -> ()
     // The runtime directory contains all of the framework DLLs that are implicitly 
     // required, like System.Core.dll
