@@ -69,7 +69,8 @@ type private Dep = {
 
 type private CoreRuntime = {
     name: string
-    version: string
+    majorVersion: int
+    minorVersion: int
     path: string
 }
 
@@ -121,6 +122,10 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())  
     // Find the assembly base name
     let projectName = root?project?restore?projectName.AsString()
+    // Parses a version string into a version tuple
+    let parseVersion(version: string): int * int =
+        let components = version.Split([| '.' |])
+        (int components.[0], int components.[1])
     // Determines the location of a Core runtime which matches the given version
     // range. Need to invoke `dotnet --info` here which gives this output:
     //
@@ -153,7 +158,8 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 let [| name; version; bracket_path |] = line.Trim().Split([| ' ' |], 3)
                 let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
                 dprintfn "Discovered framework: %s v%s at %s" name version base_path
-                runtimePaths.Add({name=name; version=version; path=Path.Combine(base_path, version)}) |> ignore
+                let (majorVersion, minorVersion) = parseVersion version
+                runtimePaths.Add({name=name; majorVersion=majorVersion; minorVersion=minorVersion; path=Path.Combine(base_path, version)}) |> ignore
         runtimePaths
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
@@ -254,21 +260,47 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
     let [| _; longFrameworkVersion |] = longFramework.Split("Version=v")
-    let runtimeDirs = HashSet<string>()
+    let (frameworkMajorVersion, frameworkMinorVersion) = parseVersion longFrameworkVersion
+    let selectedRuntimes = Dictionary<string * int, CoreRuntime>()
     let runtimes = findRuntimePaths()
     match root?project?frameworks.[shortFramework].TryGetProperty("frameworkReferences") with
     | Some frameworkRefs ->
         for frameworkRef, _ in frameworkRefs.Properties do
             for runtime in runtimes do
-                if frameworkRef = runtime.name && runtime.version.StartsWith(longFrameworkVersion) then
-                    dprintfn "Found valid runtime for %s version %s at %s" frameworkRef longFrameworkVersion runtime.path
-                    runtimeDirs.Add(runtime.path) |> ignore
+                // .NET Core does not support forward compatibility across minor versions or any
+                // compatibility between major versions. That means that the only case we need
+                // to worry about is finding a preferred framework when two candidates share a
+                // major version and both have a minor version at least as high as the target minor
+                // version.
+                //
+                // In that case, we prefer the framework which is closest to the target. This avoids
+                // drifting too far from the target framework (which could introduce extra API surface)
+                // when we have a closer alternative.
+                if frameworkRef = runtime.name && runtime.majorVersion = frameworkMajorVersion && runtime.minorVersion >= frameworkMinorVersion then
+                    let runtimeKey = (runtime.name, runtime.majorVersion)
+                    if selectedRuntimes.ContainsKey(runtimeKey) then
+                        let previousMatch = selectedRuntimes.[runtimeKey]
+                        if runtime.minorVersion < previousMatch.minorVersion then
+                            dprintfn "Overriding runtime %s with %s. New runtime is closer to %s (%d, %d)"
+                                     runtime.path
+                                     previousMatch.path
+                                     frameworkRef
+                                     frameworkMajorVersion
+                                     frameworkMinorVersion
+                            selectedRuntimes.[runtimeKey] <- runtime
+                    else
+                        dprintfn "Setting %s as path to %s (%d, %d)"
+                                 runtime.path
+                                 frameworkRef
+                                 frameworkMajorVersion
+                                 frameworkMinorVersion
+                        selectedRuntimes.[runtimeKey] <- runtime
     | None -> 
         ()
     // The runtime directory contains all of the framework DLLs that are implicitly 
     // required, like System.Core.dll
     let runtimeAssemblies =
-        [ for runtimeDir in runtimeDirs do yield! Directory.GetFiles(runtimeDir, "*.dll")]
+        [ for runtimeDir in selectedRuntimes.Values do yield! Directory.GetFiles(runtimeDir.path, "*.dll")]
     dprintfn "Discovered runtime assemblies %A" runtimeAssemblies
     // Find projects in libraries section
     for name, value in root?libraries.Properties do 
@@ -482,7 +514,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=None
             }
     with e -> 
-        dprintfn "Failed to build %s: %s" fsproj.Name e.Message
+        dprintfn "Failed to build %s %s %s" fsproj.Name e.Message e.StackTrace
         {
             fsproj=fsproj
             target=placeholderTarget
