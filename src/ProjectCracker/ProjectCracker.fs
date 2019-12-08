@@ -155,11 +155,39 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             elif line = "" then
                 inRuntimeBlock <- false
             elif inRuntimeBlock then
-                let [| name; version; bracket_path |] = line.Trim().Split([| ' ' |], 3)
-                let base_path = bracket_path.Substring(1, bracket_path.Length - 2)
-                dprintfn "Discovered framework: %s v%s at %s" name version base_path
+                let [| name; version; bracketPath |] = line.Trim().Split([| ' ' |], 3)
+                let basePath = bracketPath.Substring(1, bracketPath.Length - 2)
                 let (majorVersion, minorVersion) = parseVersion version
-                runtimePaths.Add({name=name; majorVersion=majorVersion; minorVersion=minorVersion; path=Path.Combine(base_path, version)}) |> ignore
+
+                // We want to traverse the dotnet packs directory, which will
+                // have a more exact list of assemblies than what's in the runtime.
+                // The runtime includes platform-specific assemblies with references that don't
+                // always resolve outside of Windows.
+                let dotnetRoot = Directory.GetParent(basePath).Parent.FullName
+                let packBase = Path.Combine(dotnetRoot, "packs", name + ".Ref", version, "ref")
+
+                // This only includes the version of netcoreapp corresponding to the actual
+                // version of .NET Core. Since this may not match the project we'll have to
+                // grab this from the filesystem.
+                let packFrameworks =
+                    if Directory.Exists(packBase) then
+                        List.ofSeq(Directory.EnumerateDirectories(packBase))
+                    else
+                        []
+
+                match packFrameworks with
+                | packDir :: _ ->
+                    dprintfn "Discovered framework pack: %s v%s at %s" name version packDir
+                    runtimePaths.Add({name=name;
+                                      majorVersion=majorVersion;
+                                      minorVersion=minorVersion;
+                                      path=packDir}) |> ignore
+                | [] ->
+                    dprintfn "Discovered framework runtime: %s v%s at %s" name version basePath
+                    runtimePaths.Add({name=name;
+                                      majorVersion=majorVersion;
+                                      minorVersion=minorVersion;
+                                      path=Path.Combine(basePath, version)}) |> ignore
         runtimePaths
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
