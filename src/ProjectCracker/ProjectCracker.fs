@@ -304,28 +304,60 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 // In that case, we prefer the framework which is closest to the target. This avoids
                 // drifting too far from the target framework (which could introduce extra API surface)
                 // when we have a closer alternative.
-                if frameworkRef = runtime.name && runtime.majorVersion = frameworkMajorVersion && runtime.minorVersion >= frameworkMinorVersion then
+                let versionMatch =
+                    runtime.majorVersion = frameworkMajorVersion
+                    && runtime.minorVersion >= frameworkMinorVersion
+                if frameworkRef = runtime.name && versionMatch then
                     let runtimeKey = (runtime.name, runtime.majorVersion)
                     if selectedRuntimes.ContainsKey(runtimeKey) then
                         let previousMatch = selectedRuntimes.[runtimeKey]
                         if runtime.minorVersion < previousMatch.minorVersion then
-                            dprintfn "Overriding runtime %s with %s. New runtime is closer to %s (%d, %d)"
-                                     runtime.path
-                                     previousMatch.path
-                                     frameworkRef
-                                     frameworkMajorVersion
-                                     frameworkMinorVersion
                             selectedRuntimes.[runtimeKey] <- runtime
                     else
-                        dprintfn "Setting %s as path to %s (%d, %d)"
-                                 runtime.path
-                                 frameworkRef
-                                 frameworkMajorVersion
-                                 frameworkMinorVersion
                         selectedRuntimes.[runtimeKey] <- runtime
     | None -> 
         ()
-    // The runtime directory contains all of the framework DLLs that are implicitly 
+    // ["/Users/georgefraser/.nuget/packages/", ...]
+    let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
+
+    // If the main version of the runtime differs from the target framework version, dotnet restore
+    // will put a version of the .Ref into the NuGet packages directory. We can use this as an
+    // alternative source of runtime directories if the exact version exists.
+    //
+    //   .../.nuget/packages/microsoft.netcore.app.ref/3.0.0/ref/netcoreapp3.0
+    //
+    // is preferred to this:
+    //
+    //   .../dotnet/packs/Microsoft.NETCore.App.Ref/3.1.0/ref
+    //
+    // for netcoreapp3.0
+    for runtime in List.ofSeq(selectedRuntimes.Values) do
+        let mutable currentRuntime = runtime
+
+        for packageFolder in packageFolders do
+            let nugetPackPath = Path.Combine(packageFolder, runtime.name.ToLower() + ".ref")
+            if Directory.Exists(nugetPackPath) then
+                for versionDir in Directory.GetDirectories(nugetPackPath) do
+                    let version = Path.GetFileName(versionDir)
+                    let (packMajorVersion, packMinorVersion) = parseVersion version
+                    let versionMatch =
+                        currentRuntime.majorVersion = packMajorVersion
+                        && packMinorVersion >= frameworkMinorVersion
+
+                    let packAssemblyPath = Path.Combine(nugetPackPath, version, "ref", shortFramework)
+                    if versionMatch && packMinorVersion <= currentRuntime.minorVersion && Directory.Exists(packAssemblyPath) then
+                        currentRuntime <- {currentRuntime with path=packAssemblyPath
+                                                               minorVersion=packMinorVersion}
+
+        let runtimeKey = (runtime.name, runtime.majorVersion)
+        selectedRuntimes.[runtimeKey] <- currentRuntime
+        dprintfn "Chose %s as the final path for runtime %s version (%d, %d)"
+                 currentRuntime.path
+                 currentRuntime.name
+                 currentRuntime.majorVersion
+                 currentRuntime.minorVersion
+
+    // The runtime directory contains all of the framework DLLs that are implicitly
     // required, like System.Core.dll
     let runtimeAssemblies =
         [ for runtimeDir in selectedRuntimes.Values do yield! Directory.GetFiles(runtimeDir.path, "*.dll")]
@@ -339,8 +371,6 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 findTransitiveDeps(dep)
             | _ -> 
                 dprintfn "%s doesn't look like name/version" name
-    // ["/Users/georgefraser/.nuget/packages/", ...]
-    let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
     // Search package folders for a .dll
     let absoluteDll(relativeToPackageFolder: string): string option = 
         let mutable found: string option = None
@@ -542,7 +572,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=None
             }
     with e -> 
-        dprintfn "Failed to build %s %s %s" fsproj.Name e.Message e.StackTrace
+        dprintfn "Failed to build %s %s: %s" fsproj.Name e.Message e.StackTrace
         {
             fsproj=fsproj
             target=placeholderTarget
