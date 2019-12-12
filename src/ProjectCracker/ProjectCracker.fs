@@ -572,7 +572,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=None
             }
     with e -> 
-        dprintfn "Failed to build %s %s: %s" fsproj.Name e.Message e.StackTrace
+        dprintfn "Failed to build %s: %s\n%s" fsproj.Name e.Message e.StackTrace
         {
             fsproj=fsproj
             target=placeholderTarget
