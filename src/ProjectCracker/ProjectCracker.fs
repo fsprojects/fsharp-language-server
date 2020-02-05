@@ -110,7 +110,7 @@ type private TFM =
 
         match tfm with
         | FX(INT ver)     -> let ver = if ver < 100 then ver * 10 else ver
-                             NetFX(ver)
+                             in NetFX(ver)
         | COREAPP(FL ver) -> NetCoreApp(int <| ver*100.0)
         | STD(FL ver)     -> NetStandard(int <| ver*100.0)
         | _               -> Other
@@ -145,6 +145,7 @@ let private dotnetPackFolders =
 dprintfn "dotnet pack folders: %A" dotnetPackFolders
 
 let private frameworkPreference = [
+    "netcoreapp3.1", ".NETCoreApp,Version=v3.1";
     "netcoreapp3.0", ".NETCoreApp,Version=v3.0";
     "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
@@ -622,6 +623,8 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 dprintfn "frameworkReference: %s %A" frameworkReference rid_ver
                 yield frameworkReference ]
         | _ -> []
+
+    dprintfn "frameworkReferences: %A" frameworkReferences
 
     // Find all package dlls
     let packageDlls = seq {
