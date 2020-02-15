@@ -13,7 +13,7 @@ steps:
   displayName: 'Use .NET Core sdk'
   inputs:
     packageType: 'sdk'
-    version: '3.1'
+    version: '3.1.x'
     includePreviewVersions: true
 - task: PowerShell@2
   inputs:
