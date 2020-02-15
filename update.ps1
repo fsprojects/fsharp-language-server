@@ -1,3 +1,4 @@
+Get-Process node | Stop-Process
 dotnet build -c Release
 npm run compile
 Copy-Item -Force .\src\FSharpLanguageServer\bin\Release\netcoreapp3.1\*.dll ~\AppData\Local\coc\extensions\coc-fsharp-data\server\

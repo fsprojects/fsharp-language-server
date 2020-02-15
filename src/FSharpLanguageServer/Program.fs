@@ -584,6 +584,55 @@ type Server(client: ILanguageClient) as this =
     /// so that the client-side code int client/extension.ts starts running immediately
     let mutable deferredInitialize = async { () }
 
+
+    let documentFormatting(filepath: string, filerange: Range option, opts: DocumentFormattingOptions, opts_ex: Map<string, string>): Async<TextEdit list> =
+      async {
+          let file = FileInfo(filepath)
+
+          match projects.FindProjectOptions(file), getOrRead(file) with
+          | Error _, _
+          | _, None _ -> return []
+          | Ok(proj), Some content ->
+
+          let proj = getParsingOptions proj
+          let is_fsi  = file.Extension = ".fsi"
+
+          // TODO config
+          let fmtOpts =
+            { FormatConfig.FormatConfig.Default with
+                IndentSpaceNum = opts.tabSize
+                PageWidth = 120
+                SemicolonAtEndOfLine = false
+                SpaceBeforeArgument = false
+                SpaceBeforeColon = false
+                SpaceAfterComma = true
+                SpaceAfterSemicolon = true
+                IndentOnTryWith = false }
+
+
+          let nlines = Seq.fold (fun n c -> if c = '\n' then n+1 else n) 0 content
+
+          try
+              match filerange with
+              | None       -> 
+                dprintfn "Formatting document %A with options: %A" file.FullName fmtOpts
+                let! formatted = CodeFormatter.FormatDocumentAsync(file.FullName, SourceOrigin.SourceString content, fmtOpts, proj, checker)
+                return [ { range = {start={line=0; character=0}; ``end``={line=nlines+1; character=0}}; newText = formatted } ]
+              | Some range -> 
+                dprintfn "Formatting document %A, selection %A with options: %A" file.FullName range fmtOpts
+                (*let fantomas_range = *)
+                  (*{start={line=range.start.line+1*)
+                          (*character=range.start.character}*)
+                   (*``end``={line=range.``end``.line+1*)
+                            (*character=range.``end``.character}}*)
+                let! formatted = CodeFormatter.FormatSelectionAsync(file.FullName, (asFsRange file.FullName range), SourceOrigin.SourceString content, fmtOpts, proj, checker)
+                return [ { range = range; newText = formatted } ]
+          with ex -> 
+              dprintfn "DocumentFormatting: %O" ex
+              return []
+      }
+
+
     interface ILanguageServer with 
         member __.Initialize(p: InitializeParams) =
             async {
@@ -1072,85 +1121,10 @@ type Server(client: ILanguageClient) as this =
         member __.ResolveDocumentLink(p: DocumentLink): Async<DocumentLink> = TODO()
 
         member __.DocumentFormatting(p: DocumentFormattingParams): Async<TextEdit list> = 
-            async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
-
-                match projects.FindProjectOptions(file), getOrRead(file) with
-                | Error _, _
-                | _, None _ -> return []
-                | Ok(proj), Some content ->
-
-                let proj = getParsingOptions proj
-
-                let opts    = p.options
-                let opts_ex = p.optionsMap
-                let is_fsi  = file.Extension = ".fsi"
-
-                // TODO config
-                let fmtOpts = { FormatConfig.FormatConfig.Default with
-                                IndentSpaceNum = opts.tabSize
-                                PageWidth = 120
-                                SemicolonAtEndOfLine = false
-                                SpaceBeforeArgument = false 
-                                SpaceBeforeColon = false
-                                SpaceAfterComma = true
-                                SpaceAfterSemicolon = true 
-                                IndentOnTryWith = false }
-
-                dprintfn "Formatting %A with options: %A" file.FullName fmtOpts
-
-                let nlines = Seq.fold (fun n c -> if c = '\n' then n+1 else n) 0 content
-
-                try
-                    let! range_formatted = CodeFormatter.FormatDocumentAsync(file.FullName, SourceOrigin.SourceString content, fmtOpts, proj, checker)
-                    return [ { range = {start={line=0; character=0}; ``end``={line=nlines+1; character=0}}; newText = range_formatted } ]
-                with ex -> 
-                    dprintfn "DocumentFormatting: %O" ex
-                    return []
-            }
+          documentFormatting(p.textDocument.uri.LocalPath, None, p.options, p.optionsMap)
 
         member __.DocumentRangeFormatting(p: DocumentRangeFormattingParams): Async<TextEdit list> = 
-            async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
-
-                match projects.FindProjectOptions(file), getOrRead(file) with
-                | Error _, _
-                | _, None _ -> return []
-                | Ok(proj), Some content ->
-
-                let proj = getParsingOptions proj
-
-                let opts    = p.options
-                let opts_ex = p.optionsMap
-                let range   = p.range
-                let is_fsi  = file.Extension = ".fsi"
-
-                // TODO config
-                let fmtOpts = { FormatConfig.FormatConfig.Default with
-                                IndentSpaceNum = opts.tabSize
-                                PageWidth = 120
-                                (*PreserveEndOfLine = false*)
-                                SemicolonAtEndOfLine = false
-                                SpaceBeforeArgument = false 
-                                SpaceBeforeColon = false
-                                SpaceAfterComma = true
-                                SpaceAfterSemicolon = true 
-                                IndentOnTryWith = false }
-
-                try
-                    let! range_formatted = 
-                      CodeFormatter.FormatSelectionAsync(
-                        file.FullName, 
-                        (asFsRange file.FullName p.range), 
-                        SourceOrigin.SourceString content, 
-                        fmtOpts, 
-                        proj, 
-                        checker)
-                    return [ { range = p.range; newText = range_formatted } ]
-                with ex -> 
-                    dprintfn "DocumentFormatting: %O" ex
-                    return []
-            }
+          documentFormatting(p.textDocument.uri.LocalPath, Some p.range, p.options, p.optionsMap)
 
         member __.DocumentOnTypeFormatting(p: DocumentOnTypeFormattingParams): Async<TextEdit list> = TODO()
         member __.Rename(p: RenameParams): Async<WorkspaceEdit> =
