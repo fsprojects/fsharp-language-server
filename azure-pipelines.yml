@@ -12,10 +12,9 @@ steps:
 - task: UseDotNet@2
   displayName: 'Use .NET Core sdk'
   inputs:
-    packageType: sdk
+    packageType: 'sdk'
+    version: '3.1'
     includePreviewVersions: true
-    version: 3.0.100-preview6-012264
-    installationPath: $(Agent.ToolsDirectory)/dotnet
 - task: PowerShell@2
   inputs:
     filePath: 'pack.ps1'
