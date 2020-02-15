@@ -17,7 +17,7 @@ Move-Item *.tgz publish/
 $plat = "win10-x64","linux-x64","osx.10.11-x64"
 
 foreach ($i in $plat) {
-    dotnet publish -f netcoreapp2.2 -c Release --self-contained `
+    dotnet publish -f netcoreapp3.1 -c Release --self-contained `
         -r $i src/FSharpLanguageServer -o ./bin/$i
     Compress-Archive -Path ./bin/$i/* -DestinationPath publish/coc-fsharp-$i.zip -Force
 }

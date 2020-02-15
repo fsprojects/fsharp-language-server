@@ -232,7 +232,12 @@ type ProjectManager(checker: FSharpChecker) as this =
         let analyzeFsx(fsx: FileInfo) = 
             dprintfn "Creating project options for script %s" fsx.Name
             let source = File.ReadAllText(fsx.FullName) |> SourceText.ofString
-            let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
+            let inferred, errors = 
+                checker.GetProjectOptionsFromScript(
+                    fsx.FullName, 
+                    source, 
+                    loadedTimeStamp=fsx.LastWriteTime, 
+                    assumeDotNetFramework=false) |> Async.RunSynchronously
             let combinedOtherOptions = [|
                 for p in dotNetFramework do 
                         yield "-r:" + p.FullName
@@ -384,7 +389,8 @@ type ProjectManager(checker: FSharpChecker) as this =
     /// Find all .fsproj files referenced by a .sln file
     let slnProjectReferences (sln: FileInfo): list<FileInfo> =
         // From https://github.com/OmniSharp/omnisharp-roslyn/blob/master/src/OmniSharp.MSBuild/SolutionParsing/ProjectBlock.cs
-        let projectHeader = Regex(
+        let projectHeader = 
+            Regex(
                 "^" // Beginning of line
                 + "Project\\(\"(?<PROJECTTYPEGUID>.*)\"\\)"
                 + "\\s*=\\s*" // Any amount of whitespace plus "=" plus any amount of whitespace

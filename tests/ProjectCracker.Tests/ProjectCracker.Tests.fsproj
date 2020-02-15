@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
@@ -17,6 +17,6 @@
     <ProjectReference Include="..\..\src\ProjectCracker\ProjectCracker.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="4.6.2" />
+    <PackageReference Update="FSharp.Core" Version="4.7.0" />
   </ItemGroup>
 </Project>

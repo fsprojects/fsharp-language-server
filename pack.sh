@@ -9,7 +9,7 @@ npm run compile
 
 for i in $plat
 do
-    dotnet publish -f netcoreapp2.2 -c Release --self-contained \
+    dotnet publish -f netcoreapp3.1 -c Release --self-contained \
         -r $i src/FSharpLanguageServer -o ./out/server/$i
 done
  

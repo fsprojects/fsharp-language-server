@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <RuntimeIdentifiers>win10-x64;osx.10.11-x64;linux-x64</RuntimeIdentifiers>
-    <TargetFramework>netcoreapp2.2</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
 
@@ -20,8 +20,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fantomas" Version="3.0.0-beta-002-alpha-421" />
-    <PackageReference Include="FSharp.Compiler.Service" Version="30.0.0" />
+    <PackageReference Include="Fantomas" Version="3.2.0" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="33.0.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.12" />
   </ItemGroup>
 
@@ -31,6 +31,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="4.6.2" />
+    <PackageReference Update="FSharp.Core" Version="4.7.0" />
   </ItemGroup>
 </Project>

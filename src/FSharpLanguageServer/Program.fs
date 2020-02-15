@@ -1097,11 +1097,13 @@ type Server(client: ILanguageClient) as this =
                                 SpaceAfterSemicolon = true 
                                 IndentOnTryWith = false }
 
+                dprintfn "Formatting %A with options: %A" file.FullName fmtOpts
+
                 let nlines = Seq.fold (fun n c -> if c = '\n' then n+1 else n) 0 content
 
                 try
                     let! range_formatted = CodeFormatter.FormatDocumentAsync(file.FullName, SourceOrigin.SourceString content, fmtOpts, proj, checker)
-                    return [ { range = {start={line=0; character=0}; ``end``={line=nlines; character=0}}; newText = range_formatted } ]
+                    return [ { range = {start={line=0; character=0}; ``end``={line=nlines+1; character=0}}; newText = range_formatted } ]
                 with ex -> 
                     dprintfn "DocumentFormatting: %O" ex
                     return []
@@ -1136,7 +1138,14 @@ type Server(client: ILanguageClient) as this =
                                 IndentOnTryWith = false }
 
                 try
-                    let! range_formatted = CodeFormatter.FormatSelectionAsync(file.FullName, (asFsRange file.FullName p.range), SourceOrigin.SourceString content, fmtOpts, proj, checker)
+                    let! range_formatted = 
+                      CodeFormatter.FormatSelectionAsync(
+                        file.FullName, 
+                        (asFsRange file.FullName p.range), 
+                        SourceOrigin.SourceString content, 
+                        fmtOpts, 
+                        proj, 
+                        checker)
                     return [ { range = p.range; newText = range_formatted } ]
                 with ex -> 
                     dprintfn "DocumentFormatting: %O" ex
