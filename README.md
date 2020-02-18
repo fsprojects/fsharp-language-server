@@ -6,4 +6,5 @@ Original project: https://github.com/fsprojects/fsharp-language-server
 
 # Installation
 - You'll need [coc.nvim](https://github.com/neoclide/coc.nvim) installed first.
+- Check `:set ft=` and if the result is not "fsharp", it doesn't trigger plugin initialization. Use something like https://github.com/sheerun/vim-polyglot
 - Run `:CocInstall coc-fsharp`
