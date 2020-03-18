@@ -67,7 +67,7 @@ Install [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovi
 Update your vim config to point LanguageClient-neovim to the FSharp Language Server for fsharp filetypes:
 ```
 let g:LanguageClient_serverCommands = {
-    \ 'fsharp': ['dotnet', '/Users/name/code/fsharp-language-server/src/FSharpLanguageServer/bin/Release/netcoreapp2.0/target/FSharpLanguageServer.dll']
+    \ 'fsharp': ['dotnet', '/Users/name/code/fsharp-language-server/src/FSharpLanguageServer/bin/Release/netcoreapp3.0/target/FSharpLanguageServer.dll']
     \ }
 ```
 Open an fsharp file, move the cursor, and call functions. Mappings are up to you:
@@ -96,7 +96,7 @@ dotnet publish -c Release -r osx.10.11-x64 src/FSharpLanguageServer
 dotnet publish -c Release -r win10-x64 src/FSharpLanguageServer
 ```
 
-Make sure that the FSharpLanguageServer (in `src/FSharpLanguageServer/bin/Release/netcoreapp2.0/PLATFORM/publish`) is in your PATH. Alternatively, you can set the path to the server executable manually within your .spacemacs user-config:
+Make sure that the FSharpLanguageServer (in `src/FSharpLanguageServer/bin/Release/netcoreapp3.0/PLATFORM/publish`) is in your PATH. Alternatively, you can set the path to the server executable manually within your .spacemacs user-config:
 
 ```
 (setq fsharp2-lsp-executable "/path/to/FSharpLanguageServer")

@@ -24,9 +24,9 @@
     ],
     "main": "./out/client/extension",
     "files": [
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/osx.10.11-x64/publish",
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/linux-x64/publish",
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp2.0/win10-x64/publish"
+        "./src/FSharpLanguageServer/bin/Release/netcoreapp3.0/osx.10.11-x64/publish",
+        "./src/FSharpLanguageServer/bin/Release/netcoreapp3.0/linux-x64/publish",
+        "./src/FSharpLanguageServer/bin/Release/netcoreapp3.0/win10-x64/publish"
     ],
     "contributes": {
         "languages": [
