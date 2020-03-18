@@ -11,6 +11,7 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open LSP.Types
 open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.Text
 open ProjectCracker
 
 type private ResolvedProject = {
@@ -238,8 +239,8 @@ type ProjectManager(checker: FSharpChecker) =
         /// Analyze a script file
         let analyzeFsx(fsx: FileInfo) = 
             dprintfn "Creating project options for script %s" fsx.Name
-            let source = File.ReadAllText(fsx.FullName)
-            let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
+            let source = SourceText.ofString(File.ReadAllText(fsx.FullName))
+            let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, loadedTimeStamp=fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
             let combinedOtherOptions = [|
                 for p in dotNetFramework do 
                         yield "-r:" + p.FullName

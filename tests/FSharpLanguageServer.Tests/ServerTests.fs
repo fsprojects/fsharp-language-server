@@ -5,6 +5,7 @@ open FSharpLanguageServer.Program
 open System
 open System.IO
 open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.Text
 open NUnit.Framework
 open LSP.Types
 open LSP
@@ -18,9 +19,9 @@ let setup() =
 [<Test>]
 let ``check errors in some text``() = 
     let file = "MyScript.fsx"
-    let input = """
+    let input = SourceText.ofString("""
     let foo() = "foo!""
-    """
+    """)
     let checker = FSharpChecker.Create()
     let projOptions, projOptionsErrors = checker.GetProjectOptionsFromScript(file, input) |> Async.RunSynchronously
     let parsingOptions, parsingOptionsErrors = checker.GetParsingOptionsFromProjectOptions(projOptions)
