@@ -2,6 +2,7 @@ module FSharpLanguageServer.Program
 
 open LSP.Log
 open FSharp.Compiler
+open FSharp.Compiler.Text
 open FSharp.Compiler.SourceCodeServices
 open System
 open System.Diagnostics
@@ -137,7 +138,12 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Ast.Syn
         | _ -> false
     let isTestFunction(binding: Ast.SynBinding): bool = 
         let attrs = match binding with Ast.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
-        List.exists isTestAttribute attrs
+        let mutable found = false
+        for list in attrs do 
+            for a in list.Attributes do 
+                if isTestAttribute(a) then 
+                    found <- true
+        found
     let name(binding: Ast.SynBinding): string list = 
         match binding with 
         | Ast.Binding(_, _, _, _, _, _, _, Ast.SynPat.LongIdent(Ast.LongIdentWithDots(ids, _), _, _, _, _, _), _, _, _, _) -> 
@@ -222,7 +228,7 @@ type Server(client: ILanguageClient) =
                 | None ->
                     try
                         let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                        let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
+                        let! parse = checker.ParseFile(file.FullName, SourceText.ofString(sourceText), parsingOptions)
                         return Ok(parse)
                     with e -> 
                         return Error(e.Message)
@@ -245,7 +251,7 @@ type Server(client: ILanguageClient) =
             | Ok(projectOptions), Some(sourceText, sourceVersion) -> 
                 let recompile = async {
                     let timeCheck = Stopwatch.StartNew()
-                    let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, sourceText, projectOptions)
+                    let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, SourceText.ofString(sourceText), projectOptions)
                     dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                     match force with 
                     | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
@@ -484,7 +490,7 @@ type Server(client: ILanguageClient) =
                     // Check file
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
                     let timeCheck = Stopwatch.StartNew()
-                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, sourceText, projectOptions)
+                    let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, SourceText.ofString(sourceText), projectOptions)
                     dprintfn "Checked %s in %dms" sourceFile.Name timeCheck.ElapsedMilliseconds
                     match maybeCheck with 
                     | FSharpCheckFileAnswer.Aborted -> dprintfn "Aborted checking %s" sourceFile.Name
@@ -744,11 +750,11 @@ type Server(client: ILanguageClient) =
                             dprintfn "...scan %s" sourceFile.Name
                             match maybeMatchesQuery(p.query, sourceFile) with 
                             | None -> () 
-                            | Some sourceText ->
+                            | Some(sourceText) ->
                                 try
                                     dprintfn "...parse %s" sourceFile.Name
                                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                                    let! parse = checker.ParseFile(sourceFile.FullName, sourceText, parsingOptions)
+                                    let! parse = checker.ParseFile(sourceFile.FullName, SourceText.ofString(sourceText), parsingOptions)
                                     for declaration, container in findDeclarations(parse) do 
                                         if matchesQuery(p.query, declaration.Name) then 
                                             all.Add(asSymbolInformation(declaration, container))
@@ -763,7 +769,7 @@ type Server(client: ILanguageClient) =
                 match projects.FindProjectOptions(file), getOrRead(file) with 
                 | Ok(projectOptions), Some(sourceText) -> 
                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                    let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
+                    let! parse = checker.ParseFile(file.FullName, SourceText.ofString(sourceText), parsingOptions)
                     if file.Name.EndsWith(".fs") then 
                         let fns = testFunctions(parse)
                         let fsproj = FileInfo(projectOptions.ProjectFileName)
@@ -795,7 +801,7 @@ type Server(client: ILanguageClient) =
                     match projects.FindProjectOptions(file), getOrRead(file) with 
                     | Ok(projectOptions), Some(sourceText) -> 
                         let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
-                        let! parse = checker.ParseFile(file.FullName, sourceText, parsingOptions)
+                        let! parse = checker.ParseFile(file.FullName, SourceText.ofString(sourceText), parsingOptions)
                         match findSignatureImplementation(parse, name) with 
                         | [range] -> 
                             return resolveGoToImplementation(p, file, range)

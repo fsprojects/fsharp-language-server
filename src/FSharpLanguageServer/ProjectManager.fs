@@ -11,6 +11,7 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open LSP.Types
 open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.Text
 open ProjectCracker
 
 type private ResolvedProject = {
@@ -78,10 +79,19 @@ type ProjectManager(checker: FSharpChecker) =
 
     /// Find base dlls
     /// Workaround of https://github.com/fsharp/FSharp.Compiler.Service/issues/847
+    let fsharpCore = 
+        let dir = Path.GetDirectoryName(typeof<FSharp.Collections.List<_>>.Assembly.Location)
+        let relative = [ "FSharp.Core.dll" ]
+        [ for d in relative do 
+            let f = FileInfo(Path.Combine(dir, d))
+            if f.Exists then 
+                yield f
+            else 
+                dprintfn "Couldn't find %s in %s" d dir 
+        ]
     let dotNetFramework = 
         let dir = Path.GetDirectoryName(typeof<System.Object>.Assembly.Location)
         let relative = [
-            "FSharp.Core.dll"
             "Microsoft.CSharp.dll"
             "Microsoft.VisualBasic.dll"
             "Microsoft.Win32.Primitives.dll"
@@ -238,10 +248,12 @@ type ProjectManager(checker: FSharpChecker) =
         /// Analyze a script file
         let analyzeFsx(fsx: FileInfo) = 
             dprintfn "Creating project options for script %s" fsx.Name
-            let source = File.ReadAllText(fsx.FullName)
-            let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
+            let source = SourceText.ofString(File.ReadAllText(fsx.FullName))
+            let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, loadedTimeStamp=fsx.LastWriteTime, assumeDotNetFramework=true) |> Async.RunSynchronously
             let combinedOtherOptions = [|
                 for p in dotNetFramework do 
+                        yield "-r:" + p.FullName
+                for p in fsharpCore do 
                         yield "-r:" + p.FullName
                 for o in inferred.OtherOptions do 
                     // If a dll is included by default, skip it
@@ -253,7 +265,7 @@ type ProjectManager(checker: FSharpChecker) =
             let options = {inferred with OtherOptions = combinedOtherOptions}
             printOptions(options)
             {
-                sources=[for f in inferred.SourceFiles do yield FileInfo(f)]
+                sources=[for f in options.SourceFiles do yield FileInfo(f)]
                 options=options
                 target=FileInfo("NoOutputForFsx")
                 errors=Conversions.asDiagnostics(errors)
@@ -303,7 +315,7 @@ type ProjectManager(checker: FSharpChecker) =
                 UnresolvedReferences = None 
                 UseScriptResolutionRules = false
             }
-            // Log what we inferred
+            // Log what we options
             printOptions(options)
             {
                 sources=cracked.sources

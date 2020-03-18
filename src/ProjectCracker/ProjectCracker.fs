@@ -76,6 +76,8 @@ type JsonValue with
         result
 
 let private frameworkPreference = [
+    "netcoreapp3.1", ".NETCoreApp,Version=v3.1";
+    "netcoreapp3.0", ".NETCoreApp,Version=v3.0";
     "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
     "netcoreapp2.1", ".NETCoreApp,Version=v2.1";
     "netcoreapp2.0", ".NETCoreApp,Version=v2.0";
@@ -199,7 +201,11 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     //     }
     // }
     let autoReferenced = HashSet<string>()
-    for name, dep in root?project?frameworks.[shortFramework]?dependencies.Properties do 
+    let dependencies = 
+        match root?project?frameworks.[shortFramework].TryGetProperty("dependencies") with 
+        | Some(dependencies) -> dependencies.Properties 
+        | None -> [| |]
+    for name, dep in dependencies do 
         if dep.TryGetProperty("autoReferenced") = Some(JsonValue.Boolean(true)) then 
             autoReferenced.Add(name) |> ignore
         let version = chooseVersion(name)
