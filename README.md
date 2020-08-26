@@ -62,6 +62,8 @@ npm install
 dotnet build -c Release
 ```
 
+If using a distribution based on Arch Linux, you can also install it from the [AUR](https://aur.archlinux.org/packages/fsharp-language-server/)
+
 Install [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) 
 
 Update your vim config to point LanguageClient-neovim to the FSharp Language Server for fsharp filetypes:
