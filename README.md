@@ -120,7 +120,7 @@ Finally, make sure that you have these layers enabled in your dotspacemacs-confi
 ![EmacsLspMode](videos/EmacsLspMode.gif)
 
 ## How is this project different than [Ionide](https://github.com/ionide)?
-Ionide is a suite of F# plugins for VSCode; F# language server is analagous to the [FSAC](https://github.com/fsharp/FsAutoComplete) component. While FSAC is based on a custom JSON protocol; F#LS is based on the [language server protocol](https://microsoft.github.io/language-server-protocol/specification) standard. 
+Ionide is a suite of F# plugins for VSCode; F# language server is analagous to the [FSAC](https://github.com/fsharp/FsAutoComplete) component.
 
 The implementation is a thin wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/) and is heavily focused on performance. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
 
