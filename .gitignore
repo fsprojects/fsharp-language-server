@@ -7,3 +7,4 @@ node_modules/
 build.vsix
 Scratch.fsx
 Scratch.ts
+fsharp-language-server.sln.DotSettings.user
