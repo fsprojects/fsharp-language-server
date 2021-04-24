@@ -83,6 +83,8 @@ type JsonValue with
         result
 
 let private frameworkPreference = [
+    "net5.0", "net5.0";
+
     "netcoreapp3.1", ".NETCoreApp,Version=v3.1";
     "netcoreapp3.0", ".NETCoreApp,Version=v3.0";
     "netcoreapp2.2", ".NETCoreApp,Version=v2.2";
@@ -127,7 +129,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let components = version.Split([| '.' |])
         (int components.[0], int components.[1])
     // Determines the location of a Core runtime which matches the given version
-    // range. Need to invoke `dotnet --info` here which gives this output:
+    // range. Need to invoke `dotnet --list-runtimes` here which gives this output:
     //
     //   ...
     //     Microsoft.NETCore.App 2.2.8 [/usr/share/dotnet/shared/...]
@@ -138,57 +140,54 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let findRuntimePaths(): HashSet<CoreRuntime> =
         let dotnetProcess = new Process()
         dotnetProcess.StartInfo <- new ProcessStartInfo(FileName="dotnet",
-                                                        Arguments="--info",
+                                                        Arguments="--list-runtimes",
                                                         CreateNoWindow=true,
                                                         UseShellExecute=false,
                                                         RedirectStandardOutput=true)
         dotnetProcess.Start()
         dotnetProcess.WaitForExit(5000)
         let stdoutRaw = dotnetProcess.StandardOutput.ReadToEnd()
-        let stdout = stdoutRaw.Split('\n')
+        let stdout = stdoutRaw.Trim().Split('\n')
         let runtimePaths = HashSet<CoreRuntime>()
-        let mutable inRuntimeBlock = false
+
         for rawLine in stdout do
             let line = rawLine.Trim()
-            if line = ".NET Core runtimes installed:" then
-                inRuntimeBlock <- true
-            elif line = "" then
-                inRuntimeBlock <- false
-            elif inRuntimeBlock then
-                let [| name; version; bracketPath |] = line.Trim().Split([| ' ' |], 3)
-                let basePath = bracketPath.Substring(1, bracketPath.Length - 2)
-                let (majorVersion, minorVersion) = parseVersion version
 
-                // We want to traverse the dotnet packs directory, which will
-                // have a more exact list of assemblies than what's in the runtime.
-                // The runtime includes platform-specific assemblies with references that don't
-                // always resolve outside of Windows.
-                let dotnetRoot = Directory.GetParent(basePath).Parent.FullName
-                let packBase = Path.Combine(dotnetRoot, "packs", name + ".Ref", version, "ref")
+            let [| name; version; bracketPath |] = line.Trim().Split([| ' ' |], 3)
+            let basePath = bracketPath.Substring(1, bracketPath.Length - 2)
+            let (majorVersion, minorVersion) = parseVersion version
 
-                // This only includes the version of netcoreapp corresponding to the actual
-                // version of .NET Core. Since this may not match the project we'll have to
-                // grab this from the filesystem.
-                let packFrameworks =
-                    if Directory.Exists(packBase) then
-                        List.ofSeq(Directory.EnumerateDirectories(packBase))
-                    else
-                        []
+            // We want to traverse the dotnet packs directory, which will
+            // have a more exact list of assemblies than what's in the runtime.
+            // The runtime includes platform-specific assemblies with references that don't
+            // always resolve outside of Windows.
+            let dotnetRoot = Directory.GetParent(basePath).Parent.FullName
+            let packBase = Path.Combine(dotnetRoot, "packs", name + ".Ref", version, "ref")
 
-                match packFrameworks with
-                | packDir :: _ ->
-                    dprintfn "Discovered framework pack: %s v%s at %s" name version packDir
-                    runtimePaths.Add({name=name;
-                                      majorVersion=majorVersion;
-                                      minorVersion=minorVersion;
-                                      path=packDir}) |> ignore
-                | [] ->
-                    dprintfn "Discovered framework runtime: %s v%s at %s" name version basePath
-                    runtimePaths.Add({name=name;
-                                      majorVersion=majorVersion;
-                                      minorVersion=minorVersion;
-                                      path=Path.Combine(basePath, version)}) |> ignore
+            // This only includes the version of netcoreapp corresponding to the actual
+            // version of .NET Core. Since this may not match the project we'll have to
+            // grab this from the filesystem.
+            let packFrameworks =
+                if Directory.Exists(packBase) then
+                    List.ofSeq(Directory.EnumerateDirectories(packBase))
+                else
+                    []
+
+            match packFrameworks with
+            | packDir :: _ ->
+                dprintfn "Discovered framework pack: %s v%s at %s" name version packDir
+                runtimePaths.Add({name=name;
+                                  majorVersion=majorVersion;
+                                  minorVersion=minorVersion;
+                                  path=packDir}) |> ignore
+            | [] ->
+                dprintfn "Discovered framework runtime: %s v%s at %s" name version basePath
+                runtimePaths.Add({name=name;
+                                  majorVersion=majorVersion;
+                                  minorVersion=minorVersion;
+                                  path=Path.Combine(basePath, version)}) |> ignore
         runtimePaths
+    
     // Choose one of the frameworks listed in project.frameworks
     // by scanning all possible frameworks in order of preference
     let shortFramework, longFramework = 
@@ -287,7 +286,11 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let version = chooseVersion(name)
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
-    let [| _; longFrameworkVersion |] = longFramework.Split("Version=v")
+    let [| _; longFrameworkVersion |] = 
+      if longFramework.Contains("net5") then
+        longFramework.Split("net")
+      else
+        longFramework.Split("Version=v")
     let (frameworkMajorVersion, frameworkMinorVersion) = parseVersion longFrameworkVersion
     let selectedRuntimes = Dictionary<string * int, CoreRuntime>()
     let runtimes = findRuntimePaths()
