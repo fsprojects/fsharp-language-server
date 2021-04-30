@@ -26,8 +26,10 @@ export function activate(context: ExtensionContext) {
 		transport: TransportKind.stdio 
 	}
 	if (debugMode) {
+		const commandName = process.platform === 'win32' ? 'dotnet.exe' : 'dotnet';
+
 		serverOptions = { 
-			command: findInPath('dotnet'), 
+			command: findInPath(commandName), 
 			args: ['run', '--project', 'src/FSharpLanguageServer'], 
 			transport: TransportKind.stdio,
 			options: { cwd: context.extensionPath }
