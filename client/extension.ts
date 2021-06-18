@@ -7,37 +7,119 @@
 import * as path from 'path';
 import * as fs from "fs";
 import * as cp from 'child_process';
-import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
+import * as os from 'os'
+import * as util from 'util'
+import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug, languages, TextDocument, TextEdit } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, NotificationType } from 'vscode-languageclient';
 
 // Run using `dotnet` instead of self-contained executable
 const debugMode = false;
+const exec = util.promisify(cp.exec);
+
+// for fantomas
+const fantomasPath = os.platform() === "win32" ? path.join(os.homedir(), '.dotnet/tools/fantomas.exe')
+	: path.join(os.homedir(), '.dotnet/tools/fantomas');
+const FANTOMAS_INSTALL_COMMAND = 'dotnet tool install --global fantomas-tool';
+
+async function execProcess(command: string): Promise<string> {
+	const { stdout, stderr } = await exec(command);
+	if (stderr)
+		throw new Error(stderr);
+	else
+		return stdout;
+}
+
+// install the fantomas
+async function installFantomas(): Promise<boolean> {
+	try {
+		let out = await execProcess(FANTOMAS_INSTALL_COMMAND);
+		console.log(out);
+		return out !== null;
+	} catch (error) {
+		console.error(error.toString());
+		return false;
+	}
+}
+
+async function execFantomas(document: TextDocument): Promise<string> {
+	let fileName = document.fileName;
+	let config = "";
+	let command = `${fantomasPath} ${config} --stdout ${fileName}`;
+	try {
+		return await execProcess(command);
+	} catch (error) {
+		console.error(error);
+		return null;
+	}
+}
 
 export function activate(context: ExtensionContext) {
 
 	// The server is packaged as a standalone command
 	let serverMain = context.asAbsolutePath(binName());
-	
+
+	let isFormatting = false;
+
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
-	let serverOptions: ServerOptions = { 
-		command: serverMain, 
-		args: [], 
-		transport: TransportKind.stdio 
+	let serverOptions: ServerOptions = {
+		command: serverMain,
+		args: [],
+		transport: TransportKind.stdio
 	}
 	if (debugMode) {
-		serverOptions = { 
-			command: findInPath('dotnet'), 
-			args: ['run', '--project', 'src/FSharpLanguageServer'], 
+		serverOptions = {
+			command: findInPath('dotnet'),
+			args: ['run', '--project', 'src/FSharpLanguageServer'],
 			transport: TransportKind.stdio,
 			options: { cwd: context.extensionPath }
 		}
 	}
-	
+
+	let formatDisposable = languages.registerDocumentFormattingEditProvider(
+		{ scheme: 'file', language: 'fsharp' },
+		{
+			async provideDocumentFormattingEdits(document: TextDocument): Promise<TextEdit[]> {
+				if (isFormatting) {
+					return null;
+				} else {
+					try {
+						isFormatting = true;
+						let formattedDocument = await execFantomas(document);
+						if (formattedDocument) {
+							const firstLine = document.lineAt(0);
+							const lastLine = document.lineAt(document.lineCount - 1);
+							const range = new Range(firstLine.range.start, lastLine.range.end);
+							return [TextEdit.replace(range, formattedDocument)];
+						}
+					} catch (err) {
+						console.log(err);
+						window.showErrorMessage("[FSharp] " + err.message);
+					} finally {
+						isFormatting = false;
+					}
+					return null;
+				}
+			}
+		}
+	);
+
+	// ensure fantomas is installed
+	let installed = fs.existsSync(fantomasPath);
+	if (!installed) {
+		window.showInformationMessage("fantomas not installed, install now?", 'Yes', 'No').then(async (option) => {
+			if (option === "Yes") {
+				let re = await installFantomas();
+				if (!re)
+					window.showErrorMessage('Failed to install fantomas, please install it manully');
+			}
+		});
+	}
+
 	// Options to control the language client
 	let clientOptions: LanguageClientOptions = {
 		// Register the server for F# documents
-		documentSelector: [{scheme: 'file', language: 'fsharp'}],
+		documentSelector: [{ scheme: 'file', language: 'fsharp' }],
 		synchronize: {
 			// Synchronize the setting section 'languageServerExample' to the server
 			configurationSection: 'fsharp',
@@ -50,14 +132,15 @@ export function activate(context: ExtensionContext) {
 			]
 		}
 	}
-	
+
 	// Create the language client and start the client.
 	let client = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions);
 	let disposable = client.start();
-	
+
 	// Push the disposable to the context's subscriptions so that the 
 	// client can be deactivated on extension deactivation
 	context.subscriptions.push(disposable);
+	context.subscriptions.push(formatDisposable);
 
 	// When the language client activates, register a progress-listener
 	client.onReady().then(() => createProgressListeners(client));
@@ -106,7 +189,7 @@ function debugTest(projectPath: string, fullyQualifiedName: string): Promise<num
 				'VSTEST_HOST_DEBUG': '1'
 			}
 		})
-		
+
 		outputChannel.clear()
 		outputChannel.show()
 		outputChannel.appendLine(`${cmd} ${args.join(' ')}...`)
@@ -130,19 +213,19 @@ function debugTest(projectPath: string, fullyQualifiedName: string): Promise<num
 					}
 					outputChannel.appendLine(`Attaching debugger to process ${pid}...`)
 					debug.startDebugging(workspaceFolder, config)
-					
+
 					isWaitingForDebugger = false
 				}
 			}
 		}
 
 		var stdoutBuffer = ''
-		function onStdoutChunk(chunk: string|Buffer) {
+		function onStdoutChunk(chunk: string | Buffer) {
 			// Append to output channel
 			let string = chunk.toString()
 			outputChannel.append(string)
 			// Send each line to onStdoutLine
-			stdoutBuffer += string 
+			stdoutBuffer += string
 			var newline = stdoutBuffer.indexOf('\n')
 			while (newline != -1) {
 				let line = stdoutBuffer.substring(0, newline)
@@ -159,7 +242,7 @@ function debugTest(projectPath: string, fullyQualifiedName: string): Promise<num
 }
 
 interface StartProgress {
-	title: string 
+	title: string
 	nFiles: number
 }
 
@@ -168,13 +251,13 @@ function createProgressListeners(client: LanguageClient) {
 	let progressListener = new class {
 		countChecked = 0
 		nFiles = 0
-		progress: Progress<{message?: string}>
+		progress: Progress<{ message?: string }>
 		resolve: (nothing: {}) => void
-		
+
 		startProgress(start: StartProgress) {
 			// TODO implement user cancellation
 			// TODO Change 15 to ProgressLocation.Notification
-			window.withProgress({title: start.title, location: 15}, progress => new Promise((resolve, _reject) => {
+			window.withProgress({ title: start.title, location: 15 }, progress => new Promise((resolve, _reject) => {
 				this.countChecked = 0;
 				this.nFiles = start.nFiles;
 				this.progress = progress;
@@ -191,7 +274,7 @@ function createProgressListeners(client: LanguageClient) {
 				let oldPercent = this.percentComplete();
 				this.countChecked++;
 				let newPercent = this.percentComplete();
-				let report = {message: fileName, increment: newPercent - oldPercent};
+				let report = { message: fileName, increment: newPercent - oldPercent };
 				this.progress.report(report);
 			}
 		}
