@@ -173,13 +173,41 @@ let private markup(s: string): MarkupContent =
         value=s
     }
 
+///Takes a function signature and returns a string with the definition and type signature
+///returns a string with the definition and type signature
+let extractSignature (FSharpToolTipText tips) =
+    ///This seems to just restrict the tooltip to the first line
+    let getSignature (str: string) =
+        let nlpos = str.IndexOfAny([|'\r';'\n'|])
+        let firstLine =
+            if nlpos > 0 then str.[0..nlpos-1]
+            else str
+
+        if firstLine.StartsWith("type ", StringComparison.Ordinal) then
+            let index = firstLine.LastIndexOf("=", StringComparison.Ordinal)
+            if index > 0 then firstLine.[0..index-1]
+            else firstLine
+        else firstLine
+    let firstResult x =
+        match x with
+        | FSharpToolTipElement.Group gs -> List.tryPick (fun (t : FSharpToolTipElementData<string>) -> if not (String.IsNullOrWhiteSpace t.MainDescription) then Some t.MainDescription else None) gs
+        | _ -> None
+
+    tips
+    |> Seq.tryPick firstResult
+    //I removed this because it restricted signautures to the first line,seemingly for no reason, which chops off descriptions of types
+    //|> Option.map getSignature
+    |> Option.defaultValue ""
 /// Add documentation information to the inline help of autocomplete
 let resolveDocs(item: CompletionItem, candidate: FSharpDeclarationListItem): Async<CompletionItem> = 
     async {
-        let! FSharpToolTipText(xs) = candidate.DescriptionTextAsync
+        
+        let! text=candidate.DescriptionTextAsync
+        let elems= match text with FSharpToolTipText(a)->a
+        let signature= extractSignature(text)
         // FSharpToolTipText is weirdly nested, unwrap the parts that point to documentation
         let docs = [ 
-            for x in xs do 
+            for x in elems do 
                 match x with 
                 | FSharpToolTipElement.Group(ys) -> 
                     for y in ys do 
@@ -187,13 +215,13 @@ let resolveDocs(item: CompletionItem, candidate: FSharpDeclarationListItem): Asy
                 | _ -> () ]
         // Render docs differently depending on how many overloads we find
         match docs with 
-        | [] -> return item 
+        | [] -> return {item with detail=Some signature;  } 
         | [one] -> 
             let value = docComment(one)
             let doc = Option.map markup value
-            return {item with documentation=doc}
+            return {item with documentation=doc;detail=Some signature}
         | many -> 
             let value = overloadComment(many)
             let doc = Option.map markup value
-            return {item with documentation=doc}
+            return {item with documentation=doc;detail=Some signature}
     }
