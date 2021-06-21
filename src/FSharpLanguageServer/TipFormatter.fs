@@ -176,27 +176,12 @@ let private markup(s: string): MarkupContent =
 ///Takes a function signature and returns a string with the definition and type signature
 ///returns a string with the definition and type signature
 let extractSignature (FSharpToolTipText tips) =
-    ///This seems to just restrict the tooltip to the first line
-    let getSignature (str: string) =
-        let nlpos = str.IndexOfAny([|'\r';'\n'|])
-        let firstLine =
-            if nlpos > 0 then str.[0..nlpos-1]
-            else str
-
-        if firstLine.StartsWith("type ", StringComparison.Ordinal) then
-            let index = firstLine.LastIndexOf("=", StringComparison.Ordinal)
-            if index > 0 then firstLine.[0..index-1]
-            else firstLine
-        else firstLine
     let firstResult x =
         match x with
         | FSharpToolTipElement.Group gs -> List.tryPick (fun (t : FSharpToolTipElementData<string>) -> if not (String.IsNullOrWhiteSpace t.MainDescription) then Some t.MainDescription else None) gs
         | _ -> None
-
     tips
     |> Seq.tryPick firstResult
-    //I removed this because it restricted signautures to the first line,seemingly for no reason, which chops off descriptions of types
-    //|> Option.map getSignature
     |> Option.defaultValue ""
 /// Add documentation information to the inline help of autocomplete
 let resolveDocs(item: CompletionItem, candidate: FSharpDeclarationListItem): Async<CompletionItem> = 
