@@ -4,13 +4,14 @@ open FSharpLanguageServer.Tests.Common
 open FSharpLanguageServer.Program
 open System
 open System.IO
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
 open FSharp.Compiler.Text
 open NUnit.Framework
 open LSP.Types
 open LSP
 open LSP.Log
 open FSharp.Data
+open FSharp.Compiler.CodeAnalysis
 
 [<SetUp>]
 let setup() = 

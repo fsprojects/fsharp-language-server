@@ -1,7 +1,7 @@
 module FSharpLanguageServer.Tests.ProjectManagerTests
 
 open FSharp.Compiler
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
 open FSharpLanguageServer.Tests.Common
 open FSharpLanguageServer
 open System
@@ -9,6 +9,7 @@ open System.IO
 open NUnit.Framework
 open LSP.Types 
 open FSharp.Data
+open FSharp.Compiler.CodeAnalysis
 
 type MockClient() = 
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
