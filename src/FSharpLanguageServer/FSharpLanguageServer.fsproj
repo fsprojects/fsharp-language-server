@@ -13,8 +13,8 @@
     <Compile Include="SyntaxTreeOps.fs" />
     <Compile Include="TipFormatter.fs" />
     <Compile Include="ProgressBar.fs" />
-    <Compile Include="Conversions.fs" />
     <Compile Include="Navigation.fs" />
+    <Compile Include="Conversions.fs" />
     <Compile Include="ProjectManager.fs" />
     <Compile Include="UnusedDeclarations.fs" />
     <Compile Include="DebounceCheck.fs" />

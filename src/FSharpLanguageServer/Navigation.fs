@@ -21,7 +21,7 @@ open FSharpLanguageServer.SyntaxOps
 
 /// Represents an item to be displayed in the navigation bar
  [<Sealed>]
-type NavigationItem(uniqueName: string, name: string, kind: NavigationItemKind, glyph: FSharpGlyph, range: Text.range,
+type MyNavigationItem(uniqueName: string, name: string, kind: NavigationItemKind, glyph: FSharpGlyph, range: Text.range,
                                      bodyRange: Text.range, singleTopLevel: bool, enclosingEntityKind: NavigationEntityKind, isAbstract: bool, access: SynAccess option) =
 
     member x.bodyRange = bodyRange
@@ -38,16 +38,16 @@ type NavigationItem(uniqueName: string, name: string, kind: NavigationItemKind, 
     member x.Access = access
 
     member x.WithUniqueName(uniqueName: string) =
-      NavigationItem(uniqueName, name, kind, glyph, range, bodyRange, singleTopLevel, enclosingEntityKind, isAbstract, access)
+      MyNavigationItem(uniqueName, name, kind, glyph, range, bodyRange, singleTopLevel, enclosingEntityKind, isAbstract, access)
     static member Create(name: string, kind, glyph: FSharpGlyph, range: Text.range, bodyRange: Text.range, singleTopLevel: bool, enclosingEntityKind, isAbstract, access: SynAccess option) =
-      NavigationItem("", name, kind, glyph, range, bodyRange, singleTopLevel, enclosingEntityKind, isAbstract, access)
+      MyNavigationItem("", name, kind, glyph, range, bodyRange, singleTopLevel, enclosingEntityKind, isAbstract, access)
  
 /// Represents top-level declarations (that should be in the type drop-down)
 /// with nested declarations (that can be shown in the member drop-down)
 [<NoEquality; NoComparison>]
 type FSharpNavigationTopLevelDeclaration =
-    { Declaration: NavigationItem
-      Nested: NavigationItem[] }
+    { Declaration: MyNavigationItem
+      Nested: MyNavigationItem[] }
 
 /// Represents result of 'GetNavigationItems' operation - this contains
 /// all the members and currently selected indices. First level correspond to
@@ -61,7 +61,7 @@ module Navigation =
     let unionRangesChecked r1 r2 = if r1 = Text.range.Zero then r2 elif r2 = Text.range.Zero then r1 else unionRanges r1 r2
 
     let rangeOfDecls2 f decls =
-      match (decls |> List.map (f >> (fun (d: NavigationItem) -> d.BodyRange))) with
+      match (decls |> List.map (f >> (fun (d: MyNavigationItem) -> d.BodyRange))) with
       | hd::tl -> tl |> List.fold unionRangesChecked hd
       | [] -> Text.range.Zero
 
@@ -95,20 +95,20 @@ module Navigation =
         // Create declaration (for the left dropdown)
         let createDeclLid(baseName, lid, kind, baseGlyph, m, bodym, nested, enclosingEntityKind, isAbstract, access) =
             let name = (if baseName <> "" then baseName + "." else "") + (textOfLid lid)
-            NavigationItem.Create
+            MyNavigationItem.Create
               (name, kind, baseGlyph, m, bodym, false, enclosingEntityKind, isAbstract, access), (addItemName name), nested
 
         let createDecl(baseName, id:Ident, kind, baseGlyph, m, bodym, nested, enclosingEntityKind, isAbstract, access) =
             let name = (if baseName <> "" then baseName + "." else "") + (id.idText)
-            NavigationItem.Create
+            MyNavigationItem.Create
               (name, kind, baseGlyph, m, bodym, false, enclosingEntityKind, isAbstract, access), (addItemName name), nested
 
         // Create member-kind-of-thing for the right dropdown
         let createMemberLid(lid, kind, baseGlyph, m, enclosingEntityKind, isAbstract, access) =
-            NavigationItem.Create(textOfLid lid, kind, baseGlyph, m, m, false, enclosingEntityKind, isAbstract, access), (addItemName(textOfLid lid))
+            MyNavigationItem.Create(textOfLid lid, kind, baseGlyph, m, m, false, enclosingEntityKind, isAbstract, access), (addItemName(textOfLid lid))
 
         let createMember(id:Ident, kind, baseGlyph, m, enclosingEntityKind, isAbstract, access) =
-            NavigationItem.Create(id.idText, kind, baseGlyph, m, m, false, enclosingEntityKind, isAbstract, access), (addItemName(id.idText))
+            MyNavigationItem.Create(id.idText, kind, baseGlyph, m, m, false, enclosingEntityKind, isAbstract, access), (addItemName(id.idText))
 
         // Process let-binding
         let processBinding isMember enclosingEntityKind isAbstract (SynBinding(_, _, _, _, _, _, SynValData(memebrOpt, _, _), synPat, _, synExpr, _, _)) =
@@ -159,7 +159,7 @@ module Navigation =
                 // F# class declaration
                 let members = processMembers membDefns NavigationEntityKind.Class |> snd
                 let nested = members@topMembers
-                ([ createDeclLid(baseName, lid, NavigationItemKind.Type, FSharpGlyph.Class, m, bodyRange mb nested, nested, NavigationEntityKind.Class, false, access) ]: ((NavigationItem * int * _) list))
+                ([ createDeclLid(baseName, lid, NavigationItemKind.Type, FSharpGlyph.Class, m, bodyRange mb nested, nested, NavigationEntityKind.Class, false, access) ]: ((MyNavigationItem * int * _) list))
             | SynTypeDefnRepr.Simple(simple, _) ->
                 // F# type declaration
                 match simple with
@@ -191,7 +191,7 @@ module Navigation =
                 | _ -> []
 
         // Returns class-members for the right dropdown
-        and processMembers members enclosingEntityKind : (Text.range * list<NavigationItem * int>) =
+        and processMembers members enclosingEntityKind : (Text.range * list<MyNavigationItem * int>) =
             let members =
                 members
                 |> List.groupBy (fun x -> x.Range)
@@ -273,7 +273,7 @@ module Navigation =
                 | [] -> other
                 | _ ->
                     let decl =
-                        NavigationItem.Create
+                        MyNavigationItem.Create
                             (textOfLid id, (if isModule then NavigationItemKind.ModuleFile else NavigationItemKind.Namespace),
                                 FSharpGlyph.Module, m,
                                 unionRangesChecked (rangeOfDecls nested) (moduleRange (rangeOfLid id) other),
@@ -305,16 +305,16 @@ module Navigation =
         // Create declaration (for the left dropdown)
         let createDeclLid(baseName, lid, kind, baseGlyph, m, bodym, nested, enclosingEntityKind, isAbstract, access) =
             let name = (if baseName <> "" then baseName + "." else "") + (textOfLid lid)
-            NavigationItem.Create
+            MyNavigationItem.Create
               (name, kind, baseGlyph, m, bodym, false, enclosingEntityKind, isAbstract, access), (addItemName name), nested
 
         let createDecl(baseName, id:Ident, kind, baseGlyph, m, bodym, nested, enclosingEntityKind, isAbstract, access) =
             let name = (if baseName <> "" then baseName + "." else "") + (id.idText)
-            NavigationItem.Create
+            MyNavigationItem.Create
               (name, kind, baseGlyph, m, bodym, false, enclosingEntityKind, isAbstract, access), (addItemName name), nested
 
         let createMember(id:Ident, kind, baseGlyph, m, enclosingEntityKind, isAbstract, access) =
-            NavigationItem.Create(id.idText, kind, baseGlyph, m, m, false, enclosingEntityKind, isAbstract, access), (addItemName(id.idText))
+            MyNavigationItem.Create(id.idText, kind, baseGlyph, m, m, false, enclosingEntityKind, isAbstract, access), (addItemName(id.idText))
 
         let rec processExnRepr baseName nested (SynExceptionDefnRepr(_, (SynUnionCase(_, id, fldspec, _, _, _)), _, _, access, m)) =
             // Exception declaration
@@ -332,7 +332,7 @@ module Navigation =
                 // F# class declaration
                 let members = processSigMembers membDefns
                 let nested = members @ topMembers
-                ([ createDeclLid(baseName, lid, NavigationItemKind.Type, FSharpGlyph.Class, m, bodyRange mb nested, nested, NavigationEntityKind.Class, false, access) ]: ((NavigationItem * int * _) list))
+                ([ createDeclLid(baseName, lid, NavigationItemKind.Type, FSharpGlyph.Class, m, bodyRange mb nested, nested, NavigationEntityKind.Class, false, access) ]: ((MyNavigationItem * int * _) list))
             | SynTypeDefnSigRepr.Simple(simple, _) ->
                 // F# type declaration
                 match simple with
@@ -363,7 +363,7 @@ module Navigation =
                 //| TyconCore_repr_hidden of range
                 | _ -> []
 
-        and processSigMembers (members: SynMemberSig list): list<NavigationItem * int> =
+        and processSigMembers (members: SynMemberSig list): list<MyNavigationItem * int> =
             [ for memb in members do
                  match memb with
                  | SynMemberSig.Member(SynValSig.SynValSig(_, id, _, _, _, _, _, _, access, _, m), _, _) ->
@@ -414,7 +414,7 @@ module Navigation =
 
                 // Create explicitly - it can be 'single top level' thing that is hidden
                 let decl =
-                    NavigationItem.Create
+                    MyNavigationItem.Create
                         (textOfLid id, (if isModule then NavigationItemKind.ModuleFile else NavigationItemKind.Namespace),
                             FSharpGlyph.Module, m,
                             unionRangesChecked (rangeOfDecls nested) (moduleRange (rangeOfLid id) other),

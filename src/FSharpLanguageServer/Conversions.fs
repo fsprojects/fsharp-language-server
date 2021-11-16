@@ -225,8 +225,8 @@ let private asSymbolKind(k: NavigationItemKind): SymbolKind =
 /// Convert an F# `NavigationDeclarationItem` to an LSP `SymbolInformation`
 /// `NavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
 /// `container` is present when `d` is part of a module or type
-let asSymbolInformation(d: NavigationItem, container: NavigationItem option): SymbolInformation =
-    let declarationName(d: NavigationItem) = d.Name
+let asSymbolInformation(d: MyNavigationItem, container: MyNavigationItem option): SymbolInformation =
+    let declarationName(d: MyNavigationItem) = d.Name
     {
         name=d.Name
         kind=asSymbolKind d.Kind
