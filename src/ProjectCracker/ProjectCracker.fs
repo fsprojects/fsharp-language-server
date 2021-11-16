@@ -83,6 +83,7 @@ type JsonValue with
         result
 
 let private frameworkPreference = [
+    "net6.0", "net6.0";
     "net5.0", "net5.0";
 
     "netcoreapp3.1", ".NETCoreApp,Version=v3.1";
