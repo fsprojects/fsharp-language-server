@@ -3,7 +3,7 @@ module FSharpLanguageServer.Program
 open LSP.Log
 open FSharp.Compiler
 open FSharp.Compiler.Text
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
 open System
 open System.Diagnostics
 open System.IO
@@ -13,6 +13,10 @@ open LSP.Types
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Conversions
+open FSharp.Compiler.CodeAnalysis
+open FSharp.Compiler.Syntax
+open FSharp.Compiler.Symbols
+open FSharp.Compiler.Tokenization
 
 let private TODO() = raise (Exception "TODO")
 
@@ -77,7 +81,7 @@ let private matchesQuery(query: string, candidate: string): bool =
 
 /// Find the first overload in `method` that is compatible with `activeParameter`
 // TODO actually consider types
-let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGroupItem[]): int option =
+let private findCompatibleOverload(activeParameter: int, methods: MethodGroupItem[]): int option =
     let mutable result = -1
     for i in 0 .. methods.Length - 1 do
         if result = -1 && (activeParameter = 0 || activeParameter < methods.[i].Parameters.Length) then
@@ -88,9 +92,10 @@ let private findCompatibleOverload(activeParameter: int, methods: FSharpMethodGr
 let private findDeclarations(parse: FSharpParseFileResults) =
     let items =
         match parse.ParseTree with
-        | Some(SyntaxTree.ParsedInput.SigFile(SyntaxTree.ParsedSigFileInput(_, _, _, _, modules))) ->
+        | Syntax.ParsedInput.SigFile(Syntax.ParsedSigFileInput(_, _, _, _, modules)) ->
             Navigation.getNavigationFromSigFile(modules).Declarations
-        | Some(SyntaxTree.ParsedInput.ImplFile(SyntaxTree.ParsedImplFileInput(_, _, _, _, _, modules, _))) ->
+
+        | Syntax.ParsedInput.ImplFile(Syntax.ParsedImplFileInput(_, _, _, _, _, modules, _)) ->
             Navigation.getNavigationFromImplFile(modules).Declarations
         | _ -> [||]
     [ for i in items do
@@ -100,7 +105,7 @@ let private findDeclarations(parse: FSharpParseFileResults) =
 
 let private findSignatureDeclarations(parse: FSharpParseFileResults) =
     match parse.ParseTree with
-    | Some(SyntaxTree.ParsedInput.SigFile(SyntaxTree.ParsedSigFileInput(_, _, _, _, modules))) ->
+    | Syntax.ParsedInput.SigFile(Syntax.ParsedSigFileInput(_, _, _, _, modules)) ->
         let items = Navigation.getNavigationFromSigFile(modules)
         [ for i in items.Declarations do
             for n in i.Nested do
@@ -109,7 +114,7 @@ let private findSignatureDeclarations(parse: FSharpParseFileResults) =
 
 let private findSignatureImplementation(parse: FSharpParseFileResults, name: string list) =
     match parse.ParseTree with
-    | Some(SyntaxTree.ParsedInput.ImplFile(SyntaxTree.ParsedImplFileInput(_, _, _, _, _, modules, _))) ->
+    | Syntax.ParsedInput.ImplFile(Syntax.ParsedImplFileInput(_, _, _, _, _, modules, _)) ->
         let items = Navigation.getNavigationFromImplFile(modules)
         [ for i in items.Declarations do
             for n in i.Nested do
@@ -117,7 +122,7 @@ let private findSignatureImplementation(parse: FSharpParseFileResults, name: str
     | _ -> []
 
 /// Find functions annotated with [<Test>]
-let private testFunctions(parse: FSharpParseFileResults): (string list * SyntaxTree.SynBinding) list =
+let private testFunctions(parse: FSharpParseFileResults): (string list * Syntax.SynBinding) list =
     let (|XunitTest|_|) str =
         match str with
         | "Fact" | "Xunit.FactAttribute"
@@ -127,58 +132,58 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * SyntaxT
         match str with
         | "Test" | "NUnit.Framework.Test" -> Some true
         | _ -> None
-    let isTestAttribute(a: SyntaxTree.SynAttribute): bool =
+    let isTestAttribute(a: Syntax.SynAttribute): bool =
         let ids = a.TypeName.Lid
         let string = String.concat "." [for i in ids do yield i.idText]
         match string with
         // TODO check for open NUnit.Framework before accepting plain "Test"
         | NUnitTest _ | XunitTest _ -> true
         | _ -> false
-    let isTestFunction(binding: SyntaxTree.SynBinding): bool =
-        let attrs = match binding with SyntaxTree.Binding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
+    let isTestFunction(binding: Syntax.SynBinding): bool =
+        let attrs = match binding with SynBinding(_, _, _, _, attrs, _, _, _, _, _, _, _) -> attrs
         let mutable found = false
         for list in attrs do
             for a in list.Attributes do
                 if isTestAttribute(a) then
                     found <- true
         found
-    let name(binding: SyntaxTree.SynBinding): string list =
+    let name(binding: Syntax.SynBinding): string list =
         match binding with
-        | SyntaxTree.Binding(_, _, _, _, _, _, _, SyntaxTree.SynPat.LongIdent(SyntaxTree.LongIdentWithDots(ids, _), _, _, _, _, _), _, _, _, _) ->
+        | SynBinding(_, _, _, _, _, _, _, SynPat.LongIdent(Syntax.LongIdentWithDots(ids, _), _, _, _, _, _), _, _, _, _) ->
             [for i in ids do yield i.idText]
         | _ -> []
-    let rec bindings(ctx: string list, m: SyntaxTree.SynModuleDecl): (string list * SyntaxTree.SynBinding) seq =
+    let rec bindings(ctx: string list, m: Syntax.SynModuleDecl): (string list * Syntax.SynBinding) seq =
         seq {
             match m with
-            | SyntaxTree.SynModuleDecl.NestedModule(outer, _, decls, _, _) ->
-                let ids = match outer with SyntaxTree.ComponentInfo(_, _, _, ids, _, _, _, _) -> ids
+            | Syntax.SynModuleDecl.NestedModule(outer, _, decls, _, _) ->
+                let ids = match outer with SynComponentInfo(_, _, _, ids, _, _, _, _) -> ids
                 let ctx = ctx@[for i in ids do yield i.idText]
                 for d in decls do
                     yield! bindings(ctx, d)
-            | SyntaxTree.SynModuleDecl.Let(_, bindings, _) ->
+            | Syntax.SynModuleDecl.Let(_, bindings, _) ->
                 for b in bindings do
                     yield ctx@name(b), b
-            | SyntaxTree.SynModuleDecl.Types(defs, _) ->
+            | Syntax.SynModuleDecl.Types(defs, _) ->
                 for d in defs do
                     match d with
-                    | SyntaxTree.TypeDefn(SyntaxTree.ComponentInfo(_, _, _, ids, _, _, _, _), _, members, _) ->
+                    |SynTypeDefn(SynComponentInfo(_, _, _, ids, _, _, _, _), _, members, _,_) ->
                         let ctx = ctx@[for i in ids do yield i.idText]
                         for m in members do
                             match m with
-                            | SyntaxTree.SynMemberDefn.Member(b, _) ->
+                            | SynMemberDefn.Member(b, _) ->
                                 yield ctx@name(b), b
-                            | SyntaxTree.SynMemberDefn.LetBindings(bindings, _, _, _) ->
+                            | SynMemberDefn.LetBindings(bindings, _, _, _) ->
                                 for b in bindings do
                                     yield ctx@name(b), b
                             | _ -> ()
             | _ -> ()
         }
     let modules =
-        match parse.ParseTree with
-        | Some(SyntaxTree.ParsedInput.ImplFile(SyntaxTree.ParsedImplFileInput(_, _, _, _, _, modules, _))) -> modules
-        | _ -> []
+        match parse.ParseTree with //TODO: Eli- fix this unmatched case
+        | ParsedInput.ImplFile(    ParsedImplFileInput(_, _, _, _, _, modules, _)) -> modules
+        
     [ for m in modules do
-        let ids, decls = match m with SyntaxTree.SynModuleOrNamespace(ids, _, _, decls, _, _, _, _) -> ids, decls
+        let ids, decls = match m with SynModuleOrNamespace(ids, _, _, decls, _, _, _, _) -> ids, decls
         let name = [for i in ids do yield i.idText]
         for d in decls do
             for ctx, b in bindings(name, d) do
@@ -252,7 +257,7 @@ type Server(client: ILanguageClient) =
                     let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, SourceText.ofString(sourceText), projectOptions)
                     dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
                     match force with
-                    | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Errors)
+                    | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Diagnostics)
                     | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
                 }
                 match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with
@@ -310,8 +315,8 @@ type Server(client: ILanguageClient) =
             | Error(errors) ->
                 return errors
             | Ok(parseResult, checkResult) ->
-                let parseErrors = asDiagnostics(parseResult.Errors)
-                let typeErrors = asDiagnostics(checkResult.Errors)
+                let parseErrors = asDiagnostics(parseResult.Diagnostics)
+                let typeErrors = asDiagnostics(checkResult.Diagnostics)
                 // This is just too slow. Also, it's sometimes wrong.
                 // Find unused opens
                 // let timeUnusedOpens = Stopwatch.StartNew()
@@ -381,7 +386,7 @@ type Server(client: ILanguageClient) =
         let version = docs.GetVersion(file) |> Option.defaultValue 0
         let edits = [
             for u in usages do
-                let range = refineRenameRange(u.Symbol, FileInfo(u.FileName), u.RangeAlternate)
+                let range = refineRenameRange(u.Symbol, FileInfo(u.FileName), u.Range)
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
@@ -413,11 +418,8 @@ type Server(client: ILanguageClient) =
         async {
             // If the symbol is private or internal, we only need to scan 1 file or project
             // TODO this only detects symbols *declared* private, many symbols are implicitly private
-            let isPrivate, isInternal =
-                match FSharpSymbol.GetAccessibility(symbol) with
-                | Some(a) when a.IsPrivate -> true, true
-                | Some(a) when a.IsInternal -> false, true
-                | _ -> false, false
+            let isPrivate, isInternal =symbol.Accessibility.IsPrivate,symbol.Accessibility.IsInternal
+                
             // Figure out what project and file the symbol is declared in
             // This might be nothing if the symbol is declared outside the workspace
             let symbolDeclarationProject, symbolDeclarationFile =
@@ -509,7 +511,7 @@ type Server(client: ILanguageClient) =
     let _ = checker.MaxMemoryReached.Add(maxMemoryWarning)
 
     /// Remember the last completion list for ResolveCompletionItem
-    let mutable lastCompletion: FSharpDeclarationListInfo option = None
+    let mutable lastCompletion: DeclarationListInfo option = None
 
     /// Defer initialization operations until Initialized() is called,
     /// so that the client-side code int client/extension.ts starts running immediately
@@ -659,7 +661,7 @@ type Server(client: ILanguageClient) =
                 | Ok(parseResult, checkResult), Some(id, _, _) ->
                     dprintfn "Hover over %s" id
                     let ids = List.ofArray(id.Split('.'))
-                    let tips = checkResult.GetToolTipText(p.position.line+1, p.position.character+1, line, ids, FSharpTokenTag.Identifier)
+                    let tips = checkResult.GetToolTip(p.position.line+1, p.position.character+1, line, ids, FSharpTokenTag.Identifier)
                     return Some(asHover(tips))
             }
         // Add documentation to a completion item
@@ -698,7 +700,7 @@ type Server(client: ILanguageClient) =
                             dprintfn "Looking for overloads of %s" id
                             let names = List.ofArray(id.Split('.'))
                             let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
-                            let signature(i: FSharpMethodGroupItem) = asSignatureInformation(overloads.MethodName, i)
+                            let signature(i: MethodGroupItem) = asSignatureInformation(overloads.MethodName, i)
                             let sigs = Array.map signature overloads.Methods |> List.ofArray
                             let activeParameter = countCommas(line, endOfMethodName, p.position.character)
                             let activeDeclaration = findCompatibleOverload(activeParameter, overloads.Methods)

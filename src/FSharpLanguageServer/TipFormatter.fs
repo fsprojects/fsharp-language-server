@@ -4,14 +4,62 @@ open System
 open System.IO
 open System.Text.RegularExpressions
 open System.Collections.Generic
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
 open LSP.Types
 open LSP.Log
 open HtmlAgilityPack
-
+open FSharp.Compiler.Symbols
+open FSharp.Compiler.Text
+open FSharpLanguageServer
 do HtmlAgilityPack.HtmlNode.ElementsFlags.Remove("param") |> ignore
 
 // Based on https://github.com/dotnet/roslyn/blob/master/src/Workspaces/Core/Portable/Utilities/Documentation/XmlDocumentationProvider.cs
+
+//Eli- Tagged text formatting ripped straight from fsac
+let formatTaggedText (t: TaggedText) : string =
+    match t.Tag with
+    | TextTag.ActivePatternResult
+    | TextTag.UnionCase
+    | TextTag.Delegate
+    | TextTag.Field
+    | TextTag.Keyword
+    | TextTag.LineBreak
+    | TextTag.Local
+    | TextTag.RecordField
+    | TextTag.Method
+    | TextTag.Member
+    | TextTag.ModuleBinding
+    | TextTag.Function
+    | TextTag.Module
+    | TextTag.Namespace
+    | TextTag.NumericLiteral
+    | TextTag.Operator
+    | TextTag.Parameter
+    | TextTag.Property
+    | TextTag.Space
+    | TextTag.StringLiteral
+    | TextTag.Text
+    | TextTag.Punctuation
+    | TextTag.UnknownType
+    | TextTag.UnknownEntity -> t.Text
+    | TextTag.Enum
+    | TextTag.Event
+    | TextTag.ActivePatternCase
+    | TextTag.Struct
+    | TextTag.Alias
+    | TextTag.Class
+    | TextTag.Union
+    | TextTag.Interface
+    | TextTag.Record
+    | TextTag.TypeParameter -> $"`{t.Text}`"
+
+let formatTaggedTexts = Array.map formatTaggedText >> String.concat ""
+
+let formatGenericParameters (typeMappings: TaggedText [] list) =
+    typeMappings
+    |> List.map (fun typeMap -> $"* {formatTaggedTexts typeMap}")
+    |> String.concat Environment.NewLine
+
 
 type private CachedMember = {
     summary: string option
@@ -57,6 +105,8 @@ let private convertInnerTextToCode(n: HtmlNode): HtmlNode =
 
 let private convertPara(n: HtmlNode): HtmlNode =
     HtmlNode.CreateNode("\n\n")
+
+
 
 /// Convert special tags listed in https://docs.microsoft.com/en-us/dotnet/csharp/codedoc to markdown
 let private convertSpecialTagsToMarkdown(node: HtmlNode) =
@@ -118,11 +168,11 @@ let private find(xmlFile: FileInfo, memberName: string): CachedMember option =
 let docComment(doc: FSharpXmlDoc): string option =
     match doc with
     | FSharpXmlDoc.None -> None
-    | FSharpXmlDoc.Text(unprocessedLines, elaboratedXmlLines) ->
-        unprocessedLines
+    | FSharpXmlDoc.FromXmlText(xml) ->
+        xml.UnprocessedLines
         |> String.concat "\n"
         |> Some
-    | FSharpXmlDoc.XmlDocFileSignature(dllPath, memberName) ->
+    | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
         let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with
         | None -> None
@@ -143,11 +193,11 @@ let docComment(doc: FSharpXmlDoc): string option =
 let docSummaryOnly(doc: FSharpXmlDoc): string option =
     match doc with
     | FSharpXmlDoc.None -> None
-    | FSharpXmlDoc.Text(unprocessedLines, elaboratedXmlLines) ->
-        unprocessedLines
+    | FSharpXmlDoc.FromXmlText(xml) ->
+        xml.UnprocessedLines
         |> String.concat "\n"
         |> Some
-    | FSharpXmlDoc.XmlDocFileSignature(dllPath, memberName) ->
+    | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
         let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with
         | None -> None
@@ -160,10 +210,10 @@ let private overloadComment(docs: FSharpXmlDoc list): string option =
             match doc with
             | FSharpXmlDoc.None -> ()
 //            | FSharpXmlDoc.Text(s) -> yield s
-            | FSharpXmlDoc.Text(unprocessedLines, elaboratedXmlLines) ->
-                yield unprocessedLines
+            | FSharpXmlDoc.FromXmlText(xml) ->
+                yield xml.UnprocessedLines
                         |> String.concat "\n"
-            | FSharpXmlDoc.XmlDocFileSignature(dllPath, memberName) ->
+            | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
                 let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
                 match find(xmlFile, memberName) with
                 | None -> ()
@@ -184,26 +234,26 @@ let private markup(s: string): MarkupContent =
 
 ///Takes a function signature and returns a string with the definition and type signature
 ///returns a string with the definition and type signature
-let extractSignature (FSharpToolTipText tips) =
+let extractSignature (ToolTipText tips) =
     let firstResult x =
         match x with
-        | FSharpToolTipElement.Group gs -> List.tryPick (fun (t : FSharpToolTipElementData<string>) -> if not (String.IsNullOrWhiteSpace t.MainDescription) then Some t.MainDescription else None) gs
+        | ToolTipElement.Group gs -> List.tryPick (fun (t : ToolTipElementData) -> if not (t.MainDescription.Length=0) then Some (t.MainDescription |>formatTaggedTexts)else None) gs
         | _ -> None
     tips
     |> Seq.tryPick firstResult
     |> Option.defaultValue ""
 /// Add documentation information to the inline help of autocomplete
-let resolveDocs(item: CompletionItem, candidate: FSharpDeclarationListItem): Async<CompletionItem> =
+let resolveDocs(item: CompletionItem, candidate: DeclarationListItem): Async<CompletionItem> =
     async {
         
-        let! text=candidate.DescriptionTextAsync
-        let elems= match text with FSharpToolTipText(a)->a
+        let text=candidate.Description
+        let elems= match text with ToolTipText(a)->a
         let signature= extractSignature(text)
-        // FSharpToolTipText is weirdly nested, unwrap the parts that point to documentation
+        // ToolTipText is weirdly nested, unwrap the parts that point to documentation
         let docs = [ 
             for x in elems do 
                 match x with 
-                | FSharpToolTipElement.Group(ys) -> 
+                | ToolTipElement.Group(ys) -> 
                     for y in ys do 
                         yield y.XmlDoc
                 | _ -> () ]
@@ -219,4 +269,4 @@ let resolveDocs(item: CompletionItem, candidate: FSharpDeclarationListItem): Asy
             let doc = Option.map markup value
             return {item with documentation=doc;detail=Some signature}
     }
-    }
+    

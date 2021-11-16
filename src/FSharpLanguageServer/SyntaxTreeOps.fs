@@ -1,8 +1,8 @@
-﻿module FSharpLanguageServer.SyntaxTreeOps
+﻿module FSharpLanguageServer.SyntaxOps
 
 // Forked from https://github.com/dotnet/fsharp/blob/60a2fa663a3c4aed3f03c8bfc6f5e05b04284f23/src/fsharp/range.fs
 
-open FSharp.Compiler.SyntaxTree
+open FSharp.Compiler.Syntax
 open FSharp.Compiler.Text.Range
 
 let ident (s, r) = Ident(s, r)

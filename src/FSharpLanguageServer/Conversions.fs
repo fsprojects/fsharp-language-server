@@ -2,18 +2,22 @@ module FSharpLanguageServer.Conversions
 
 open LSP.Log
 open FSharp.Compiler
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.CodeAnalysis 
+open FSharp.Compiler.Symbols
+open FSharp.Compiler.EditorServices
 open System
 open System.IO
 open LSP.Types
 open FSharp.Data
-
+open FSharp.Compiler.Diagnostics
+open FSharp.Compiler
+open TipFormatter
 /// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpDiagnostic): Range =
     {
         // Got error "The field, constructor or member 'StartLine' is not defined"
-        start = {line=err.StartLineAlternate-1; character=err.StartColumn}
-        ``end`` = {line=err.EndLineAlternate-1; character=err.EndColumn}
+        start = {line=err.StartLine-1; character=err.StartColumn}
+        ``end`` = {line=err.EndLine-1; character=err.EndColumn}
     }
 
 /// Convert an F# `Range.pos` to an LSP `Position`
@@ -66,9 +70,9 @@ let diagnostic(message: string, range: Text.range, severity: DiagnosticSeverity)
 
 /// Some compiler errors have no location in the file and should be displayed at the top of the file
 let private hasNoLocation(err: FSharpDiagnostic): bool =
-    err.StartLineAlternate-1 = 0 &&
+    err.StartLine-1 = 0 &&
     err.StartColumn = 0 &&
-    err.EndLineAlternate-1 = 0 &&
+    err.StartLine-1 = 0 &&
     err.EndColumn = 0
 
 /// A special error message that shows at the top of the file
@@ -92,38 +96,38 @@ let asDiagnostics(errors: FSharpDiagnostic seq): Diagnostic list =
     ]
 
 
-/// Convert an F# `FSharpToolTipElement` to an LSP `Hover`
-let asHover(FSharpToolTipText tips): Hover =
+/// Convert an F# `ToolTipElement` to an LSP `Hover`
+let asHover(ToolTipText tips): Hover =
     let elements =
         [ for t in tips do
             match t with
-            | FSharpToolTipElement.CompositionError(e) -> dprintfn "Error rendering tooltip: %s" e
-            | FSharpToolTipElement.None -> ()
-            | FSharpToolTipElement.Group(elements) ->
+            | ToolTipElement.CompositionError(e) -> dprintfn "Error rendering tooltip: %s" e
+            | ToolTipElement.None -> ()
+            | ToolTipElement.Group(elements) ->
                 yield! elements ]
     let contents =
         match elements with
         | [] -> []
         | [one] ->
-            [   yield HighlightedString(one.MainDescription, "fsharp")
+            [   yield HighlightedString(one.MainDescription|>formatTaggedTexts, "fsharp") //TODO: see how FSAC deals with this with th updated compiler stuff
                 match TipFormatter.docComment(one.XmlDoc) with
                 | None -> ()
                 | Some(markdown) -> yield PlainString(markdown + "\n\n")
                 match one.Remarks with
-                | None | Some("") -> ()
+                | None | Some([||])-> ()
                 | Some(remarks) ->
-                    yield PlainString("*" + remarks + "*\n\n") ]
+                    yield PlainString("*" + (remarks|>formatTaggedTexts) + "*\n\n") ]
         | many ->
             let last = List.last(many)
             [   for e in many do
-                    yield HighlightedString(e.MainDescription, "fsharp")
+                    yield HighlightedString(e.MainDescription|>formatTaggedTexts, "fsharp")
                 match TipFormatter.docSummaryOnly(last.XmlDoc) with
                 | None -> ()
                 | Some(markdown) -> yield PlainString(markdown)
                 match last.Remarks with
-                | None | Some("") -> ()
+                | None | Some([||]) -> ()
                 | Some(remarks) ->
-                    yield PlainString("*" + remarks + "*\n\n") ]
+                    yield PlainString("*" + (remarks|>formatTaggedTexts) + "*\n\n") ]
     {contents=contents; range=None}
 
 /// Convert an F# `FSharpGlyph` to an LSP `CompletionItemKind`
@@ -151,8 +155,8 @@ let private asCompletionItemKind(k: FSharpGlyph): CompletionItemKind =
     | FSharpGlyph.ExtensionMethod -> CompletionItemKind.Method
     | FSharpGlyph.Error -> CompletionItemKind.Class  // ?
 
-/// Convert an F# `FSharpDeclarationListItem` to an LSP `CompletionItem`
-let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem =
+/// Convert an F# `DeclarationListItem` to an LSP `CompletionItem`
+let private asCompletionItem(i: DeclarationListItem): CompletionItem =
     { defaultCompletionItem with
         label = i.Name
         insertText = Some(i.NameInCode)
@@ -162,32 +166,32 @@ let private asCompletionItem(i: FSharpDeclarationListItem): CompletionItem =
         data = JsonValue.Record [|"FullName", JsonValue.String(i.FullName)|]
     }
 
-/// Convert an F# `FSharpDeclarationListInfo` to an LSP `CompletionList`
+/// Convert an F# `DeclarationListInfo` to an LSP `CompletionList`
 /// Used in rendering autocomplete lists
-let asCompletionList(ds: FSharpDeclarationListInfo): CompletionList =
+let asCompletionList(ds: DeclarationListInfo): CompletionList =
     let items = [for i in ds.Items do yield asCompletionItem(i)]
     {isIncomplete=List.isEmpty(items); items=items}
 
-/// Convert an F# `FSharpMethodGroupItemParameter` to an LSP `ParameterInformation`
-let private asParameterInformation(p: FSharpMethodGroupItemParameter): ParameterInformation =
+/// Convert an F# `MethodGroupItemParameter` to an LSP `ParameterInformation`
+let private asParameterInformation(p: MethodGroupItemParameter): ParameterInformation =
     {
         label = p.ParameterName
-        documentation = Some p.Display
+        documentation = Some (p.Display|>formatTaggedTexts )//TODO: find out what to do with taggedtext
     }
 
-/// Convert an F# method name + `FSharpMethodGroupItem` to an LSP `SignatureInformation`
+/// Convert an F# method name + `MethodGroupItem` to an LSP `SignatureInformation`
 /// Used in providing signature help after autocompleting
-let asSignatureInformation(methodName: string, s: FSharpMethodGroupItem): SignatureInformation =
+let asSignatureInformation(methodName: string, s: MethodGroupItem): SignatureInformation =
     let doc = match s.Description with
-                | FSharpToolTipText [FSharpToolTipElement.Group [tip]] -> Some tip.MainDescription
+                | ToolTipText [ToolTipElement.Group [tip]] -> Some tip.MainDescription
                 | _ ->
                     dprintfn "Can't render documentation %A" s.Description
                     None
-    let parameterName(p: FSharpMethodGroupItemParameter) = p.ParameterName
+    let parameterName(p: MethodGroupItemParameter) = p.ParameterName
     let parameterNames = Array.map parameterName s.Parameters
     {
         label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames)
-        documentation = doc
+        documentation = doc|>Option.map formatTaggedTexts
         parameters = Array.map asParameterInformation s.Parameters |> List.ofArray
     }
 
@@ -202,21 +206,21 @@ let declarationLocation(s: FSharpSymbol): Location option =
 
 /// Get the location where `s` was used
 let useLocation(s: FSharpSymbolUse): Location =
-    asLocation(s.RangeAlternate)
+    asLocation(s.Range)
 
-/// Convert an F# `FSharpNavigationDeclarationItemKind` to an LSP `SymbolKind`
-/// `FSharpNavigationDeclarationItemKind` is the level of symbol-type information you get when parsing without typechecking
-let private asSymbolKind(k: FSharpNavigationDeclarationItemKind): SymbolKind =
+/// Convert an F# `NavigationItemKind` to an LSP `SymbolKind`
+/// `NavigationItemKind` is the level of symbol-type information you get when parsing without typechecking
+let private asSymbolKind(k: NavigationItemKind): SymbolKind =
     match k with
-    | NamespaceDecl -> SymbolKind.Namespace
-    | ModuleFileDecl -> SymbolKind.Module
-    | ExnDecl -> SymbolKind.Class
-    | ModuleDecl -> SymbolKind.Module
-    | TypeDecl -> SymbolKind.Interface
-    | MethodDecl -> SymbolKind.Method
+    | NavigationItemKind.Namespace -> SymbolKind.Namespace
+    | NavigationItemKind.ModuleFile -> SymbolKind.Module
+    | NavigationItemKind.Exception -> SymbolKind.Class
+    | NavigationItemKind.Module -> SymbolKind.Module
+    | NavigationItemKind.Type -> SymbolKind.Interface
+    | NavigationItemKind.Method -> SymbolKind.Method
     | PropertyDecl -> SymbolKind.Property
-    | FieldDecl -> SymbolKind.Field
-    | OtherDecl -> SymbolKind.Variable
+    | NavigationItemKind.Field -> SymbolKind.Field
+    | NavigationItemKind.Other -> SymbolKind.Variable
 
 /// Convert an F# `NavigationDeclarationItem` to an LSP `SymbolInformation`
 /// `NavigationDeclarationItem` is the parsed AST representation of a symbol without typechecking
@@ -275,18 +279,18 @@ let resolveMissingGoToImplementation(unresolved: CodeLens, file: FileInfo): Code
         }
     { unresolved with command = Some(command) }
 
-let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: SyntaxTree.SynBinding): CodeLens =
+let asRunTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Syntax.SynBinding): CodeLens =
     {
-        range=asRange(test.RangeOfBindingSansRhs)
+        range=asRange(test.RangeOfBindingWithoutRhs)
         command=Some({  title="Run Test"
                         command="fsharp.command.test.run"
                         arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
         data=JsonValue.Null
     }
 
-let asDebugTest(fsproj: FileInfo, fullyQualifiedName: string list, test: SyntaxTree.SynBinding): CodeLens =
+let asDebugTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Syntax.SynBinding): CodeLens =
     {
-        range=asRange(test.RangeOfBindingSansRhs)
+        range=asRange(test.RangeOfBindingWithoutRhs)
         command=Some({  title="Debug Test"
                         command="fsharp.command.test.debug"
                         arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })

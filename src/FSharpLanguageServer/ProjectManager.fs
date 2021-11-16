@@ -10,9 +10,10 @@ open System.Xml
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open LSP.Types
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
 open FSharp.Compiler.Text
 open ProjectCracker
+open FSharp.Compiler.CodeAnalysis
 
 type private ResolvedProject = {
     sources: FileInfo list
@@ -52,13 +53,12 @@ type ProjectManager(checker: FSharpChecker) =
         dprintfn "%s: " options.ProjectFileName
         dprintfn "  ProjectFileName: %A" options.ProjectFileName
         dprintfn "  SourceFiles: %A" options.SourceFiles
-        dprintfn "  ReferencedProjects: %A" [for dll, _ in options.ReferencedProjects do yield dll]
+        dprintfn "  ReferencedProjects: %A" [for dll in options.ReferencedProjects do yield dll.FileName]
         dprintfn "  OtherOptions: %A" options.OtherOptions
         dprintfn "  LoadTime: %A" options.LoadTime
-        dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
+    //    dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo //TODO:ELI- find if this was useful
         dprintfn "  IsIncompleteTypeCheckEnvironment: %A" options.IsIncompleteTypeCheckEnvironment
         dprintfn "  OriginalLoadReferences: %A" options.OriginalLoadReferences
-        dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo
         dprintfn "  Stamp: %A" options.Stamp
         dprintfn "  UnresolvedReferences: %A" options.UnresolvedReferences
         dprintfn "  UseScriptResolutionRules: %A" options.UseScriptResolutionRules
@@ -265,7 +265,6 @@ type ProjectManager(checker: FSharpChecker) =
             let cracked = ProjectCracker.crack(fsproj)
             // Convert to FSharpProjectOptions
             let options = {
-                ExtraProjectInfo = None
                 IsIncompleteTypeCheckEnvironment = false
                 LoadTime = lastModified(fsproj)
                 OriginalLoadReferences = []
@@ -293,7 +292,7 @@ type ProjectManager(checker: FSharpChecker) =
                     [|
                         for r in cracked.projectReferences do
                             let options = cache.Get(r, analyzeLater)
-                            yield options.resolved.Value.target.FullName, options.resolved.Value.options
+                            yield FSharpReferencedProject.CreateFSharp(options.resolved.Value.target.FullName, options.resolved.Value.options)
                     |]
                 SourceFiles =
                     [|
@@ -327,24 +326,24 @@ type ProjectManager(checker: FSharpChecker) =
             let file = FileInfo(fileName)
             let project = cache.Get(file, analyzeLater)
             if project.resolved.IsValueCreated then
-                for _, ancestor in project.resolved.Value.options.ReferencedProjects do
-                    if ancestor.ProjectFileName = fsprojOrFsx.FullName then
-                        dprintfn "%s has been invalidated by changes to %s" ancestor.ProjectFileName fsprojOrFsx.Name
-                        cache.Invalidate(FileInfo(ancestor.ProjectFileName))
+                for ancestor in project.resolved.Value.options.ReferencedProjects do
+                    if ancestor.FileName = fsprojOrFsx.FullName then
+                        dprintfn "%s has been invalidated by changes to %s" ancestor.FileName fsprojOrFsx.Name
+                        cache.Invalidate(FileInfo(ancestor.FileName))
+
 
     /// All transitive deps of anproject, including itself
-    let transitiveDeps(fsprojOrFsx: FileInfo) =
+    let transitiveDeps(fsprojOrFsx: FileInfo) projectChecker = //TODO: this is terrible project checker is stupid solution to this problem
         let touched = new HashSet<String>()
         let result = new List<FSharpProjectOptions>()
         let rec walk(options: FSharpProjectOptions) =
             if touched.Add(options.ProjectFileName) then
-                for _, parent in options.ReferencedProjects do
-                    walk(parent)
+                for parent in options.ReferencedProjects do
+                    walk( projectChecker parent)
                 result.Add(options)
         let root = cache.Get(fsprojOrFsx, analyzeLater)
         walk(root.resolved.Value.options)
         List.ofSeq(result)
-
     /// Find all .fsproj files referenced by a .sln file
     let slnProjectReferences (sln: FileInfo): list<FileInfo> =
         // From https://github.com/OmniSharp/omnisharp-roslyn/blob/master/src/OmniSharp.MSBuild/SolutionParsing/ProjectBlock.cs
@@ -446,8 +445,8 @@ type ProjectManager(checker: FSharpChecker) =
         let result = new List<FSharpProjectOptions>()
         let rec walk(options: FSharpProjectOptions) =
             if touched.Add(options.ProjectFileName) then
-                for _, parent in options.ReferencedProjects do
-                    walk(parent)
+                for parent in options.ReferencedProjects do
+                    walk(match (this.FindProjectOptions (FileInfo(parent.FileName)))with Ok(proj)->proj) //TODO: this is terrible 
                 result.Add(options)
         for f in knownProjects do
             let project = cache.Get(FileInfo(f), analyzeLater)
@@ -456,7 +455,7 @@ type ProjectManager(checker: FSharpChecker) =
         List.ofSeq(result)
     /// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
-        transitiveDeps(projectFile)
+        transitiveDeps(projectFile)(fun x ->match (this.FindProjectOptions (FileInfo(x.FileName)))with Ok(proj)->proj) //TODO: this is terrible 
     /// Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) =
         match this.FindProjectOptions(fromSourceFile) with
@@ -470,5 +469,5 @@ type ProjectManager(checker: FSharpChecker) =
             // Otherwise, check if targetSourceFile is in the transitive dependencies of fromProjectOptions
             else
                 let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
-                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))
+                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName)) (fun x ->match (this.FindProjectOptions (FileInfo(x.FileName)))with Ok(proj)->proj) //TODO: this is terrible 
                 List.exists containsTarget deps
