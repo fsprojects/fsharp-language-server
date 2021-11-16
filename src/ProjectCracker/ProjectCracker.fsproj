@@ -8,7 +8,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Buildalyzer" Version="2.2.0" />
+    <PackageReference Include="Buildalyzer" Version="3.2.3" />
     <!-- Fix warnings from Buildalyzer indirect refs to old versions -->
     <PackageReference Include="System.Threading.ThreadPool" Version="4.3.0" />
     <PackageReference Include="System.Net.NameResolution" Version="4.3.0" />

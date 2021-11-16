@@ -233,7 +233,16 @@ type ProjectManager(checker: FSharpChecker) =
             else
                 dprintfn "Couldn't find %s in %s" d dir
         ]
-
+    ///Decodes the FSharpReferencedProject information object
+    /// Comes from ionide.proj-info https://github.com/ionide/proj-info/blob/a972839f7ee015f50e7fac9af56c19402acef5a6/test/Ionide.ProjInfo.Tests/Tests.fs
+    let internalGetProjectOptions =
+        fun (r: FSharpReferencedProject) ->
+            let felds=r.GetType().GetFields(Reflection.BindingFlags.Instance ||| Reflection.BindingFlags.NonPublic)
+            try
+                let projOptions: FSharpProjectOptions = felds.[1].GetValue( r) :?> _
+                Some projOptions
+            with |e-> None
+        
     /// Analyze a .fsx or .fsproj file
     let rec analyzeLater(fsprojOrFsx: FileInfo): LazyProject =
         /// Analyze a script file
@@ -333,13 +342,16 @@ type ProjectManager(checker: FSharpChecker) =
 
 
     /// All transitive deps of anproject, including itself
-    let transitiveDeps(fsprojOrFsx: FileInfo) projectChecker = //TODO: this is terrible project checker is stupid solution to this problem
+    let transitiveDeps(fsprojOrFsx: FileInfo) = //TODO: this is terrible project checker is stupid solution to this problem
         let touched = new HashSet<String>()
         let result = new List<FSharpProjectOptions>()
         let rec walk(options: FSharpProjectOptions) =
             if touched.Add(options.ProjectFileName) then
                 for parent in options.ReferencedProjects do
-                    walk( projectChecker parent)
+                    match internalGetProjectOptions parent with //TODO:This uses reflection and is pure evil....
+                    |Some(parentOpts)->walk(parentOpts)
+                    |None->dprintfn "Project %s has a reference to a project {%s} which we don't know how to handle " options.ProjectFileName parent.FileName
+                    
                 result.Add(options)
         let root = cache.Get(fsprojOrFsx, analyzeLater)
         walk(root.resolved.Value.options)
@@ -446,7 +458,10 @@ type ProjectManager(checker: FSharpChecker) =
         let rec walk(options: FSharpProjectOptions) =
             if touched.Add(options.ProjectFileName) then
                 for parent in options.ReferencedProjects do
-                    walk(match (this.FindProjectOptions (FileInfo(parent.FileName)))with Ok(proj)->proj) //TODO: this is terrible 
+                //for some reason getting the project filename directly returns the dll path instead so we have to do this
+                    match internalGetProjectOptions parent with //TODO:This uses reflection and is pure evil....
+                    |Some(parentOpts)->walk(parentOpts)
+                    |None->dprintfn "Project %s has a reference to a project {%s} which we don't know how to handle " options.ProjectFileName parent.FileName
                 result.Add(options)
         for f in knownProjects do
             let project = cache.Get(FileInfo(f), analyzeLater)
@@ -455,7 +470,8 @@ type ProjectManager(checker: FSharpChecker) =
         List.ofSeq(result)
     /// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
-        transitiveDeps(projectFile)(fun x ->match (this.FindProjectOptions (FileInfo(x.FileName)))with Ok(proj)->proj) //TODO: this is terrible 
+        //transitiveDeps(projectFile)(fun x ->this.FindProjectOptions (FileInfo(x.FileName))) //TODO: this might be terrible 
+        transitiveDeps(projectFile)
     /// Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) =
         match this.FindProjectOptions(fromSourceFile) with
@@ -469,5 +485,5 @@ type ProjectManager(checker: FSharpChecker) =
             // Otherwise, check if targetSourceFile is in the transitive dependencies of fromProjectOptions
             else
                 let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
-                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName)) (fun x ->match (this.FindProjectOptions (FileInfo(x.FileName)))with Ok(proj)->proj) //TODO: this is terrible 
+                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))  //TODO: this might be terrible 
                 List.exists containsTarget deps

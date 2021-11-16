@@ -288,7 +288,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
     let [| _; longFrameworkVersion |] = 
-      if longFramework.Contains("net5") then
+      if longFramework.Contains("net5")||longFramework.Contains("net6") then //TODO: find a better solution, this is kind of  hack
         longFramework.Split("net")
       else
         longFramework.Split("Version=v")
@@ -482,7 +482,7 @@ let private project(fsproj: FileInfo): ProjectAnalyzer =
     let options = new AnalyzerManagerOptions()
     options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
     let manager = AnalyzerManager(options)
-    manager.GetProject(fsproj.FullName)
+    manager.GetProject(fsproj.FullName):?>ProjectAnalyzer
 
 let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult =
     let builds = project(fsproj).Build()
@@ -492,11 +492,11 @@ let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult =
         if chosen.IsNone then
             for build in builds do
                 if build.TargetFramework = shortFramework then
-                    chosen <- Some(build)
+                    chosen <- Some(build:?>AnalyzerResult)
     if chosen.IsNone then
         for build in builds do
             if chosen.IsNone then
-                chosen <- Some(build)
+                chosen <- Some(build:?>AnalyzerResult)
     chosen.Value
 
 let private projectTarget(csproj: FileInfo) =
@@ -535,12 +535,12 @@ let crack(fsproj: FileInfo): CrackedProject =
             [ for KeyValue(k, v) in project.Items do
                 if k = "Compile" then
                     for i in v do
-                        yield absoluteIncludePath(fsproj, i) ]
+                        yield absoluteIncludePath(fsproj, i:?>ProjectItem) ]
         let directReferences =
             [ for KeyValue(k, v) in project.Items do
                 if k = "Reference" then
                     for i in v do
-                        yield absoluteIncludePath(fsproj, i) ]
+                        yield absoluteIncludePath(fsproj, i:?>ProjectItem) ]
         dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
         let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])

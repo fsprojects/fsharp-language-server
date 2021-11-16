@@ -171,3 +171,8 @@ let ``find implicit references with net5``() =
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "Net5Console"; "Net5Console.fsproj"|] |> FileInfo
     let cracked = ProjectCracker.crack(fsproj)
     CollectionAssert.Contains([for f in cracked.packageReferences do yield f.Name], "System.Core.dll")
+[<Test>]
+let ``find implicit references with net6``() =
+    let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "Net6Console"; "Net6Console.fsproj"|] |> FileInfo
+    let cracked = ProjectCracker.crack(fsproj)
+    CollectionAssert.Contains([for f in cracked.packageReferences do yield f.Name], "System.Core.dll")
