@@ -16,6 +16,7 @@
     <Compile Include="Navigation.fs" />
     <Compile Include="Conversions.fs" />
     <Compile Include="ProjectManager.fs" />
+    <Compile Include="Semantic.fs" />
     <Compile Include="UnusedDeclarations.fs" />
     <Compile Include="DebounceCheck.fs" />
     <Compile Include="Program.fs" />

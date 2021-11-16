@@ -12,6 +12,7 @@ open FSharp.Data
 open FSharp.Compiler.Diagnostics
 open FSharp.Compiler
 open TipFormatter
+open LSP.BaseTypes
 /// Convert an F# Compiler Services 'FSharpErrorInfo' to an LSP 'Range'
 let private errorAsRange(err: FSharpDiagnostic): Range =
     {
@@ -26,13 +27,19 @@ let private asPosition(p: Text.pos): Position =
         line=p.Line-1
         character=p.Column
     }
-
+let private toPosition(p: Position): Text.Position =
+    Text.Position.mkPos(p.line+1) p.character
+    
 /// Convert an F# `Range.range` to an LSP `Range`
 let asRange(r: Text.range): Range =
     {
         start=asPosition r.Start
         ``end``=asPosition r.End
     }
+/// Convert an F# `Range.range` to an LSP `Range`
+let toRange str (r: Range): Text.Range =
+    Text.Range.mkRange str (toPosition r.start) (toPosition r.``end`` )
+    
 
 /// Convert an F# `Range.range` to an LSP `Location`
 let private asLocation(l: Text.range): Location =

@@ -10,6 +10,8 @@ open System.IO
 open System.Text.RegularExpressions
 open LSP
 open LSP.Types
+open LSP.BaseTypes
+open LSP.SemanticToken
 open FSharp.Data
 open FSharp.Data.JsonExtensions
 open Conversions
@@ -45,11 +47,12 @@ let findMethodCallBeforeCursor(lineContent: string, cursor: int): int option =
 /// Figure out the active parameter by counting ',' characters
 let private countCommas(lineContent: string, endOfMethodName: int, cursor: int): int =
     let mutable count = 0
+    
     for i in endOfMethodName .. (min (cursor-1) lineContent.Length) do
         if lineContent.[i] = ',' then
             count <- count + 1
     count
-
+    
 /// Check if `candidate` contains all the characters of `find`, in-order, case-insensitive
 /// Matches can be discontinuous if the letters of `find` match the first letters of words in `candidate`
 /// For example, fb matches FooBar, but it doesn't match Foobar
@@ -530,7 +533,7 @@ type Server(client: ILanguageClient) =
                         { defaultServerCapabilities with
                             hoverProvider = true
                             completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
-                            signatureHelpProvider = Some({triggerCharacters=['('; ',']})
+                            signatureHelpProvider = Some({triggerCharacters = ['('; ','; ' '];retriggerCharacters=[',' ;')'; ' ']})
                             documentSymbolProvider = true
                             codeLensProvider = Some({resolveProvider=true})
                             workspaceSymbolProvider = true
@@ -543,6 +546,13 @@ type Server(client: ILanguageClient) =
                                     save = Some({ includeText = false })
                                     change = TextDocumentSyncKind.Incremental
                                 }
+                            semanticTokensProvider=
+                                Some<|{
+                                    legend= createTokenLegend<SemanticTokenTypes, SemanticTokenModifier>
+                                    range= Some false
+                                    full= Some true
+                                }
+
                         }
                 }
             }
@@ -761,6 +771,7 @@ type Server(client: ILanguageClient) =
                                 with e ->
                                     dprintfn "Error parsing %s: %s" sourceFile.Name e.Message
                 return List.ofSeq(all)
+                
             }
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
         member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> =
@@ -847,6 +858,35 @@ type Server(client: ILanguageClient) =
                     let file = FileInfo(root.uri.LocalPath)
                     do! projects.AddWorkspaceRoot(file.Directory)
                 // TODO removed
+            }
+        member this.SemanticTokensFull (p: SemanticTokensParams) : Async<SemanticTokens option>=
+            async{
+            let path= p.textDocument.uri.LocalPath
+            let! checks=checkOpenFile(FileInfo(path),true,true)
+            let tokens=
+                match checks with
+                |Ok(parse,check)->
+                let ranges=(check.GetSemanticClassification(None))  
+                let filteredRanges = SemanticHighlighting.scrubRanges ranges
+                Some filteredRanges  //TODO: get the fsac scrub ranges        
+                |_->None
+            return SemanticHighlighting.handleToken tokens
+            }
+        member this.SemanticTokensFullDelta (p: SemanticTokensDeltaParams): Async<SemanticTokensDelta option>=TODO()
+
+        member this.SemanticTokensRange (p: SemanticTokensRangeParams): Async<SemanticTokens option>=
+            async{
+                let path= p.textDocument.uri.LocalPath
+                let! checks=checkOpenFile(FileInfo(path),true,true)
+                let fcsRange = Conversions.toRange path p.range
+                let tokens=
+                    match checks with
+                    |Ok(parse,check)->
+                    let ranges=(check.GetSemanticClassification(Some fcsRange))  
+                    let filteredRanges = SemanticHighlighting.scrubRanges ranges
+                    Some filteredRanges  //TODO: get the fsac scrub ranges        
+                    |_->None
+                return SemanticHighlighting.handleToken tokens
             }
 
 [<EntryPoint>]

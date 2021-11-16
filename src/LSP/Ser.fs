@@ -6,7 +6,7 @@ open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Reflection.FSharpReflectionExtensions
 open System.Text.RegularExpressions
 open FSharp.Data
-
+open LSP.Log
 let private escapeChars = Regex("[\t\n\r\"\\\\]", RegexOptions.Compiled)
 let private replaceChars =
     MatchEvaluator(fun m ->
@@ -78,6 +78,7 @@ let private makeOption(t: Type, item: obj option) =
     typeof<MakeHelpers>.GetMethod("MakeOption").MakeGenericMethod([|t|]).Invoke(null, [|item|])
 
 let rec private serializer (options: JsonWriteOptions, t: Type): obj -> string =
+    
     let custom = findWriter(t, options.customWriters)
     if custom.IsSome then
         let fObj = custom.Value
@@ -90,6 +91,8 @@ let rec private serializer (options: JsonWriteOptions, t: Type): obj -> string =
         fun o -> sprintf "%b" (unbox<bool> o)
     elif t = typeof<int> then
         fun o -> sprintf "%d" (unbox<int> o)
+    elif t = typeof<uint32> then
+        fun o -> sprintf "%d" (unbox<uint32> o)
     elif t = typeof<char> then
         fun o -> sprintf "%c" (unbox<char> o) |> escapeStr
     elif t = typeof<string> then
@@ -132,6 +135,7 @@ let rec private serializer (options: JsonWriteOptions, t: Type): obj -> string =
     else
         raise (Exception (sprintf "Don't know how to serialize %s to JSON" (t.ToString())))
 and fieldSerializer (options: JsonWriteOptions, field: PropertyInfo): obj -> string =
+//    dprintfn "Serializing feild %s" (field.ToString())
     let name = escapeStr(field.Name)
     let innerSerializer = serializer(options, field.PropertyType)
     fun outer ->

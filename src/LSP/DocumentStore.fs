@@ -6,7 +6,7 @@ open System.IO
 open System.Collections.Generic
 open System.Text
 open Types 
-
+open BaseTypes
 type private Version = {
     text: StringBuilder 
     mutable version: int
