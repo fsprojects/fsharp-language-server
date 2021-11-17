@@ -190,7 +190,24 @@ let ``hover over function``() =
     match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 6, 23)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
-
+[<Test>]
+let ``hover over System function``() = 
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+    
+    match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 14, 36)) |> Async.RunSynchronously with 
+    | None -> Assert.Fail("No hover")
+    | Some hover -> 
+        if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
+        hover.contents|>List.iter(fun x->
+            let doc=
+                match x with
+                |PlainString(s)->s
+                |HighlightedString(s,_)->s
+            Assert.False(doc.Contains "<summary>","Documentation contains xml tag <summary> meaning it was not correctly formatted with xml tags removed")
+            let containsDocs=doc.Contains("Applies a function to each element of the collection, threading an accumulator argument")
+            Assert.True(containsDocs,"List does not contain required System function doc string")
+            )
+        
 [<Test>]
 let ``hover over left edge``() = 
     let client, server = createServerAndReadFile("MainProject", "Hover.fs")
@@ -322,6 +339,13 @@ let ``find project symbols``() =
 let ``go to definition``() = 
     let client, server = createServerAndReadFile("MainProject", "Reference.fs")
     match server.GotoDefinition(textDocumentPosition("MainProject", "Reference.fs", 3, 30)) |> Async.RunSynchronously with 
+    | [] -> Assert.Fail("No symbol definition")
+    | [single] -> ()
+    | many -> Assert.Fail(sprintf "Multiple definitions found %A" many)
+[<Test>]
+let ``go to func definition``() = 
+    let client, server = createServerAndReadFile("MainProject", "Reference.fs")
+    match server.GotoDefinition(textDocumentPosition("MainProject", "Reference.fs", 5, 15)) |> Async.RunSynchronously with 
     | [] -> Assert.Fail("No symbol definition")
     | [single] -> ()
     | many -> Assert.Fail(sprintf "Multiple definitions found %A" many)

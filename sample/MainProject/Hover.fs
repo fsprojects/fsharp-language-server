@@ -10,3 +10,5 @@ module private InternalHover =
 
 let private testInternalFun() = 
     eprintfn "%d" (InternalHover.internalFun())
+
+let private systemFuncHover=List.fold

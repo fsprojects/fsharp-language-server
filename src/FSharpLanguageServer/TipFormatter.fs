@@ -51,7 +51,7 @@ let formatTaggedText (t: TaggedText) : string =
     | TextTag.Union
     | TextTag.Interface
     | TextTag.Record
-    | TextTag.TypeParameter -> $"`{t.Text}`"
+    | TextTag.TypeParameter -> $"{t.Text}"
 
 let formatTaggedTexts = Array.map formatTaggedText >> String.concat ""
 
@@ -61,7 +61,7 @@ let formatGenericParameters (typeMappings: TaggedText [] list) =
     |> String.concat Environment.NewLine
 
 
-type private CachedMember = {
+type CachedMember = {
     summary: string option
     // For example, ("myParam", "A great param.")
     parameters: (string * string) list
@@ -121,6 +121,31 @@ let private cref(node: HtmlNode) =
     let attr = node.GetAttributeValue("cref", "")
     let parts = attr.Split(':')
     Array.last(parts)
+let parseHtml(node)=
+    convertSpecialTagsToMarkdown(node)
+    let summary = [for e in node.Descendants("summary") do yield e.InnerHtml]
+    let parameters = [for e in node.Descendants("param") do yield e.GetAttributeValue("name", ""), e.InnerHtml]
+    let returns = [for e in node.Descendants("returns") do yield e.InnerHtml]
+    let exceptions = [for e in node.Descendants("exception") do yield cref(e), e.InnerHtml]
+    {
+        summary = List.tryHead(summary)
+        parameters = parameters
+        returns = List.tryHead(returns)
+        exceptions = exceptions
+    }
+///Generates tooltip info from a parsed html data object
+let createCommentFromParsed data=
+    let lines = [
+        if data.summary.IsSome && data.summary.Value.Length > 0 then
+            yield data.summary.Value.Trim()
+        for name, desc in data.parameters do
+            yield sprintf "**%s** %s" name desc
+        if data.returns.IsSome && data.returns.Value.Length > 0 then
+            yield sprintf "**returns** %s" data.returns.Value
+        for name, desc in data.exceptions do
+            yield sprintf "**exception** `%s` %s" name desc ]
+    let comment = String.concat "\n\n" lines
+    Some(comment)
 
 let private ensure(xmlFile: FileInfo) =
     if xmlFile.Exists then
@@ -137,18 +162,8 @@ let private ensure(xmlFile: FileInfo) =
             html.Load(xmlFile.FullName)
             // Find all members
             for m in html.DocumentNode.Descendants("member") do
-                convertSpecialTagsToMarkdown(m)
                 let name = m.GetAttributeValue("name", "")
-                let summary = [for e in m.Descendants("summary") do yield e.InnerHtml]
-                let parameters = [for e in m.Descendants("param") do yield e.GetAttributeValue("name", ""), e.InnerHtml]
-                let returns = [for e in m.Descendants("returns") do yield e.InnerHtml]
-                let exceptions = [for e in m.Descendants("exception") do yield cref(e), e.InnerHtml]
-                parsed.TryAdd(name, {
-                    summary = List.tryHead(summary)
-                    parameters = parameters
-                    returns = List.tryHead(returns)
-                    exceptions = exceptions
-                }) |> ignore
+                parsed.TryAdd(name,m|>parseHtml) |> ignore
                 cache.TryAdd(xmlFile.FullName, {
                     members = parsed
                     loadTime = xmlFile.LastWriteTime
@@ -169,9 +184,11 @@ let docComment(doc: FSharpXmlDoc): string option =
     match doc with
     | FSharpXmlDoc.None -> None
     | FSharpXmlDoc.FromXmlText(xml) ->
-        xml.UnprocessedLines
-        |> String.concat "\n"
-        |> Some
+        let doc=HtmlDocument()  //TODO: it would be good to memoize this to stop it from being recalculated all the time
+        doc.LoadHtml(xml.UnprocessedLines|> String.concat "\n")
+        doc.DocumentNode
+        |>parseHtml
+        |>createCommentFromParsed
     | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
         let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with
@@ -196,7 +213,7 @@ let docSummaryOnly(doc: FSharpXmlDoc): string option =
     | FSharpXmlDoc.FromXmlText(xml) ->
         xml.UnprocessedLines
         |> String.concat "\n"
-        |> Some
+        |> Some //TODO: make this use parsed data
     | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
         let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with
@@ -234,7 +251,7 @@ let private markup(s: string): MarkupContent =
 
 ///Takes a function signature and returns a string with the definition and type signature
 ///returns a string with the definition and type signature
-let extractSignature (ToolTipText tips) =
+let private extractSignature (ToolTipText tips) =
     let firstResult x =
         match x with
         | ToolTipElement.Group gs -> List.tryPick (fun (t : ToolTipElementData) -> if not (t.MainDescription.Length=0) then Some (t.MainDescription |>formatTaggedTexts)else None) gs
