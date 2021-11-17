@@ -549,7 +549,7 @@ type Server(client: ILanguageClient) =
                             semanticTokensProvider=
                                 Some<|{
                                     legend= createTokenLegend<SemanticTokenTypes, SemanticTokenModifier>
-                                    range= Some false
+                                    range= Some true
                                     full= Some true
                                 }
 
@@ -668,10 +668,12 @@ type Server(client: ILanguageClient) =
                 | _, None ->
                     dprintfn "No identifier at %s(%d, %d)" file.FullName p.position.line p.position.character
                     return None
+                    
                 | Ok(parseResult, checkResult), Some(id, _, _) ->
                     dprintfn "Hover over %s" id
                     let ids = List.ofArray(id.Split('.'))
                     let tips = checkResult.GetToolTip(p.position.line+1, p.position.character+1, line, ids, FSharpTokenTag.Identifier)
+                    dprintVerbosefn "Hover tooltipText=%A" tips
                     return Some(asHover(tips))
             }
         // Add documentation to a completion item
