@@ -7,6 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ToolTips/Format.fs" />
+    <Compile Include="ToolTips/XmlDoc.fs" />
+    <Compile Include="ToolTips/ToolTip.fs" />
     <Compile Include="SyntaxTreeOps.fs" />
     <Compile Include="TipFormatter.fs" />
     <Compile Include="ProgressBar.fs" />
