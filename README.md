@@ -3,7 +3,7 @@ This project is an implementation of the [language server protocol](https://micr
 
 This has been forked from GeorgeWfraser's orginal project because that appears to be unmaintained.
 It has been updated to support fcs 41 and net6.0
-I have used code from FSharpAutoComplete and some adjustments to the original to add some features
+I have used code from [FSharpAutoComplete](https://github.com/fsharp/FsAutoComplete) and some adjustments to the original to add some features
 - Better hover docs
 - working documentation for system types
 - semantic tokenization
@@ -57,11 +57,11 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 - tests/ProjectCracker.Tests
 - tests/FSharpLanguageServer.Tests
 - videos: Animated GIFs on this page
-
+- 
 ## Installation
 
 ### VSCode
-[Install from the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=georgewfraser.fsharp-language-server)
+[Install from the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=faldor20.fsharp-language-server-updated)
 
 ### Vim
 Clone this repo to your system and build it:
@@ -72,7 +72,7 @@ dotnet build -c Release
 ```
 
 If using a distribution based on Arch Linux, you can also install it from the [AUR](https://aur.archlinux.org/packages/fsharp-language-server/)
-
+(Still installs the old version)
 Install [LanguageClient-neovim](https://github.com/autozimu/LanguageClient-neovim) 
 
 Update your vim config to point LanguageClient-neovim to the FSharp Language Server for fsharp filetypes:
