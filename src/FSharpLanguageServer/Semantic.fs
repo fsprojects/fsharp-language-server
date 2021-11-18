@@ -1,15 +1,16 @@
-module FSharpLanguageServer.SemanticHighlighting
+module FSharpLanguageServer.SemanticTokenization
 open System
 open LSP.SemanticToken
 open LSP
 open FSharp.Compiler.EditorServices
 
 open FSharp.Compiler.Text
+open FSharp.Compiler.CodeAnalysis
+open LSP.Types
 
-
-  // See https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#semantic-token-scope-map for the built-in scopes
-  // if new token-type strings are added here, make sure to update the 'legend' in any downstream consumers.
-  let map (t: SemanticClassificationType) : string =
+// See https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide#semantic-token-scope-map for the built-in scopes
+// if new token-type strings are added here, make sure to update the 'legend' in any downstream consumers.
+let map (t: SemanticClassificationType) : string =
       match t with
       | SemanticClassificationType.Operator -> "operator"
       | SemanticClassificationType.ReferenceType
@@ -48,21 +49,10 @@ open FSharp.Compiler.Text
       | SemanticClassificationType.Value
       | SemanticClassificationType.LocalValue -> "variable"
       | SemanticClassificationType.Plaintext -> "text"
-(* let GetHighlighting (file: string<LocalPath>, range: Range option) =
-      async {
-        let! res = x.TryGetLatestTypeCheckResultsForFile file
-        let res =
-          match res with
-          | Some res ->
-            let r = res.GetCheckResults.GetSemanticClassification(range)
-            let filteredRanges = scrubRanges r
-            Some filteredRanges
-          | None ->
-            None
-        return CoreResponse.Res res
-      } *)
-let handleToken (tokens:SemanticClassificationItem[] option)=
 
+
+///Converts FCS token information to LSP Token information
+let private convertToken (tokens:SemanticClassificationItem[] option)=
     match tokens with
       | None ->
           None
@@ -80,12 +70,13 @@ let handleToken (tokens:SemanticClassificationItem[] option)=
           | Some encoded ->
               (Some { data = encoded|>Array.toList; resultId = None }) // TODO: provide a resultId when we support delta ranges
 
-//All taken from FSAC
-let posEq (p1: pos) (p2: pos) = p1 = p2
 
-// given an enveloping range and the sub-ranges it overlaps, split out the enveloping range into a
-// set of range segments that are non-overlapping with the children
-let segmentRanges (parentRange: Range) (childRanges: Range []): Range [] =
+let posEq (p1: pos) (p2: pos) = p1 = p2
+//All taken from FSAC semnantic token code
+
+/// given an enveloping range and the sub-ranges it overlaps, split out the enveloping range into a
+/// set of range segments that are non-overlapping with the children
+let private segmentRanges (parentRange: Range) (childRanges: Range []): Range [] =
     let firstSegment = Range.mkRange parentRange.FileName parentRange.Start childRanges.[0].Start // from start of parent to start of first child
     let lastSegment = Range.mkRange parentRange.FileName (Array.last childRanges).End parentRange.End // from end of last child to end of parent
     // now we can go pairwise, emitting a new range for the area between each end and start
@@ -101,10 +92,10 @@ let segmentRanges (parentRange: Range) (childRanges: Range []): Range [] =
         if posEq lastSegment.Start lastSegment.End then () else lastSegment
     |]
 
-// TODO: LSP technically does now know how to handle overlapping, nested and multiline ranges, but
-    // as of 3 February 2021 there are no good examples of this that I've found, so we still do this
-    /// because LSP doesn't know how to handle overlapping/nested ranges, we have to dedupe them here
-let scrubRanges (highlights: SemanticClassificationItem array): SemanticClassificationItem array =
+/// TODO: LSP technically does now know how to handle overlapping, nested and multiline ranges, but
+/// as of 3 February 2021 there are no good examples of this that I've found, so we still do this
+/// because LSP doesn't know how to handle overlapping/nested ranges, we have to dedupe them here
+let private scrubRanges (highlights: SemanticClassificationItem array): SemanticClassificationItem array =
   let startToken = fun( {Range=m}:SemanticClassificationItem) -> m.Start.Line, m.Start.Column
   highlights
   |> Array.sortBy startToken
@@ -128,3 +119,20 @@ let scrubRanges (highlights: SemanticClassificationItem array): SemanticClassifi
       |> Array.collect expandParents
   )
   |> Array.sortBy startToken
+
+///Gets the tokens for semantic tokenization
+///This is done by getting typecheck data and then getting the individual semntic clasifcations of the tokens in that data
+///The checking can be done only in a certain range using the Range attribute. I'm not sure if this is really much faster or not 
+//TODO: benchmark this process to find out whether only doing a certian range is actually faster
+let getSemanticTokens range (typeCheckResults:Result<(FSharpParseFileResults * FSharpCheckFileResults),Diagnostic list>)=
+    async{
+        let tokens=
+            match typeCheckResults with
+            |Ok(parse,check)->
+                let ranges=check.GetSemanticClassification range
+                //If we don't do the crubbing heaps of the tokesn don't show up properly in the edditor
+                let filteredRanges = scrubRanges ranges
+                Some filteredRanges    
+            |_->None
+        return convertToken tokens
+        }

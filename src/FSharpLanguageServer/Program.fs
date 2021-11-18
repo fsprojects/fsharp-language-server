@@ -863,16 +863,9 @@ type Server(client: ILanguageClient) =
             }
         member this.SemanticTokensFull (p: SemanticTokensParams) : Async<SemanticTokens option>=
             async{
-            let path= p.textDocument.uri.LocalPath
-            let! checks=checkOpenFile(FileInfo(path),true,true)
-            let tokens=
-                match checks with
-                |Ok(parse,check)->
-                let ranges=(check.GetSemanticClassification(None))  
-                let filteredRanges = SemanticHighlighting.scrubRanges ranges
-                Some filteredRanges  //TODO: get the fsac scrub ranges        
-                |_->None
-            return SemanticHighlighting.handleToken tokens
+                let path= p.textDocument.uri.LocalPath
+                let! checks=checkOpenFile(FileInfo(path),true,true)
+                return! SemanticTokenization.getSemanticTokens None checks
             }
         member this.SemanticTokensFullDelta (p: SemanticTokensDeltaParams): Async<SemanticTokensDelta option>=TODO()
 
@@ -880,15 +873,8 @@ type Server(client: ILanguageClient) =
             async{
                 let path= p.textDocument.uri.LocalPath
                 let! checks=checkOpenFile(FileInfo(path),true,true)
-                let fcsRange = Conversions.toRange path p.range
-                let tokens=
-                    match checks with
-                    |Ok(parse,check)->
-                    let ranges=(check.GetSemanticClassification(Some fcsRange))  
-                    let filteredRanges = SemanticHighlighting.scrubRanges ranges
-                    Some filteredRanges  //TODO: get the fsac scrub ranges        
-                    |_->None
-                return SemanticHighlighting.handleToken tokens
+                let fcsRange = Conversions.toRange path p.range                
+                return! SemanticTokenization.getSemanticTokens (Some fcsRange) checks
             }
 
 [<EntryPoint>]
