@@ -34,7 +34,43 @@ let formatTaggedText (t: TaggedText) : string =
     | TextTag.Namespace
     | TextTag.NumericLiteral
     | TextTag.Operator
+    | TextTag.Property
+    | TextTag.Space
+    | TextTag.StringLiteral
+    | TextTag.Text
     | TextTag.Parameter
+    | TextTag.Punctuation
+    | TextTag.UnknownType
+    | TextTag.UnknownEntity -> t.Text
+    | TextTag.Enum
+    | TextTag.Event
+    | TextTag.ActivePatternCase
+    | TextTag.Struct
+    | TextTag.Alias
+    | TextTag.Class
+    | TextTag.Union
+    | TextTag.Interface
+    | TextTag.Record
+    | TextTag.TypeParameter -> $"{t.Text}"
+///Adjusted to have a newline before function params
+let formatTaggedFunctionText (t: TaggedText) : string =
+    match t.Tag with
+    | TextTag.ActivePatternResult
+    | TextTag.UnionCase
+    | TextTag.Delegate
+    | TextTag.Field
+    | TextTag.Keyword
+    | TextTag.LineBreak
+    | TextTag.Local
+    | TextTag.RecordField
+    | TextTag.Method
+    | TextTag.Member
+    | TextTag.ModuleBinding
+    | TextTag.Function
+    | TextTag.Module
+    | TextTag.Namespace
+    | TextTag.NumericLiteral
+    | TextTag.Operator
     | TextTag.Property
     | TextTag.Space
     | TextTag.StringLiteral
@@ -52,8 +88,33 @@ let formatTaggedText (t: TaggedText) : string =
     | TextTag.Interface
     | TextTag.Record
     | TextTag.TypeParameter -> $"{t.Text}"
+    | TextTag.Parameter-> $"\n    {t.Text}" //We use 4 spaces becuase tabs look way to big in completion popups
+    ///How to perform formatting:
+    //When the type is a function:
+    //Each paramater should have a \n\t before it to create seperation
+    //The last occurance of -> should have a \nt\t before it as well
+let formatTaggedTexts (t:TaggedText[])= 
+    //We check positions where we would exepect to find the name of the function in a  fucntion defintion eg: let map etc..  |0"let"|1" "|2"map"| etc..
+    // or let rec map or let rec private map
+    let functionTag=
+        [t|>Array.tryItem(2);t|>Array.tryItem(4);t|>Array.tryItem(6)]
+        |>List.tryFind
+            (Option.map(fun text->text.Tag=TextTag.Function)
+            >>Option.defaultValue false)
+        
+    match functionTag  with
+    |Some(_) ->
+         //We find the last ->  and insert an extra tag to create a newline before the return type of the function
+        let index=t|>Array.findIndexBack(fun tag->tag.Text="->") 
+        let arr=t|>Array.insertAt index (TaggedText(TextTag.Punctuation,"\n    "))
 
-let formatTaggedTexts = Array.map formatTaggedText >> String.concat ""
+        arr|>(Array.map formatTaggedFunctionText >> String.concat "") 
+    |_-> t|>(Array.map formatTaggedText >> String.concat "" ) 
+    
+
+    
+    
+    
 
 let formatGenericParameters (typeMappings: TaggedText [] list) =
     typeMappings
