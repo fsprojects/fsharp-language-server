@@ -1,6 +1,15 @@
 # F# Language Server
 This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
 
+This has been forked from GeorgeWfraser's orginal project because that appears to be unmaintained.
+It has been updated to support fcs 41 and net6.0
+I have used code from FSharpAutoComplete and some adjustments to the original to add some features
+- Better hover docs
+- working documentation for system types
+- semantic tokenization
+
+## Now the original descritption
+
 ![https://ci.appveyor.com/api/projects/status/github/fsprojects/fsharp-language-server?svg=true](https://ci.appveyor.com/api/projects/status/github/fsprojects/fsharp-language-server?svg=true)
 
 ## Features
