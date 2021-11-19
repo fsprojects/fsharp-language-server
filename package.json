@@ -5,7 +5,7 @@
     "author": "George Fraser and Eli Dowling",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.30",
+    "version": "0.1.31",
     "preview": false,
     "publisher": "faldor20",
     "repository": {
@@ -13,7 +13,7 @@
         "url": "https://github.com/faldor20/fsharp-language-server"
     },
     "engines": {
-        "vscode": "^1.62.0"
+        "vscode": "^1.52.0"
     },
     "categories": [
         "Programming Languages",
@@ -115,7 +115,7 @@
         "vscode-languageclient": "^7.0.0"
     },
     "devDependencies": {
-        "@types/vscode": "^1.62.0",
+        "@types/vscode": "^1.52.0",
         "typescript": "^4.4.4",
         "vsce": "^2.3.0",
         "@types/node": "^16.11.7",

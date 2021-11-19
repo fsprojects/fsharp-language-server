@@ -1,14 +1,20 @@
-# F# Language Server
-This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
+# F# Language Server Updated
+**This has been forked from GeorgeWfraser's orginal project because that appears to be unmaintained.**
 
-This has been forked from GeorgeWfraser's orginal project because that appears to be unmaintained.
 It has been updated to support fcs 41 and net6.0
 I have used code from [FSharpAutoComplete](https://github.com/fsharp/FsAutoComplete) and some adjustments to the original to add some features
 - Better hover docs
 - working documentation for system types
 - semantic tokenization
+- support semantic tokens
+- Have pretty multiline function signatures in hover docs
 
+
+I may at some point work on supporting the vim and emacs versions of these extensions but as i use neither, i have not at this time.
+
+My work here is done specificallly in reponse to this issue with ionide [here](https://github.com/fsharp/FsAutoComplete/issues/805), which makes it unusuable for me and potentially many others.
 ## Now the original descritption
+This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
 
 ![https://ci.appveyor.com/api/projects/status/github/fsprojects/fsharp-language-server?svg=true](https://ci.appveyor.com/api/projects/status/github/fsprojects/fsharp-language-server?svg=true)
 
