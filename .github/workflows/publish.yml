@@ -1,0 +1,57 @@
+name: publish-extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      name: 
+        description: 'test'
+        required: false
+        default: 'hi'
+
+jobs:   
+  pubBinaries:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setupdotnet
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 6.0.x
+    - uses: actions/cache@v2
+      with:
+        path: ./paket
+        key: ${{ runner.os }}-${{ hashFiles('**/paket.lock','**/paket.dependencies') }}
+    - run: bash ./scripts/paketActions.sh  
+    - name: Restore dependencies
+      run: dotnet tool restore
+    - name: paket install 
+      run: dotnet paket install
+    - name: publish
+      run: dotnet publish -c Release src/FSharpLanguageServer
+    - uses: actions/upload-artifact@v2
+        # Upload the artifact so the MacOS runner do something with it
+      with:
+          name: CompiledProject
+          path: src/FSharpLanguageServer/bin/Release/net6.0/publish
+      #I think i need to do something wiith these to make the be accessable to the next action(upload artifact i think)
+  publish:
+    runs-on: ubuntu-latest
+    needs: pubBinaries
+    if: success()
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - run: npm install
+      - uses: actions/download-artifact@master
+        with:
+          name: CompiledProject
+          path: src/FSharpLanguageServer/bin/Release/net6.0/publish
+      - run: npx vsce package 
+      - uses: actions/download-artifact@v2
+      - run: npx vsce publish --packagePath $(find . -iname *.vsix)
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

@@ -1,4 +1,3 @@
-STORAGE: PACKAGES
 NUGET
   remote: https://api.nuget.org/v3/index.json
     Buildalyzer (3.2.3)
