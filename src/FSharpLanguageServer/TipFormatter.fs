@@ -105,14 +105,16 @@ let formatTaggedTexts (t:TaggedText[])=
     match functionTag  with
     |Some(_) ->
          //We find the last ->  and insert an extra tag to create a newline before the return type of the function
-        let index=t|>Array.findIndexBack(fun tag->tag.Text="->") 
-        let arr=t|>Array.insertAt index (TaggedText(TextTag.Punctuation,"\n    "))
+        let index=t|>Array.tryFindIndexBack(fun tag->tag.Text="->") 
+        let arr=
+            match index with 
+            |Some(i)-> t|>Array.insertAt i (TaggedText(TextTag.Punctuation,"\n    "))
+            |_->t
 
         arr|>(Array.map formatTaggedFunctionText >> String.concat "") 
     |_-> t|>(Array.map formatTaggedText >> String.concat "" ) 
     
 
-    
     
     
 
