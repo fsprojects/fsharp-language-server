@@ -190,23 +190,6 @@ let ``hover over function``() =
     match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 6, 23)) |> Async.RunSynchronously with 
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
-[<Test>]
-let ``hover over System function``() = 
-    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
-    
-    match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 14, 36)) |> Async.RunSynchronously with 
-    | None -> Assert.Fail("No hover")
-    | Some hover -> 
-        if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
-        let matches=hover.contents|>List.filter(fun x->
-            let doc=
-                match x with
-                |PlainString(s)->s
-                |HighlightedString(s,_)->s
-            Assert.False(doc.Contains "<summary>","Documentation contains xml tag <summary> meaning it was not correctly formatted with xml tags removed")
-            doc.Contains("Applies a function to each element of the collection, threading an accumulator argument")
-            )
-        Assert.True(matches.Length>0,"List does not contain required System function doc string")
 
         
 [<Test>]

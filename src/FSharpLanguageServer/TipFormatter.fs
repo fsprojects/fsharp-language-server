@@ -210,8 +210,20 @@ let createCommentFromParsed data=
     let comment = String.concat "\n\n" lines
     Some(comment)
 
-let private ensure(xmlFile: FileInfo) =
-    if xmlFile.Exists then
+let private ensure(docFile: FileInfo) =
+    let file=
+        match docFile.Exists with
+        |true->Some(docFile)
+        |false->
+            //This should put us around the nuget libraries directory
+            //TODO: this really needs a check to make sure the version is the same between the xml file found and the one it was looking for. 
+            //I'll need to investigate nuget package structure conscistency to be able to do this
+            docFile.Directory.Parent.Parent.GetFiles(docFile.Name,EnumerationOptions(RecurseSubdirectories=true))//TODO This could get very expensive on larger projects. it would eb good to find a better solution
+            |>Array.tryHead
+            
+    match file with 
+    |None->(docFile)
+    |Some(xmlFile)->
         let needsUpdate =
             match cache.TryGetValue(xmlFile.FullName) with
             | false, _ -> true
@@ -231,11 +243,15 @@ let private ensure(xmlFile: FileInfo) =
                     members = parsed
                     loadTime = xmlFile.LastWriteTime
                 }) |> ignore
+        xmlFile
+        
+    
+    
 
 /// Find the documentation for `memberName` inside of `xmlFile`
 let private find(xmlFile: FileInfo, memberName: string): CachedMember option =
-    ensure(xmlFile)
-    match cache.TryGetValue(xmlFile.FullName) with
+    let newFile= ensure(xmlFile)
+    match cache.TryGetValue(newFile.FullName) with
     | false, _ -> None
     | _, cached ->
         match cached.members.TryGetValue(memberName) with

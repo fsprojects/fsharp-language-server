@@ -1,5 +1,5 @@
 module Hover
-
+open System.Net
 let private myFun(): int = 1
 
 let private testFun() = 
@@ -12,3 +12,8 @@ let private testInternalFun() =
     eprintfn "%d" (InternalHover.internalFun())
 
 let private systemFuncHover=List.fold
+
+type intFunc= int->int
+let multiply a b c =
+    a*b*c
+let aliasedFunc:intFunc = (multiply 1 2)
