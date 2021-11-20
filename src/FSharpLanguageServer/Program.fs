@@ -19,6 +19,7 @@ open FSharp.Compiler.CodeAnalysis
 open FSharp.Compiler.Syntax
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.Tokenization
+open System.Threading
 
 let private TODO() = raise (Exception "TODO")
 
@@ -882,6 +883,11 @@ let main(argv: array<string>): int =
     let read = new BinaryReader(Console.OpenStandardInput())
     let write = new BinaryWriter(Console.OpenStandardOutput())
     let serverFactory(client) = Server(client) :> ILanguageServer
+    if argv|>Array.exists ((=)"--attach-debugger") then
+        Console.WriteLine("Waiting for debugger to attach");
+        while (Debugger.IsAttached|>not ) do
+            Thread.Sleep(100);
+        Console.WriteLine("Debugger attached");
     dprintfn "Listening on stdin"
     try
         LanguageServer.connect(serverFactory, read, write)
