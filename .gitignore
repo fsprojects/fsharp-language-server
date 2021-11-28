@@ -9,3 +9,6 @@ Scratch.fsx
 Scratch.ts
 fsharp-language-server.sln.DotSettings.user
 .vs
+
+.fake
+.ionide

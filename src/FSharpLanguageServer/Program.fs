@@ -219,7 +219,7 @@ type Server(client: ILanguageClient) =
             ""
         else
             reader.ReadLine()
-
+        
     /// Parse a file
     let parseFile(file: FileInfo): Async<Result<FSharpParseFileResults, string>> =
         async {
@@ -277,6 +277,7 @@ type Server(client: ILanguageClient) =
                             dprintfn "Re-compile timed out, using stale results"
                             return Ok(parseResult, checkResult)
                     else
+                        dprintfn "Checking: cannot use stale results and currentVersion %i did not match cached version %i" version sourceVersion
                         return! recompile
                 | _ ->
                     return! recompile
@@ -885,7 +886,7 @@ let main(argv: array<string>): int =
     let serverFactory(client) = Server(client) :> ILanguageServer
     if argv|>Array.exists ((=)"--attach-debugger") then
         Console.WriteLine("Waiting for debugger to attach");
-        while (Debugger.IsAttached|>not ) do
+        while not(Debugger.IsAttached ) do
             Thread.Sleep(100);
         Console.WriteLine("Debugger attached");
     dprintfn "Listening on stdin"
