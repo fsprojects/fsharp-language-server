@@ -28,7 +28,7 @@ export function activate(context: ExtensionContext) {
 
 	let args: string[] = customCommandArgs ?? [binName()]
 	//This always needs to be just a single command with no args. If not it will cause an error.
-	let serverMain =customCommand ?? findInPath('dotnet');
+	let serverMain =customCommand ?? findInPath('dotnet')??'dotnet';
 	
 	// The server is packaged as a standalone command
 
@@ -51,7 +51,7 @@ export function activate(context: ExtensionContext) {
 	}
 	if (debugMode) {
 		serverOptions = {
-			command: findInPath('dotnet'),
+			command: findInPath('dotnet')??'dotnet',
 			args: ['run', '--project', FSLangServerFolder.fsPath],
 			transport: TransportKind.stdio,
 			options: {

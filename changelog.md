@@ -1,3 +1,5 @@
+## 0.1.41
+    Fixed bug with finding dotnet executable on windows
 ## 0.1.40
 Switched from using binaries to publishing a netcore dependant dll.
     Massively reduces extension size and also reduces problems with running binaries on strange operating systems or not having certain dependencies
