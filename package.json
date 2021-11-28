@@ -88,6 +88,18 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Sets whether to run a dll using 'dotnet ./FSharpLanguageServer.dll' or to run a binary like normal"
+                },
+                "fsharp.customCommand": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": null,
+                    "description": "Allows you to set a custom command to run the langserver, good for testing custom version \n This must be just the command to run, eg: 'dotnet' put any args in customCommandArgs"
+                },
+                "fsharp.customCommandArgs": {
+                    "scope": "window",
+                    "type": "array",
+                    "default": null,
+                    "description": "Allows you to set a custom command args to run the langserver, good for testing custom version or passing special arguments"
                 }
             }
         },

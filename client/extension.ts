@@ -21,19 +21,43 @@ import {
 export function activate(context: ExtensionContext) {
 	let FSLangServerFolder = Uri.joinPath(workspace.workspaceFolders[0].uri, ('src/FSharpLanguageServer'));
 	const debugMode = workspace.getConfiguration().get("fsharp.debug.enable", false);
-	const useDll = workspace.getConfiguration().get("fsharp.UseSystemdotnet", false);
+	const useDll = workspace.getConfiguration().get("fsharp.useSystemDotnet", false);
+
+	const customCommand: string = workspace.getConfiguration().get("fsharp.customCommand", null);
+
+	const customCommandArgs: string[] = workspace.getConfiguration().get("fsharp.customCommandArgs", null);
+
+	let args: string[] = customCommandArgs ?? []
+	//This always needs to be just a single command with no args. If not it will cause an error.
+	let serverMain =
+		customCommand ?? (() => {
+			let path = context.asAbsolutePath(binName(useDll));
+			if (useDll) {
+				args=[path]
+				return findInPath('dotnet')
+			}
+			
+			else return path;
+		})();
+	
 	// The server is packaged as a standalone command
-	let serverMain = context.asAbsolutePath(binName(useDll))
-
-	if (useDll) { serverMain = "dotnet " + serverMain };
 
 
+	console.log("Going to start server with command ",serverMain);
+	
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	let serverOptions: ServerOptions = {
 		command: serverMain,
-		args: [],
-		transport: TransportKind.stdio
+		args: args,
+		transport: TransportKind.stdio,
+		options: {
+			cwd: context.extensionPath,
+			env: {
+				...process.env,
+			}
+
+		}
 	}
 	if (debugMode) {
 		serverOptions = {
@@ -42,10 +66,6 @@ export function activate(context: ExtensionContext) {
 			transport: TransportKind.stdio,
 			options: {
 				cwd: context.extensionPath,
-				env: {
-					...process.env,
-					'VSTEST_HOST_DEBUG': '1'
-				}
 			},
 
 		}
