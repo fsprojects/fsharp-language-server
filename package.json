@@ -5,7 +5,7 @@
     "author": "George Fraser and Eli Dowling",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.32",
+    "version": "0.1.4",
     "preview": false,
     "publisher": "faldor20",
     "repository": {
@@ -24,9 +24,7 @@
     ],
     "main": "./out/client/extension",
     "files": [
-        "src/FSharpLanguageServer/bin/Release/net6.0/osx.10.11-x64/publish/",
-        "src/FSharpLanguageServer/bin/Release/net6.0/linux-x64/publish/",
-        "src/FSharpLanguageServer/bin/Release/net6.0/win10-x64/publish/"
+        "src/FSharpLanguageServer/bin/Release/net6.0/publish/"
     ],
     "contributes": {
         "languages": [
