@@ -128,7 +128,7 @@ let asHover(ToolTipText tips): Hover =
             let last = List.last(many)
             [   for e in many do
                     yield HighlightedString(e.MainDescription|>formatTaggedTexts, "fsharp")
-                match TipFormatter.docSummaryOnly(last.XmlDoc) with
+                match TipFormatter.docComment(last.XmlDoc) with
                 | None -> ()
                 | Some(markdown) -> yield PlainString(markdown)
                 match last.Remarks with
@@ -194,11 +194,15 @@ let asSignatureInformation(methodName: string, s: MethodGroupItem): SignatureInf
                 | _ ->
                     dprintfn "Can't render documentation %A" s.Description
                     None
+    let xmlDocs=
+        match TipFormatter.docComment(s.XmlDoc) with
+        | None -> ""
+        | Some(markdown) ->  markdown
     let parameterName(p: MethodGroupItemParameter) = p.ParameterName
     let parameterNames = Array.map parameterName s.Parameters
     {
         label = sprintf "%s(%s)" methodName (String.concat ", " parameterNames)
-        documentation = doc|>Option.map formatTaggedTexts
+        documentation = doc|>Option.map (fun x-> (x|>formatTaggedTexts)+"\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n"+xmlDocs)
         parameters = Array.map asParameterInformation s.Parameters |> List.ofArray
     }
 
