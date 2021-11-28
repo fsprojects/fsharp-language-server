@@ -83,12 +83,6 @@
                     "default": false,
                     "description": "Sets whether to use dotnet run to run a debug build of FSlanguageserver"
                 },
-                "fsharp.useSystemDotnet": {
-                    "scope": "window",
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Sets whether to run a dll using 'dotnet ./FSharpLanguageServer.dll' or to run a binary like normal"
-                },
                 "fsharp.customCommand": {
                     "scope": "window",
                     "type": "string",

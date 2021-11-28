@@ -21,24 +21,14 @@ import {
 export function activate(context: ExtensionContext) {
 	let FSLangServerFolder = Uri.joinPath(workspace.workspaceFolders[0].uri, ('src/FSharpLanguageServer'));
 	const debugMode = workspace.getConfiguration().get("fsharp.debug.enable", false);
-	const useDll = workspace.getConfiguration().get("fsharp.useSystemDotnet", false);
-
+	
 	const customCommand: string = workspace.getConfiguration().get("fsharp.customCommand", null);
 
 	const customCommandArgs: string[] = workspace.getConfiguration().get("fsharp.customCommandArgs", null);
 
-	let args: string[] = customCommandArgs ?? []
+	let args: string[] = customCommandArgs ?? [binName()]
 	//This always needs to be just a single command with no args. If not it will cause an error.
-	let serverMain =
-		customCommand ?? (() => {
-			let path = context.asAbsolutePath(binName(useDll));
-			if (useDll) {
-				args=[path]
-				return findInPath('dotnet')
-			}
-			
-			else return path;
-		})();
+	let serverMain =customCommand ?? findInPath('dotnet');
 	
 	// The server is packaged as a standalone command
 
@@ -253,10 +243,9 @@ function createProgressListeners(client: LanguageClient) {
 	});
 }
 
-function binName(useDll: boolean): string {
+function binName() {
 	var baseParts = ['src', 'FSharpLanguageServer', 'bin', 'Release', 'net6.0'];
-	var pathParts = getPathParts(process.platform);
-	if (useDll) { pathParts[pathParts.length - 1] = "FSharpLanguageServer.dll" }
+	var pathParts = getPathParts();
 	var fullParts = baseParts.concat(pathParts);
 
 	return path.join(...fullParts);
@@ -264,8 +253,8 @@ function binName(useDll: boolean): string {
 
 
 
-function getPathParts(platform: string,): string[] {
-	switch (platform) {
+function getPathParts(): string[] {
+	/* switch (platform) {
 		case 'win32':
 			return ['win10-x64', 'publish', 'FSharpLanguageServer.exe'];
 
@@ -276,7 +265,8 @@ function getPathParts(platform: string,): string[] {
 			return ['osx.10.11-x64', 'publish', 'FSharpLanguageServer'];
 	}
 
-	throw `unsupported platform: ${platform}`;
+	throw `unsupported platform: ${platform}`; */
+	return ['publish', 'FSharpLanguageServer.dll'];
 }
 
 function findInPath(binname: string) {

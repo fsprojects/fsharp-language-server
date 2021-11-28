@@ -7,7 +7,8 @@ client/**
 **/obj/**
 **.vsix
 src/**
-!src/FSharpLanguageServer/bin/Release/net6.0/osx.10.11-x64/publish/**
-!src/FSharpLanguageServer/bin/Release/net6.0/win10-x64/publish/**
-!src/FSharpLanguageServer/bin/Release/net6.0/linux-x64/publish/**
+#!src/FSharpLanguageServer/bin/Release/net6.0/osx.10.11-x64/publish/**
+#!src/FSharpLanguageServer/bin/Release/net6.0/win10-x64/publish/**
+#!src/FSharpLanguageServer/bin/Release/net6.0/linux-x64/publish/**
 !src/FSharpLanguageServer/bin/Release/net6.0/assembly/README.md
+!src/FSharpLanguageServer/bin/Release/net6.0//publish/**
