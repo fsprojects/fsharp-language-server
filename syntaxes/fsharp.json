@@ -525,6 +525,15 @@
         "comments": {
             "patterns": [
                 {
+                    "name": "comment.literate.command.fsharp",
+                    "match": "(\\(\\*{3}.*\\*{3}\\))",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "comment.block.fsharp"
+                        }
+                    }
+                },
+                {
                     "name": "comment.block.markdown.fsharp",
                     "begin": "^\\s*(\\(\\*\\*(?!\\)))((?!\\*\\)).)*$",
                     "while": "^(?!\\s*(\\*)+\\)$)",
