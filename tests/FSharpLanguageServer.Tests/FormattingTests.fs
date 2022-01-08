@@ -34,3 +34,36 @@ let hover_over_System_function() =
             doc.Contains("Applies a function to each element of the collection, threading an accumulator argument")
             )
         Assert.True(matches.Length>0,"List does not contain required System function doc string")
+[<Test>]
+let hoverMethodParams() = 
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+    
+    match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 25, 19)) |> Async.RunSynchronously with 
+    | None -> Assert.Fail("No hover")
+    | Some hover -> 
+        if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
+        let matches=hover.contents|>List.filter(fun x->
+            let doc=
+                match x with
+                |PlainString(s)->s
+                |HighlightedString(s,_)->s
+            doc.Contains("This function has documentation")
+            )
+        Assert.True(matches.Length>0,"List does not contain required function doc string from a non-xml comment")
+[<Test>]
+let hoverMDDocs() = 
+    let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+    
+    match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 23, 10)) |> Async.RunSynchronously with 
+    | None -> Assert.Fail("No hover")
+    | Some hover -> 
+        if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
+        let matches=hover.contents|>List.filter(fun x->
+            let doc=
+                match x with
+                |PlainString(s)->s
+                |HighlightedString(s,_)->s
+            doc.Contains("This function has documentation")
+            )
+        Assert.True(matches.Length>0,"List does not contain required function doc string from a non-xml comment")
+let a=0
