@@ -6,6 +6,9 @@ open System
 open System.Collections.Generic
 open System.IO
 open Serilog
+open Serilog
+open Serilog.Core
+open Serilog.Events
 let diagnosticsLog = ref stderr
 /// Print to LSP.Log.diagnosticsLog, which is stderr by default but can be redirected
 let dprintfn(fmt: Printf.TextWriterFormat<'T>): 'T = 
@@ -64,14 +67,21 @@ let lgVerb3  (message:string) (data:obj) (data2:obj) (data3:obj)=
 let startTime=DateTime.Now
 let createLogger logPath =
     let logName=sprintf "%sdebugLog-%i-%i_%i;%i-%is--.log" logPath startTime.Month startTime.Day startTime.Hour startTime.Minute startTime.Second
-    printfn "%s"logName
+    dprintfn "%s"logName
     
     let logger=
         Serilog.LoggerConfiguration()
             .MinimumLevel.Verbose()
-            .WriteTo.Console(theme=Sinks.SystemConsole.Themes.SystemConsoleTheme.Literate,standardErrorFromLevel=Serilog.Events.LogEventLevel.Information)
             .WriteTo.File(logName ,Serilog.Events.LogEventLevel.Verbose,rollingInterval=RollingInterval.Day,fileSizeLimitBytes=(int64 (1000*1000)))
             .WriteTo.File(logPath+"simpleLog-.log",Serilog.Events.LogEventLevel.Information,rollingInterval=RollingInterval.Day,fileSizeLimitBytes=(int64 (1000*1000)))
+            .MinimumLevel.Information()
+            .WriteTo.Console(theme=Sinks.SystemConsole.Themes.SystemConsoleTheme.Literate,standardErrorFromLevel=Serilog.Events.LogEventLevel.Information)
             .CreateLogger()
-    Log.Logger<-logger 
-    printfn "logger created"
+    (* let logger2=
+        Serilog.LoggerConfiguration()  
+            .WriteTo.Async(
+                fun c -> c.Console(outputTemplate = outputTemplate, standardErrorFromLevel = Nullable<_>(LogEventLevel.Verbose), theme = Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code) |> ignore
+            ) // make it so that every console log is logged to stderr
+ *)
+    Serilog.Log.Logger<-logger
+    dprintfn "logger created"

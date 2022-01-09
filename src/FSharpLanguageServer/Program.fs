@@ -533,36 +533,40 @@ type Server(client: ILanguageClient) =
                 | Some root ->
                     lgInfo "Add workspace root {path}" root.LocalPath
                     deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath))
-                | _ -> lgWarn"No root URI in initialization message {msg}" p
-                return {
-                    capabilities =
-                        { defaultServerCapabilities with
-                            hoverProvider = true
-                            completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
-                            signatureHelpProvider = Some({triggerCharacters = ['('; ','; ' '];retriggerCharacters=[',' ;')'; ' ']})
-                            documentSymbolProvider = true
-                            codeLensProvider = Some({resolveProvider=true})
-                            workspaceSymbolProvider = true
-                            definitionProvider = true
-                            referencesProvider = true
-                            renameProvider = true
-                            textDocumentSync =
-                                { defaultTextDocumentSyncOptions with
-                                    openClose = true
-                                    save = Some({ includeText = false })
-                                    change = TextDocumentSyncKind.Incremental
-                                }
-                            semanticTokensProvider=
-                                Some<|{
-                                    legend= createTokenLegend<SemanticTokenTypes, SemanticTokenModifier>
-                                    range= Some true
-                                    full= Some true
-                                }
+                | _ -> lgWarn" No root URI in initialization message {msg}" p
+                let capabilities=
+                    {
+                        capabilities =
+                            { defaultServerCapabilities with
+                                hoverProvider = true
+                                completionProvider = Some({resolveProvider=true; triggerCharacters=['.']})
+                                signatureHelpProvider = Some({triggerCharacters = ['('; ','; ' '];retriggerCharacters=[',' ;')'; ' ']})
+                                documentSymbolProvider = true
+                                codeLensProvider = Some({resolveProvider=true})
+                                workspaceSymbolProvider = true
+                                definitionProvider = true
+                                referencesProvider = true
+                                renameProvider = true
+                                textDocumentSync =
+                                    { defaultTextDocumentSyncOptions with
+                                        openClose = true
+                                        save = Some({ includeText = false })
+                                        change = TextDocumentSyncKind.Incremental
+                                    }
+                                semanticTokensProvider=
+                                    Some<|{
+                                        legend= createTokenLegend<SemanticTokenTypes, SemanticTokenModifier>
+                                        range= Some true
+                                        full= Some true
+                                    }
 
-                        }
-                }
+                            }
+                    }
+                lgInfof "returning capabilities"
+                return capabilities
             }
         member this.Initialized(): Async<unit> =
+            lgInfo "Running inititialization"
             deferredInitialize
         member this.Shutdown(): Async<unit> =
             async { () }
@@ -886,15 +890,15 @@ type Server(client: ILanguageClient) =
 [<EntryPoint>]
 let main(argv: array<string>): int =
     dprintfn "starting"
-    let logger=createLogger("C:/logs/")
+    let read = new BinaryReader(Console.OpenStandardInput())
+    let write = new BinaryWriter(Console.OpenStandardOutput())
     dprintfn "Logging started"
+    let logger=createLogger("C:/logs/")
     lgDebugf "debug log"
     lgVerbosef "verbose log"
     lgInfof "info log"
     lgWarnf "warn log"
     lgErrorf "erroor log"
-    let read = new BinaryReader(Console.OpenStandardInput())
-    let write = new BinaryWriter(Console.OpenStandardOutput())
     let serverFactory(client) = Server(client) :> ILanguageServer
     if argv|>Array.exists ((=)"--attach-debugger") then
         Console.WriteLine("Waiting for debugger to attach");

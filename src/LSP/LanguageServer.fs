@@ -208,12 +208,12 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                         lgInfo "Request {id} has already finished" id
                 // Process other requests on worker thread
                 | Parser.NotificationMessage(method, json) -> 
-                //    dprintfn "Got notification. method %s with: %s"  (method)(json.ToString())
+                    lgVerbosef "Got notification. method %s with: %s"  (method)(json.ToString())
                     let n = Parser.parseNotification(method, json)
                     let task = processNotification(n)
                     processQueue.Add(ProcessNotification(method, task))
                 | Parser.RequestMessage(id, method, json) -> 
-                    //dprintfn "Got request. id %d method %s with: %s" id (method) (json.ToString())
+                    lgVerbosef "Got request. id %d method %s with: %s" id (method) (json.ToString())
                     let task = processRequest(Parser.parseRequest(method, json)) 
                     let cancel = new CancellationTokenSource()
                     processQueue.Add(ProcessRequest(id, task, cancel))
@@ -228,7 +228,7 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
         match processQueue.Take() with 
         | Quit -> quit <- true
         | ProcessNotification(method, task) -> 
-            //dprintfn "sending notification. method %s "  (method)
+            lgDebugf "sending notification. method %s "  (method)
             Async.RunSynchronously(task)
         | ProcessRequest(id, task, cancel) -> 
             if cancel.IsCancellationRequested then 
@@ -241,7 +241,7 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                         respond(send, id, result)
                     | None -> 
                         lgInfo "Sending Response. id {id}  NO response "  id 
-                    //    respond(send, id, "null")
+                        respond(send, id, "null")
                 with :? OperationCanceledException -> 
                     lgInfo "Request {id} was cancelled" id
             pendingRequests.TryRemove(id) |> ignore
