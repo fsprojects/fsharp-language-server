@@ -74,8 +74,7 @@ let createLogger logPath =
             .MinimumLevel.Verbose()
             .WriteTo.File(logName ,Serilog.Events.LogEventLevel.Verbose,rollingInterval=RollingInterval.Day,fileSizeLimitBytes=(int64 (1000*1000)))
             .WriteTo.File(logPath+"simpleLog-.log",Serilog.Events.LogEventLevel.Information,rollingInterval=RollingInterval.Day,fileSizeLimitBytes=(int64 (1000*1000)))
-            .MinimumLevel.Information()
-            .WriteTo.Console(theme=Sinks.SystemConsole.Themes.SystemConsoleTheme.Literate,standardErrorFromLevel=Serilog.Events.LogEventLevel.Information)
+            .WriteTo.Console(theme=Sinks.SystemConsole.Themes.SystemConsoleTheme.Literate,restrictedToMinimumLevel=Serilog.Events.LogEventLevel.Information, standardErrorFromLevel=Serilog.Events.LogEventLevel.Information)
             .CreateLogger()
     (* let logger2=
         Serilog.LoggerConfiguration()  
