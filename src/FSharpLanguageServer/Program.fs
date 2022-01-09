@@ -893,7 +893,7 @@ let main(argv: array<string>): int =
     let read = new BinaryReader(Console.OpenStandardInput())
     let write = new BinaryWriter(Console.OpenStandardOutput())
     dprintfn "Logging started"
-    let logger=createLogger("C:/logs/")
+    let logger=createLogger("./logs/")
     lgDebugf "debug log"
     lgVerbosef "verbose log"
     lgInfof "info log"
