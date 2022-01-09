@@ -120,7 +120,7 @@ let private frameworkPreference = [
     "net11", ".NETFramework,Version=v1.1" ]
 
 let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
-    dprintfn "Parsing %s" projectAssetsJson.FullName
+    lgInfo "Parsing {name}" projectAssetsJson.FullName
     let root = JsonValue.Parse(File.ReadAllText(projectAssetsJson.FullName))
     let fsproj = FileInfo(root?project?restore?projectPath.AsString())
     // Find the assembly base name
@@ -139,7 +139,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // The path returned here will have framework DLLs which we need, but which may
     // not be explicitly referenced elsewhere
     let findRuntimePaths(): HashSet<CoreRuntime> =
-        let dotnetProcess = new Process()
+        use dotnetProcess = new Process()
         dotnetProcess.StartInfo <- new ProcessStartInfo(FileName="dotnet",
                                                         Arguments="--list-runtimes",
                                                         CreateNoWindow=true,
@@ -176,13 +176,13 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 
             match packFrameworks with
             | packDir :: _ ->
-                dprintfn "Discovered framework pack: %s v%s at %s" name version packDir
+                lgDebug3 "Discovered framework pack: {name} v{version} at {Dir}" name version packDir
                 runtimePaths.Add({name=name;
                                   majorVersion=majorVersion;
                                   minorVersion=minorVersion;
                                   path=packDir}) |> ignore
             | [] ->
-                dprintfn "Discovered framework runtime: %s v%s at %s" name version basePath
+                lgDebug3 "Discovered framework runtime:{name} v{version} at {Dir}" name version basePath
                 runtimePaths.Add({name=name;
                                   majorVersion=majorVersion;
                                   minorVersion=minorVersion;
@@ -199,7 +199,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             if projectContainsFramework(short) && found.IsNone then
                 found <- Some(short, long)
         found.Value
-    dprintfn "Chose framework %s / %s" shortFramework longFramework
+    lgInfo2 "Chose framework {shortName} / {longName}" shortFramework longFramework
     // Choose a version of a dependency by scanning targets
     let chooseVersion(dependencyName: string): string =
         let prefix = dependencyName + "/"
@@ -239,7 +239,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let nameVersion = parent.name + "/" + parent.version
         match root?targets.[longFramework].GetCaseInsensitive(nameVersion) with
         | None ->
-            dprintfn "Couldn't find %s in targets" nameVersion
+            lgWarn "Couldn't find {name} in targets" nameVersion
         | Some (lib) when transitiveDependencies.TryAdd(nameVersion, parent) ->
             match lib.TryGetProperty("dependencies") with
             | None -> ()
@@ -251,7 +251,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                     let child = {name=name; version=version}
                     let childNameVersion = child.name + "/" + child.version
                     if not(transitiveDependencies.ContainsKey(childNameVersion)) then
-                        dprintfn "\t%s <- %s" nameVersion childNameVersion
+                        lgVerb2 "\t{version} <- {child}" nameVersion childNameVersion
                     findTransitiveDeps(child)
         | _ -> ()
     // Find root dependencies by scanning the project section
@@ -355,7 +355,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 
         let runtimeKey = (runtime.name, runtime.majorVersion)
         selectedRuntimes.[runtimeKey] <- currentRuntime
-        dprintfn "Chose %s as the final path for runtime %s version (%d, %d)"
+        lgInfof "Chose %s as the final path for runtime %s version (%d, %d)"
                  currentRuntime.path
                  currentRuntime.name
                  currentRuntime.majorVersion
@@ -365,7 +365,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     // required, like System.Core.dll
     let runtimeAssemblies =
         [ for runtimeDir in selectedRuntimes.Values do yield! Directory.GetFiles(runtimeDir.path, "*.dll")]
-    dprintfn "Discovered runtime assemblies %A" runtimeAssemblies
+    lgDebug "Discovered runtime assemblies {assemblies}" runtimeAssemblies
     // Find projects in libraries section
     for name, value in root?libraries.Properties do
         if value?``type``.AsString() = "project" then
@@ -374,7 +374,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
                 let dep = {name=name; version=version}
                 findTransitiveDeps(dep)
             | _ ->
-                dprintfn "%s doesn't look like name/version" name
+                lgWarn "{name} doesn't look like name/version" name
     // Search package folders for a .dll
     let absoluteDll(relativeToPackageFolder: string): string option =
         let mutable found: string option = None
@@ -383,7 +383,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             if File.Exists(candidate) && found.IsNone then
                 found <- Some(candidate)
         if found.IsNone then
-            dprintfn "Couldn't find %s in %A" relativeToPackageFolder packageFolders
+            lgWarn2 "Couldn't find {packageFolder} in {folders}" relativeToPackageFolder packageFolders
         found
     // Find .dll files for each dependency
     // "targets": {
@@ -427,7 +427,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             let target = root?targets.[longFramework].GetCaseInsensitive(nameVersion).Value
             match target.TryGetProperty("compile") with
             | None ->
-                dprintfn "%s has no compile-time dependencies" nameVersion
+                lgInfo "{name} has no compile-time dependencies" nameVersion
                 []
             | Some(map) ->
                 [ for dll, _ in map.Properties do
@@ -442,7 +442,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let dllNameVersion =
             [ for d in packageDlls @ runtimeAssemblies do
                 match readAssembly(FileInfo(d)) with
-                | Error(e) -> dprintfn "Failed loading %s with error %s" d e
+                | Error(e) -> lgError2 "Failed loading {dll} with error {err}" d e
                 | Ok(name, version) -> yield d, name, version ]
         let aName(dll, name, version) = name
         let aVersion(dll, name, version) = version
@@ -452,7 +452,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
             | [(file, _, _)] -> yield file
             | _ ->
                 let winner, _, _ = List.maxBy aVersion versions
-                dprintfn "Conflict between %A, chose %s" versions winner
+                lgWarn2 "Conflict between {versions}, chose {winner}" versions winner
                 yield winner ]
     // Find all transitive project dependencies by examining libraries
     // Values with "type": "project" are projects
@@ -481,11 +481,15 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
 let private project(fsproj: FileInfo): ProjectAnalyzer =
     let options = new AnalyzerManagerOptions()
     options.LogWriter <- !diagnosticsLog // TODO this doesn't follow ref changes
-    let manager = AnalyzerManager(options)
+    let manager = AnalyzerManager(options)//TODO: i may be able to only make one instance oof this, though beucase the project inof is cached in projmanager we may get double caching
     manager.GetProject(fsproj.FullName):?>ProjectAnalyzer
 
 let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult =
-    let builds = project(fsproj).Build()
+    let opt = new Environment.EnvironmentOptions()
+    opt.TargetsToBuild.Remove("Clean")|>ignore
+    opt.EnvironmentVariables.Add("IntermediateOutputPath", Path.Combine(fsproj.Directory.FullName, ".ba", "obj" ))
+    opt.EnvironmentVariables.Add("OutputPath", Path.Combine(fsproj.Directory.FullName, ".ba", "bin"))
+    let builds = project(fsproj).Build(opt)
     // TODO get target framework from project.assets.json
     let mutable chosen: AnalyzerResult option = None
     for shortFramework, _ in frameworkPreference do
@@ -541,7 +545,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 if k = "Reference" then
                     for i in v do
                         yield absoluteIncludePath(fsproj, i:?>ProjectItem) ]
-        dprintfn "Cracked %s in %dms" fsproj.Name timeProject.ElapsedMilliseconds
+        lgInfo2 "Cracked {proj} in {time}ms" fsproj.Name timeProject.ElapsedMilliseconds
         // Get package info from project.assets.json
         let projectAssetsJson = FileInfo(Path.Combine [|fsproj.DirectoryName; "obj"; "project.assets.json"|])
         if not(projectAssetsJson.Exists) then
@@ -564,7 +568,7 @@ let crack(fsproj: FileInfo): CrackedProject =
             let isFsproj(f: FileInfo) = f.Name.EndsWith(".fsproj")
             let fsProjects, csProjects = List.partition isFsproj assets.projects
             let otherProjects = [for csproj in csProjects do yield projectTarget(csproj)]
-            dprintfn "Cracked project.assets.json in %dms" timeAssets.ElapsedMilliseconds
+            lgInfo "Cracked project.assets.json in {time}ms" timeAssets.ElapsedMilliseconds
             {
                 fsproj=fsproj
                 target=target
@@ -576,7 +580,7 @@ let crack(fsproj: FileInfo): CrackedProject =
                 error=None
             }
     with e ->
-        dprintfn "Failed to build %s: %s\n%s" fsproj.Name e.Message e.StackTrace
+        lgError3 "Failed to build {prooj}: {msg}\n{trace}" fsproj.Name e.Message e.StackTrace
         {
             fsproj=fsproj
             target=placeholderTarget
