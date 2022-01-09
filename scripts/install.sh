@@ -3,7 +3,7 @@
 set -e
 
 artifact=build.vsix
-package=georgewfraser.fsharp-language-server
+package=faldor20.fsharp-language-server
 
 if [ ! -z `code --list-extensions | grep $package` ]; then
   code --uninstall-extension $package

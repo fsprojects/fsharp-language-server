@@ -141,3 +141,24 @@ Ionide is a suite of F# plugins for VSCode; F# language server is analagous to t
 The implementation is a thin wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/) and is heavily focused on performance. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
 
 ![Autocomplete warm](videos/LSP-vs-Ionide-Warm.gif)
+# Contributing
+Please do!
+
+Any help is very much appreciated, issues, PR's, even just asking a question about how something works. I'm happy to help and be helped 
+## Building
+
+Run :
+
+- ``npm install`` to setup node deps (not needed unless you plan to build the vsix extension package)
+
+- ``dotnet tool restore`` to install paket
+
+- ``dotnet paket install`` to install all dependencies
+
+Then refer to the build scripts.
+
+Essentially you just publish the language server with ``dotnet publish -c Release src/FSharpLanguageServer`` then run ``vsce package -o build.vsix`` to package it up
+
+If you want to try your newly created extension run ``code --install-extension build.vsix``
+
+You can also change the Fsharp.debug setting in vscode which will cause the installed extension to try to build fslsp when it launches. Very handy for testing many smaller changes without republishing the extension. 
