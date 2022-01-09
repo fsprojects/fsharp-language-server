@@ -33,12 +33,15 @@ type private ProjectCache() =
     member this.Invalidate(fsprojOrFsx: FileInfo) =
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
     member this.Get(fsprojOrFsx: FileInfo, analyzeLater: FileInfo -> LazyProject): LazyProject =
-        if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then
-            knownProjects.Add(fsprojOrFsx.FullName, analyzeLater(fsprojOrFsx))
-        knownProjects.[fsprojOrFsx.FullName]
+            if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then
+                lgVerb "Creating lazy analysis results entry for{file}" fsprojOrFsx.FullName
+                knownProjects.Add(fsprojOrFsx.FullName, analyzeLater(fsprojOrFsx))
+            knownProjects.[fsprojOrFsx.FullName]
+            
 
 /// Maintains caches of parsed versions of .fsprojOrFsx files
 type ProjectManager(checker: FSharpChecker) =
+    do lgInfof "created new Project Manager"
     /// Remember what .fsproj files are referenced by .sln files
     /// Keys are full paths to .sln files
     /// Values are lists of .fsproj files referenced by the .sln file
@@ -281,10 +284,11 @@ type ProjectManager(checker: FSharpChecker) =
                     [|
                         // Dotnet framework should be specified explicitly
                         yield "--noframework"
+                        let names=cracked.projectReferences|>List.map( fun x->async{return (cache.Get(x, analyzeLater)).resolved.Value.target.FullName }|>Async.StartChild)|>Async.Parallel|>Async.RunSynchronously|>Async.Parallel|>Async.RunSynchronously
                         // Reference output of other projects
-                        for r in cracked.projectReferences do
-                            let options = cache.Get(r, analyzeLater)
-                            yield "-r:" + options.resolved.Value.target.FullName
+                        for r in names do
+                            yield "-r:" + r
+                        
                         // Reference target .dll for .csproj proejcts
                         for r in cracked.otherProjectReferences do
                             yield "-r:" + r.FullName
@@ -330,6 +334,7 @@ type ProjectManager(checker: FSharpChecker) =
 
     /// Invalidate all descendents of a modified .fsproj or .fsx file
     let invalidateDescendents(fsprojOrFsx: FileInfo) =
+        lgInfo "invalidating project :{projectName}" fsprojOrFsx.Name
         cache.Invalidate(fsprojOrFsx)
         for fileName in knownProjects do
             let file = FileInfo(fileName)
@@ -396,13 +401,16 @@ type ProjectManager(checker: FSharpChecker) =
         knownProjects.Add(fsprojOrFsx.FullName) |> ignore
         invalidateDescendents(fsprojOrFsx)
     member this.UpdateProjectFile(fsprojOrFsx: FileInfo) =
+        lgInfo "Invalidating project {project} becuase it has been changed" fsprojOrFsx
         invalidateDescendents(fsprojOrFsx)
     member this.DeleteSlnFile(sln: FileInfo) =
         knownSolutions.Remove(sln.FullName) |> ignore
     member this.UpdateSlnFile(sln: FileInfo) =
         knownSolutions.[sln.FullName] <- slnProjectReferences(sln)
     member this.UpdateAssetsJson(assets: FileInfo) =
-        for fsproj in projectFileForAssets(assets) do invalidateDescendents(fsproj)
+        for fsproj in projectFileForAssets(assets) do
+            lgInfo "Invalidating project {project} becuase oof changes to asset.json" fsproj.Name
+            invalidateDescendents(fsproj)
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> =
         let isSourceFile(f: FileInfo) = f.FullName = sourceFile.FullName
         // Does `p` contain a reference to `sourceFile`?
@@ -420,7 +428,7 @@ type ProjectManager(checker: FSharpChecker) =
                 for KeyValue(sln, fsprojs) in knownSolutions do
                     for f in fsprojs do
                         if fsproj.file.FullName = f.FullName then
-                            lgInfo2 "{refProj} is referenced by {proj}" f.Name sln
+                            lgDebug2 "{refProj} is referenced by {proj}" f.Name sln
                             yield sln
             } |> Seq.isEmpty |> not
         let referencedProjects, orphanProjects = List.partition isReferencedBySln notYetCracked
