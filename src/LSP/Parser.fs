@@ -132,10 +132,10 @@ let parseNotification(method: string, maybeBody: JsonValue option): Notification
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
     | _, None -> 
-        dprintfn "%s is not a known notification, or it is expected to contain a body" method
+        lgWarn "{notification} is not a known notification, or it is expected to contain a body" method
         OtherNotification method
     | _, _ -> 
-        dprintfn "%s is not a known notification" method
+        lgWarn "{notification} is not a known notification" method
         OtherNotification method
 
 type InitializeParamsRaw = {

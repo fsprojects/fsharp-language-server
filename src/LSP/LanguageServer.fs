@@ -113,6 +113,7 @@ type private PendingTask =
 | Quit
 
 let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryReader, send: BinaryWriter) = 
+    
     let server = serverFactory(RealClient(send))
     let processRequest(request: Request): Async<string option> = 
         match request with 
@@ -201,10 +202,10 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                     let id = json?id.AsInteger()
                     let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
                     if stillRunning then
-                        dprintfn "Cancelling request %d" id
+                        lgInfo "Cancelling request {id}" id
                         pendingRequest.Cancel()
                     else 
-                        dprintfn "Request %d has already finished" id
+                        lgInfo "Request {id} has already finished" id
                 // Process other requests on worker thread
                 | Parser.NotificationMessage(method, json) -> 
                 //    dprintfn "Got notification. method %s with: %s"  (method)(json.ToString())
@@ -219,7 +220,7 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                     pendingRequests.[id] <- cancel
             processQueue.Add(Quit)
         with e -> 
-            dprintfn "Exception in read thread %O" e
+            lgError "Exception in read thread {exception}" e
     ).Start()
     // Process messages on main thread
     let mutable quit = false
@@ -231,16 +232,16 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
             Async.RunSynchronously(task)
         | ProcessRequest(id, task, cancel) -> 
             if cancel.IsCancellationRequested then 
-                dprintfn "Skipping cancelled request %d" id
+                lgVerb "Skipping cancelled request %d" id
             else
                 try 
                     match Async.RunSynchronously(task, 0, cancel.Token) with 
                     | Some(result) -> 
-                        //dprintfn "Sending Response. id %d response %s"  id (result)
+                        lgVerb2 "Sending Response. id {id} response {response}"  id (result)
                         respond(send, id, result)
                     | None -> 
-                        dprintfn "Sending Response. id %d  NO response "  id 
+                        lgInfo "Sending Response. id {id}  NO response "  id 
                     //    respond(send, id, "null")
                 with :? OperationCanceledException -> 
-                    dprintfn "Request %d was cancelled" id
+                    lgInfo "Request {id} was cancelled" id
             pendingRequests.TryRemove(id) |> ignore

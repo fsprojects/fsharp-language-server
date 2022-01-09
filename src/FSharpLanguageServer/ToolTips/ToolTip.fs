@@ -59,7 +59,7 @@ let private buildFormatComment cmt (formatStyle: FormatCommentStyle) (typeDoc: s
     with
     | ex ->
 
-      (dprintfn "TipFormatter - Error while parsing the doc comment %A" ex)
+      (lgWarn "TipFormatter - Error while parsing the doc comment {err}" ex)
       sprintf
         "An error occured when parsing the doc comment, please check that your doc comment is valid.\n\nMore info can be found LSP output"
 

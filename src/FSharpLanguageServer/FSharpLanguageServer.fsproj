@@ -11,6 +11,7 @@
     <Compile Include="ToolTips/Format.fs" />
     <Compile Include="ToolTips/XmlDoc.fs" />
     <Compile Include="ToolTips/ToolTip.fs" />
+    <Compile Include="SourceLink.fs" />
     <Compile Include="SyntaxTreeOps.fs" />
     <Compile Include="TipFormatter.fs" />
     <Compile Include="ProgressBar.fs" />
@@ -26,6 +27,8 @@
   <ItemGroup>
     <PackageReference Include="FSharp.Compiler.Service" Version="41.0.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.38" />
+    <PackageReference Include="FSharp.UMX" />
+
   </ItemGroup>
 
 

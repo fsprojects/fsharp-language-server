@@ -108,7 +108,7 @@ let asHover(ToolTipText tips): Hover =
     let elements =
         [ for t in tips do
             match t with
-            | ToolTipElement.CompositionError(e) -> dprintfn "Error rendering tooltip: %s" e
+            | ToolTipElement.CompositionError(e) -> lgError "Error rendering tooltip: {error}" e
             | ToolTipElement.None -> ()
             | ToolTipElement.Group(elements) ->
                 yield! elements ]
@@ -192,7 +192,7 @@ let asSignatureInformation(methodName: string, s: MethodGroupItem): SignatureInf
     let doc = match s.Description with
                 | ToolTipText [ToolTipElement.Group [tip]] -> Some tip.MainDescription
                 | _ ->
-                    dprintfn "Can't render documentation %A" s.Description
+                    lgWarn "Can't render documentation {description}" s.Description
                     None
     let xmlDocs=
         match TipFormatter.docComment(s.XmlDoc) with
@@ -210,7 +210,7 @@ let asSignatureInformation(methodName: string, s: MethodGroupItem): SignatureInf
 let declarationLocation(s: FSharpSymbol): Location option =
     match s.DeclarationLocation with
     | None ->
-        dprintfn "Symbol %s has no declaration" s.FullName
+        lgWarn "Symbol {Name} has no declaration" s.FullName
         None
     | Some l ->
         Some(asLocation(l))

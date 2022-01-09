@@ -229,7 +229,7 @@ let private ensure(docFile: FileInfo) =
             | false, _ -> true
             | _, existing -> existing.loadTime < xmlFile.LastWriteTime
         if needsUpdate then
-            dprintfn "Reading %s" xmlFile.FullName
+            lgInfo "Reading {file}" xmlFile.FullName
             let parsed = Dictionary<string, CachedMember>()
             // The extension of these files is .xml, but they seem to actually be HTML
             // For example, they contain unclosed <p> tags

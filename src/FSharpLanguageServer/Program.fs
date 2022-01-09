@@ -38,10 +38,10 @@ let findMethodCallBeforeCursor(lineContent: string, cursor: int): int option =
     else
         let prefix = lineContent.Substring(0, found).TrimEnd()
         if Regex(@"let[ \w]+$").IsMatch(prefix) then
-            dprintfn "No signature help in let expression %s" lineContent
+            lgInfo "No signature help in let expression %s" lineContent
             None
         else if Regex(@"member[ \w\.]+$").IsMatch(prefix) then
-            dprintfn "No signature help in member expression %s" lineContent
+            lgInfo "No signature help in member expression %s" lineContent
             None
         else Some prefix.Length
 
@@ -215,7 +215,7 @@ type Server(client: ILanguageClient) =
             reader.ReadLine() |> ignore
             line <- line + 1
         if reader.Peek() = -1 then
-            dprintfn "Reached EOF before line %d in file %O" targetLine file.Name
+            lgWarn2 "Reached EOF before target line {target} in file {name}" targetLine file.Name
             ""
         else
             reader.ReadLine()
@@ -251,7 +251,7 @@ type Server(client: ILanguageClient) =
             match projects.FindProjectOptions(file), docs.Get(file) with
             | _, None ->
                 // If file doesn't exist, there's nothing to report
-                dprintfn "%s was closed" file.FullName
+                lgInfo "{file} was closed" file.FullName
                 return Error []
             | Error(errs), _ ->
                 return Error(errs)
@@ -259,27 +259,31 @@ type Server(client: ILanguageClient) =
                 let recompile = async {
                     let timeCheck = Stopwatch.StartNew()
                     let! force = checker.ParseAndCheckFileInProject(file.FullName, sourceVersion, SourceText.ofString(sourceText), projectOptions)
-                    dprintfn "Checked %s in %dms" file.Name timeCheck.ElapsedMilliseconds
+                    lgInfo2 "Checked {file} in {time}ms" file.Name timeCheck.ElapsedMilliseconds
                     match force with
                     | parseResult, FSharpCheckFileAnswer.Aborted -> return Error(asDiagnostics parseResult.Diagnostics)
                     | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
                 }
+
                 match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with
                 | Some(parseResult, checkResult, version) ->
+                    lgVerb2 "Getting typecheck for file with version {newVers}, previous version {oldVers}"  sourceVersion version
                     if allowCached && version = sourceVersion then
+                        lgInfof "cached allowed and version is same,using recent Typecheck results"
                         return Ok(parseResult, checkResult)
                     else if allowCached && allowStale then
                         try
-                            dprintfn "Trying to recompile %s with timeout" file.Name
+                            lgInfo "Trying to recompile {file} with timeout" file.Name
                             let! worker = Async.StartChild(recompile, millisecondsTimeout=200)
                             return! worker
                         with :? TimeoutException ->
-                            dprintfn "Re-compile timed out, using stale results"
+                            lgInfof "Re-compile timed out, using stale results"
                             return Ok(parseResult, checkResult)
                     else
-                        dprintfn "Checking: cannot use stale results and currentVersion %i did not match cached version %i" version sourceVersion
+                        lgInfo2 "Checking: cannot use stale results and currentVersion {currentVers} did not match cached version {cachedVers}" version sourceVersion
                         return! recompile
                 | _ ->
+                    lgInfof "recompiling file becuase could not get parseTesult or checkResult"
                     return! recompile
         }
 
@@ -333,7 +337,7 @@ type Server(client: ILanguageClient) =
                 let uses = checkResult.GetAllUsesOfAllSymbolsInFile()
                 let unusedDeclarationRanges = UnusedDeclarations.getUnusedDeclarationRanges(Seq.toArray uses, file.Name.EndsWith(".fsx"))
                 let unusedDeclarationErrors = [for r in unusedDeclarationRanges do yield diagnostic("Unused declaration", r, DiagnosticSeverity.Hint)]
-                dprintfn "Found %d unused declarations in %dms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
+                lgInfo2 "Found {count} unused declarations in {time}ms" unusedDeclarationErrors.Length timeUnusedDeclarations.ElapsedMilliseconds
                 // Combine
                 // return parseErrors@typeErrors@unusedOpenErrors@unusedDeclarationErrors
                 return parseErrors@typeErrors@unusedDeclarationErrors
@@ -355,17 +359,17 @@ type Server(client: ILanguageClient) =
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
             match c, maybeId with
             | Error(errors), _ ->
-                dprintfn "Check failed, ignored %d errors" (List.length errors)
+                lgError "'SymbolAt' Check failed, ignored {count} errors" (List.length errors)
                 return None
             | _, None ->
-                dprintfn "No identifier at %d in line '%s'" position.character line
+                lgWarn2 "'SymbolAt' No identifier at {char} in line '{line}'" position.character line
                 return None
             | Ok(_, checkResult), Some(id, endOfIdentifier, _) ->
-                dprintfn "Looking at symbol %s" id
+                lgInfo "'SymbolAt' Looking at symbol {id}" id
                 let names = List.ofArray(id.Split('.'))
                 let maybeSymbol = checkResult.GetSymbolUseAtLocation(position.line+1, endOfIdentifier, line, names)
                 if maybeSymbol.IsNone then
-                    dprintfn "%s in line '%s' is not a symbol use" id line
+                    lgWarn2 "{id} in line '{line}' is not a symbol use" id line
                 return maybeSymbol
         }
 
@@ -378,7 +382,7 @@ type Server(client: ILanguageClient) =
         let lineText = lineContent(file, line )
         let find = lineText.LastIndexOf(s.DisplayName, endColumn, endColumn - startColumn)
         if find = -1 then
-            dprintfn "Couldn't find '%s' in line '%s'" s.DisplayName lineText
+            lgWarn2 "'RefineRange' Couldn't find '{symbol}' in line '{line}'" s.DisplayName lineText
             asRange range
         else
             {
@@ -436,9 +440,9 @@ type Server(client: ILanguageClient) =
                     | Error(_) -> None, Some(f)
                     | Ok(projectOptions) -> Some(projectOptions), Some(f)
             if isPrivate then
-                dprintfn "Symbol %s is private so we will only check declaration file %A" symbol.FullName symbolDeclarationFile
+                lgInfo2 "'findAllSymbolUses' Symbol {symbol} is private so we will only check declaration file {file}" symbol.FullName symbolDeclarationFile
             elif isInternal then
-                dprintfn "Symbol %s is internal so we will onlcy check declaration project %A" symbol.FullName symbolDeclarationProject
+                lgInfo2 "'findAllSymbolUses' Symbol {symbol} is internal so we will onlcy check declaration project {file}" symbol.FullName symbolDeclarationProject
             // Is fileName the same file symbol was declared in?
             let isSymbolFile(fileName: string) =
                 match symbolDeclarationFile with None -> false | Some(f) -> f.FullName = fileName
@@ -466,7 +470,7 @@ type Server(client: ILanguageClient) =
                             yield projectOptions, FileInfo(fileName)
             ]
             let visibleNames = String.concat ", " [for _, f in visible do yield f.Name]
-            dprintfn "Symbol %s is visible from %s" symbol.FullName visibleNames
+            lgInfo2 "'findAllSymbolUses' Symbol {symbol} is visible from {names}" symbol.FullName visibleNames
             // Check source files for possible symbol references using string matching
             let searchFor =
                 // Attributes are referenced without the `Attribute` suffix
@@ -483,7 +487,7 @@ type Server(client: ILanguageClient) =
                     | Some(sourceText) -> yield projectOptions, sourceFile, sourceText
             ]
             let candidateNames = String.concat ", " [for _, file, _ in candidates do yield file.Name]
-            dprintfn "Name %s appears in %s" searchFor candidateNames
+            lgInfo2 "'findAllSymbolUses' Name {searched} appears in {candidateFiles}" searchFor candidateNames
             // Check each candidate file
             use progress = new ProgressBar(candidates.Length, sprintf "Search %d files" candidates.Length, client)
             let all = System.Collections.Generic.List<FSharpSymbolUse>()
@@ -496,15 +500,15 @@ type Server(client: ILanguageClient) =
                     let sourceVersion = docs.GetVersion(sourceFile) |> Option.defaultValue 0
                     let timeCheck = Stopwatch.StartNew()
                     let! _, maybeCheck = checker.ParseAndCheckFileInProject(sourceFile.FullName, sourceVersion, SourceText.ofString(sourceText), projectOptions)
-                    dprintfn "Checked %s in %dms" sourceFile.Name timeCheck.ElapsedMilliseconds
+                    lgInfo2 "'findAllSymbolUses' Checked {file} in {time}ms" sourceFile.Name timeCheck.ElapsedMilliseconds
                     match maybeCheck with
-                    | FSharpCheckFileAnswer.Aborted -> dprintfn "Aborted checking %s" sourceFile.Name
+                    | FSharpCheckFileAnswer.Aborted -> lgWarn "'findAllSymbolUses' Aborted checking {file}" sourceFile.Name
                     | FSharpCheckFileAnswer.Succeeded(check) ->
                         let uses = check.GetUsesOfSymbolInFile(symbol)
                         for u in uses do
                             all.Add(u)
                 with e ->
-                    dprintfn "Error checking %s: %s" sourceFile.Name e.Message
+                    lgError2 "Error checking {file}: {msg}" sourceFile.Name e.Message
             return List.ofSeq(all)
         }
 
@@ -527,9 +531,9 @@ type Server(client: ILanguageClient) =
             async {
                 match p.rootUri with
                 | Some root ->
-                    dprintfn "Add workspace root %s" root.LocalPath
+                    lgInfo "Add workspace root {path}" root.LocalPath
                     deferredInitialize <- projects.AddWorkspaceRoot(DirectoryInfo(root.LocalPath))
-                | _ -> dprintfn "No root URI in initialization message %A" p
+                | _ -> lgWarn"No root URI in initialization message {msg}" p
                 return {
                     capabilities =
                         { defaultServerCapabilities with
@@ -564,7 +568,7 @@ type Server(client: ILanguageClient) =
             async { () }
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): Async<unit> =
             async {
-                dprintfn "New configuration %s" (p.ToString())
+                lgInfo "New configuration {cfg}" (p.ToString())
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> =
             async {
@@ -609,7 +613,7 @@ type Server(client: ILanguageClient) =
             async {
                 for change in p.changes do
                     let file = FileInfo(change.uri.LocalPath)
-                    dprintfn "Watched file %s %O" file.FullName change.``type``
+                    lgVerb2 "Watched file {file} {change}" file.FullName change.``type``
                     if file.Name.EndsWith(".fsproj") || file.Name.EndsWith(".fsx") then
                         match change.``type`` with
                         | FileChangeType.Created ->
@@ -637,7 +641,7 @@ type Server(client: ILanguageClient) =
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
                 let file = FileInfo(p.textDocument.uri.LocalPath)
-                dprintfn "Autocompleting at %s(%d,%d)" file.FullName p.position.line p.position.character
+                lgInfo3 "Autocompleting at {file}({line},{char})" file.FullName p.position.line p.position.character
                 let line = lineContent(file, p.position.line)
                 let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
                 // When a partial identifier is not present, stale completions are very inaccurate
@@ -646,15 +650,15 @@ type Server(client: ILanguageClient) =
                 let noPartialName = partialName.QualifyingIdents.IsEmpty && partialName.PartialIdent = ""
                 // TODO when this is the only edited line, and the line looks like x.y.z.?, then stale completions are quite accurate
                 let! c = checkOpenFile(file, true, not(noPartialName))
-                dprintfn "Finished typecheck, looking for completions..."
+                lgInfof "Finished typecheck, looking for completions..."
                 match c with
                 | Error errors ->
-                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
+                    lgError "Check failed, ignored {num} errors" (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) ->
                         let declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
                         lastCompletion <- Some declarations
-                        dprintfn "Found %d completions" declarations.Items.Length
+                        lgInfo "Found {num} completions" declarations.Items.Length
                         return Some(asCompletionList(declarations))
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> =
@@ -665,17 +669,17 @@ type Server(client: ILanguageClient) =
                 let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character)
                 match c, maybeId with
                 | Error(errors), _ ->
-                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
+                    lgError "Check failed, ignored {num} errors" (List.length(errors))
                     return None
                 | _, None ->
-                    dprintfn "No identifier at %s(%d, %d)" file.FullName p.position.line p.position.character
+                    lgInfo3 "No identifier at{file}({line},{char})" file.FullName p.position.line p.position.character
                     return None
                     
                 | Ok(parseResult, checkResult), Some(id, _, _) ->
-                    dprintfn "Hover over %s" id
+                    lgInfo "Hover over {id}" id
                     let ids = List.ofArray(id.Split('.'))
                     let tips = checkResult.GetToolTip(p.position.line+1, p.position.character+1, line, ids, FSharpTokenTag.Identifier)
-                    dprintVerbosefn "Hover tooltipText=%A" tips
+                    lgDebug "Hover tooltipText={text}" tips
                     return Some(asHover(tips))
             }
         // Add documentation to a completion item
@@ -686,7 +690,7 @@ type Server(client: ILanguageClient) =
                 if lastCompletion.IsSome then
                     for candidate in lastCompletion.Value.Items do
                         if candidate.FullName = p.data?FullName.AsString() then
-                            dprintfn "Resolve description for %s" candidate.FullName
+                            lgInfo "Resolve description for {candidate}" candidate.FullName
                             let! resolved = TipFormatter.resolveDocs(p, candidate)
                             result <- resolved
                 return result
@@ -697,28 +701,28 @@ type Server(client: ILanguageClient) =
                 let! c = checkOpenFile(file, true, true)
                 match c with
                 | Error errors ->
-                    dprintfn "Check failed, ignored %d errors" (List.length(errors))
+                    lgError "Check failed, ignored {num} errors"  (List.length(errors))
                     return None
                 | Ok(parseResult, checkResult) ->
                     let line = lineContent(file, p.position.line)
                     match findMethodCallBeforeCursor(line, p.position.character) with
                     | None ->
-                        dprintfn "No method call in line %s" line
+                        lgWarn "No method call in line {line}" line
                         return None
                     | Some endOfMethodName ->
                         match QuickParse.GetCompleteIdentifierIsland false line (endOfMethodName - 1) with
                         | None ->
-                            dprintfn "No identifier before column %d in %s" (endOfMethodName - 1) line
+                            lgInfo2 "No identifier before column {col} in {line}" (endOfMethodName - 1) line
                             return None
                         | Some(id, _, _) ->
-                            dprintfn "Looking for overloads of %s" id
+                            lgInfo "Looking for overloads of {id}" id
                             let names = List.ofArray(id.Split('.'))
                             let overloads = checkResult.GetMethods(p.position.line+1, endOfMethodName, line, Some names)
                             let signature(i: MethodGroupItem) = asSignatureInformation(overloads.MethodName, i)
                             let sigs = Array.map signature overloads.Methods |> List.ofArray
                             let activeParameter = countCommas(line, endOfMethodName, p.position.character)
                             let activeDeclaration = findCompatibleOverload(activeParameter, overloads.Methods)
-                            dprintfn "Found %d overloads" overloads.Methods.Length
+                            lgInfo "Found {num} overloads" overloads.Methods.Length
                             return Some({signatures=sigs; activeSignature=activeDeclaration; activeParameter=Some activeParameter})
             }
         member this.GotoDefinition(p: TextDocumentPositionParams): Async<Location list> =
@@ -744,7 +748,7 @@ type Server(client: ILanguageClient) =
                 let! maybeParse = parseFile(file)
                 match maybeParse with
                 | Error e ->
-                    dprintfn "%s" e
+                    lgError "%s" e
                     return []
                 | Ok parse ->
                     let flat = findDeclarations(parse)
@@ -752,28 +756,28 @@ type Server(client: ILanguageClient) =
             }
         member this.WorkspaceSymbols(p: WorkspaceSymbolParams): Async<SymbolInformation list> =
             async {
-                dprintfn "Looking for symbols matching `%s`" p.query
+                lgInfo "Looking for symbols matching `%s`" p.query
                 // Read open projects until we find at least 50 symbols that match query
                 let all = System.Collections.Generic.List<SymbolInformation>()
                 // TODO instead of checking open projects, check all .fs files, using default parsing options
                 for projectOptions in projects.OpenProjects do
-                    dprintfn "...check project %s" projectOptions.ProjectFileName
+                    lgInfo "...check project {projFile}" projectOptions.ProjectFileName
                     for sourceFileName in projectOptions.SourceFiles do
                         let sourceFile = FileInfo(sourceFileName)
                         if all.Count < 50 then
-                            dprintfn "...scan %s" sourceFile.Name
+                            lgVerb "...scan {sourceFile}" sourceFile.Name
                             match maybeMatchesQuery(p.query, sourceFile) with
                             | None -> ()
                             | Some(sourceText) ->
                                 try
-                                    dprintfn "...parse %s" sourceFile.Name
+                                    lgVerb "...parse {sourceFile}" sourceFile.Name
                                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                                     let! parse = checker.ParseFile(sourceFile.FullName, SourceText.ofString(sourceText), parsingOptions)
                                     for declaration, container in findDeclarations(parse) do
                                         if matchesQuery(p.query, declaration.Name) then
                                             all.Add(asSymbolInformation(declaration, container))
                                 with e ->
-                                    dprintfn "Error parsing %s: %s" sourceFile.Name e.Message
+                                    lgWarn2 "Error parsing {sourceFile}: {msg}" sourceFile.Name e.Message
                 return List.ofSeq(all)
                 
             }
@@ -796,19 +800,19 @@ type Server(client: ILanguageClient) =
                             [ for name, range in findSignatureDeclarations(parse) do
                                 yield asGoToImplementation(name, file, range) ]
                     else
-                        dprintfn "Don't know how to compute code lenses on extension %s" file.Extension
+                        lgInfo "Don't know how to compute code lenses on extension {file}" file.Extension
                         return []
                 | Error(e), _ ->
-                    dprintfn "Failed to create code lens because project options failed to load: %A" e
+                    lgError "Failed to create code lens because project options failed to load: {err}" e
                     return []
                 | _, None ->
-                    dprintfn "Failed to create code lens because file %s does not exist" file.FullName
+                    lgWarn "Failed to create code lens because file {file} does not exist" file.FullName
                     return []
             }
         member this.ResolveCodeLens(p: CodeLens): Async<CodeLens> =
             async {
                 if p.data <> JsonValue.Null then
-                    dprintfn "Resolving %A" p.data
+                    lgInfo "Resolving {data}" p.data
                     let fsi, name = goToImplementationData(p)
                     if not(fsi.Extension = ".fsi") then
                         raise(Exception(sprintf "Signature file %s should end with .fsi" fsi.Name))
@@ -821,19 +825,19 @@ type Server(client: ILanguageClient) =
                         | [range] ->
                             return resolveGoToImplementation(p, file, range)
                         | [] ->
-                            dprintfn "Signature %A has no implementation in %s" name file.Name
+                            lgInfo2 "Signature {sig} has no implementation in {file}" name file.Name
                             return resolveMissingGoToImplementation(p, fsi)
                         | many ->
-                            dprintfn "Signature %A has multiple implementations in %s: %A" name file.Name many
+                            lgInfo3 "Signature {sig} has multiple implementations in {file}: {locations}" name file.Name many
                             // Go to the first overload
                             // This is wrong but still useful
                             let range = many.Head
                             return resolveGoToImplementation(p, file, range)
                     | Error(e), _ ->
-                        dprintfn "Failed to resolve code lens because project options failed to load: %A" e
+                        lgError "Failed to resolve code lens because project options failed to load: {err}" e
                         return p
                     | _, None ->
-                        dprintfn "Failed to resolve code lens because file %s does not exist" file.FullName
+                        lgWarn "Failed to resolve code lens because file {file} does not exist" file.FullName
                         return p
                 else return p
             }
@@ -851,7 +855,7 @@ type Server(client: ILanguageClient) =
                     let! uses = findAllSymbolUses(s.Symbol)
                     let byFile = List.groupBy (fun (usage:FSharpSymbolUse) -> usage.FileName) uses
                     let fileNames = List.map fst byFile
-                    dprintfn "Renaming %s to %s in %s" s.Symbol.FullName p.newName (String.concat ", " fileNames)
+                    lgInfo3 "Renaming {oldName} to {newName} in {files}" s.Symbol.FullName p.newName (String.concat ", " fileNames)
                     let renames = [for fileName, uses in byFile do yield renameTo(p.newName, FileInfo(fileName), uses)]
                     return {documentChanges=List.ofSeq(renames)}
             }
@@ -881,6 +885,14 @@ type Server(client: ILanguageClient) =
 
 [<EntryPoint>]
 let main(argv: array<string>): int =
+    dprintfn "starting"
+    let logger=createLogger("C:/logs/")
+    dprintfn "Logging started"
+    lgDebugf "debug log"
+    lgVerbosef "verbose log"
+    lgInfof "info log"
+    lgWarnf "warn log"
+    lgErrorf "erroor log"
     let read = new BinaryReader(Console.OpenStandardInput())
     let write = new BinaryWriter(Console.OpenStandardOutput())
     let serverFactory(client) = Server(client) :> ILanguageServer
@@ -889,10 +901,11 @@ let main(argv: array<string>): int =
         while not(Debugger.IsAttached ) do
             Thread.Sleep(100);
         Console.WriteLine("Debugger attached");
-    dprintfn "Listening on stdin"
+    lgInfof "Listening on stdin"
+    dprintfn "fist log should have happened"
     try
         LanguageServer.connect(serverFactory, read, write)
         0 // return an integer exit code
     with e ->
-        dprintfn "Exception in language server %O" e
+        lgError "Exception in language server {err}" e
         1

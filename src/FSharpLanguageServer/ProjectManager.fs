@@ -50,18 +50,18 @@ type ProjectManager(checker: FSharpChecker) =
 
     let printOptions(options: FSharpProjectOptions) =
         // This is long but it's useful
-        dprintfn "%s: " options.ProjectFileName
-        dprintfn "  ProjectFileName: %A" options.ProjectFileName
-        dprintfn "  SourceFiles: %A" options.SourceFiles
-        dprintfn "  ReferencedProjects: %A" [for dll in options.ReferencedProjects do yield dll.FileName]
-        dprintfn "  OtherOptions: %A" options.OtherOptions
-        dprintfn "  LoadTime: %A" options.LoadTime
+        lgInfo "{fileName}: " options.ProjectFileName
+        lgVerb "  ProjectFileName: {fileName}" options.ProjectFileName
+        lgInfo "  LoadTime: {loadTime}" options.LoadTime
+        lgVerb "  SourceFiles: {files}" options.SourceFiles
+        lgVerb "  ReferencedProjects: {refProjects}" [for dll in options.ReferencedProjects do yield dll.FileName]
+        lgVerb "  OtherOptions: {options}" options.OtherOptions
     //    dprintfn "  ExtraProjectInfo: %A" options.ExtraProjectInfo //TODO:ELI- find if this was useful
-        dprintfn "  IsIncompleteTypeCheckEnvironment: %A" options.IsIncompleteTypeCheckEnvironment
-        dprintfn "  OriginalLoadReferences: %A" options.OriginalLoadReferences
-        dprintfn "  Stamp: %A" options.Stamp
-        dprintfn "  UnresolvedReferences: %A" options.UnresolvedReferences
-        dprintfn "  UseScriptResolutionRules: %A" options.UseScriptResolutionRules
+        lgVerb "  IsIncompleteTypeCheckEnvironment: {incomplete}" options.IsIncompleteTypeCheckEnvironment
+        lgVerb "  OriginalLoadReferences: {refs}" options.OriginalLoadReferences
+        lgVerb "  Stamp: {:}" options.Stamp
+        lgInfo "  UnresolvedReferences: {unresolved}" options.UnresolvedReferences
+        lgInfo "  UseScriptResolutionRules: {rules}" options.UseScriptResolutionRules
 
     /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
@@ -231,7 +231,7 @@ type ProjectManager(checker: FSharpChecker) =
             if f.Exists then
                 yield f
             else
-                dprintfn "Couldn't find %s in %s" d dir
+                lgWarn2 "Couldn't find {dll} in {directory}" d dir
         ]
     ///Decodes the FSharpReferencedProject information object
     /// Comes from ionide.proj-info https://github.com/ionide/proj-info/blob/a972839f7ee015f50e7fac9af56c19402acef5a6/test/Ionide.ProjInfo.Tests/Tests.fs
@@ -247,7 +247,7 @@ type ProjectManager(checker: FSharpChecker) =
     let rec analyzeLater(fsprojOrFsx: FileInfo): LazyProject =
         /// Analyze a script file
         let analyzeFsx(fsx: FileInfo) =
-            dprintfn "Creating project options for script %s" fsx.Name
+            lgInfo "Creating project options for script {name}" fsx.Name
             let source = SourceText.ofString(File.ReadAllText(fsx.FullName))
             let inferred, errors = checker.GetProjectOptionsFromScript(fsx.FullName, source, loadedTimeStamp=fsx.LastWriteTime, assumeDotNetFramework=false) |> Async.RunSynchronously
             let combinedOtherOptions = [|
@@ -270,7 +270,7 @@ type ProjectManager(checker: FSharpChecker) =
             }
         /// Analyze a project
         let analyzeFsproj(fsproj: FileInfo) =
-            dprintfn "Analyzing %s" fsproj.Name
+            lgInfo "Analyzing {name}" fsproj.Name
             let cracked = ProjectCracker.crack(fsproj)
             // Convert to FSharpProjectOptions
             let options = {
@@ -337,7 +337,7 @@ type ProjectManager(checker: FSharpChecker) =
             if project.resolved.IsValueCreated then
                 for ancestor in project.resolved.Value.options.ReferencedProjects do
                     if ancestor.FileName = fsprojOrFsx.FullName then
-                        dprintfn "%s has been invalidated by changes to %s" ancestor.FileName fsprojOrFsx.Name
+                        lgInfo2 "{fileName} has been invalidated by changes to {projectName}" ancestor.FileName fsprojOrFsx.Name
                         cache.Invalidate(FileInfo(ancestor.FileName))
 
 
@@ -350,7 +350,7 @@ type ProjectManager(checker: FSharpChecker) =
                 for parent in options.ReferencedProjects do
                     match internalGetProjectOptions parent with //TODO:This uses reflection and is pure evil....
                     |Some(parentOpts)->walk(parentOpts)
-                    |None->dprintfn "Project %s has a reference to a project {%s} which we don't know how to handle " options.ProjectFileName parent.FileName
+                    |None->lgWarn2 "Project {thisProj} has a reference to a project {referencedProj} which we don't know how to handle " options.ProjectFileName parent.FileName
                     
                 result.Add(options)
         let root = cache.Get(fsprojOrFsx, analyzeLater)
@@ -420,7 +420,7 @@ type ProjectManager(checker: FSharpChecker) =
                 for KeyValue(sln, fsprojs) in knownSolutions do
                     for f in fsprojs do
                         if fsproj.file.FullName = f.FullName then
-                            dprintfn "%s is referenced by %s" f.Name sln
+                            lgInfo2 "{refProj} is referenced by {proj}" f.Name sln
                             yield sln
             } |> Seq.isEmpty |> not
         let referencedProjects, orphanProjects = List.partition isReferencedBySln notYetCracked
@@ -433,12 +433,12 @@ type ProjectManager(checker: FSharpChecker) =
                 if isMatch(options.resolved.Value) then
                     yield options
             // If that doesn't work, check other .fsproj files
-            dprintfn "No cracked project references %s, looking at uncracked projects..." sourceFile.Name
+            lgInfo "No cracked project references {projectName}, looking at uncracked projects..." sourceFile.Name
             // Prioritize .fsproj files that are referenced by .sln files
             for options in referencedProjects@orphanProjects do
                 // Only parse projects that contain the simple name of `sourceFile`
                 if isPotentialMatch(options) then
-                    dprintfn "The text of %s contains the string '%s', cracking" options.file.Name sourceFile.Name
+                    lgInfo2 "The text of {projectFile} contains the string {fileName}', cracking" options.file.Name sourceFile.Name
                     if isMatch(options.resolved.Value) then
                         yield options
         }
@@ -461,7 +461,7 @@ type ProjectManager(checker: FSharpChecker) =
                 //for some reason getting the project filename directly returns the dll path instead so we have to do this
                     match internalGetProjectOptions parent with //TODO:This uses reflection and is pure evil....
                     |Some(parentOpts)->walk(parentOpts)
-                    |None->dprintfn "Project %s has a reference to a project {%s} which we don't know how to handle " options.ProjectFileName parent.FileName
+                    |None->lgWarn2 "Project {proj} has a reference to a project {refedProj} which we don't know how to handle " options.ProjectFileName parent.FileName
                 result.Add(options)
         for f in knownProjects do
             let project = cache.Get(FileInfo(f), analyzeLater)
