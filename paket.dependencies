@@ -1,0 +1,26 @@
+source https://api.nuget.org/v3/index.json
+
+nuget FSharp.Core
+nuget Buildalyzer 3.2.3
+nuget FSharp.Compiler.Service 41.0.1
+nuget FSharp.Data 4.2.5
+nuget FSharp.UMX
+nuget HtmlAgilityPack 1.11.39
+nuget logary 4.2.1
+nuget Microsoft.Build 
+nuget Microsoft.Build.Framework 
+nuget Microsoft.Build.Runtime 
+nuget Microsoft.Build.Tasks.Core 
+nuget Microsoft.Build.Utilities.Core 
+nuget Microsoft.NET.Sdk.Functions
+nuget Microsoft.NET.Test.Sdk 17.0.0
+nuget NUnit 3.13.2
+nuget NUnit3TestAdapter 4.1.0
+nuget Serilog 2.10.0
+nuget Serilog.Sinks.Console 4.0.1
+nuget Serilog.Sinks.File 5.0.1-dev-00947 prerelease
+nuget System.IO.FileSystem 4.3.0
+nuget System.IO.FileSystem.Primitives 4.3.0
+nuget System.Net.NameResolution 4.3.0
+nuget System.Security.Principal 4.3.0
+nuget System.Threading.ThreadPool 4.3.0

@@ -1,12 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <InvariantGlobalization>true</InvariantGlobalization>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <!-- <RuntimeIdentifiers>win10-x64;osx.10.11-x64;linux-x64</RuntimeIdentifiers> -->
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="ToolTips/Format.fs" />
     <Compile Include="ToolTips/XmlDoc.fs" />
@@ -23,17 +22,9 @@
     <Compile Include="DebounceCheck.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="41.0.1" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.11.38" />
-    <PackageReference Include="FSharp.UMX" />
-
-  </ItemGroup>
-
-
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
     <ProjectReference Include="..\ProjectCracker\ProjectCracker.fsproj" />
   </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

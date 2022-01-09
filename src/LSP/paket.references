@@ -1,0 +1,6 @@
+FSharp.Compiler.Service
+Serilog
+FSharp.Data
+Serilog.Sinks.Console
+Serilog.Sinks.File
+FSharp.Core
