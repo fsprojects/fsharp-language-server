@@ -12,3 +12,4 @@ fsharp-language-server.sln.DotSettings.user
 
 .fake
 .ionide
+*.vsix
