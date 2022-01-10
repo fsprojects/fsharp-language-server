@@ -1,3 +1,8 @@
+## 0.1.51
+new and improved logging
+MangleMaxine added improved grammars
+Fixed buildAnalyser deleting build artifacts
+added paket
 ## 0.1.5
 
 Improved signature help and hover for methods in classes. Both now include parameter information and possible exceptions
