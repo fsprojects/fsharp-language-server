@@ -1,20 +1,24 @@
 # F# Language Server Updated
-**This has been forked from GeorgeWfraser's orginal project because that appears to be unmaintained.**
 
-It has been updated to support fcs 41 and net6.0
-I have used code from [FSharpAutoComplete](https://github.com/fsharp/FsAutoComplete) and some adjustments to the original to add some features
+**This has been forked from GeorgeWfraser's original project because that appears to be unmaintained.**
+
+It has been updated to support fcs 41 and .NET 6.0.
+I have used code from [FSharpAutoComplete](https://github.com/fsharp/FsAutoComplete) and some adjustments to the original to add some features:
+
 - Better hover docs
-- working documentation for system types
-- semantic tokenization
-- support semantic tokens
+- Working documentation for system types
+- Semantic tokenization
+- Support semantic tokens
 - Have pretty multiline function signatures in hover docs
 
 
-I may at some point work on supporting the vim and emacs versions of these extensions but as i use neither, i have not at this time.
+I may at some point work on supporting the vim and emacs versions of these extensions but as i use neither, I have not at this time.
 
-My work here is done specificallly in reponse to this issue with ionide [here](https://github.com/fsharp/FsAutoComplete/issues/805), which makes it unusuable for me and potentially many others.
-Almost all credit for this should go to georgewfraser and the guys of at FSAC. Really I've mostly just smashed stuff toegther, added glue and fixed some bugs
+My work here is done specificallly in reponse to this issue with Ionide [here](https://github.com/fsharp/FsAutoComplete/issues/805), which makes it unusuable for me and potentially many others.
+Almost all credit for this should go to georgewfraser and the guys of at FSAC. Really I've mostly just smashed stuff together, added glue and fixed some bugs
+
 ## Now the original descritption
+
 This project is an implementation of the [language server protocol](https://microsoft.github.io/language-server-protocol/) using the [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/).
 
 ![https://ci.appveyor.com/api/projects/status/github/fsprojects/fsharp-language-server?svg=true](https://ci.appveyor.com/api/projects/status/github/fsprojects/fsharp-language-server?svg=true)
@@ -52,6 +56,7 @@ This project is an implementation of the [language server protocol](https://micr
 ![Debug test](videos/DebugTest.mov.gif)
 
 ## Code structure
+
 The language server protocol (LSP) is very similar to the API defined by the F# compiler service (FCS); most of the implementation is devoted to translating between the types used by FCS and the JSON representation of LSP.
 
 - client/extension.ts: Client-side VSCode launcher
@@ -68,9 +73,11 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 ## Installation
 
 ### VSCode
+
 [Install from the VSCode extension marketplace](https://marketplace.visualstudio.com/items?itemName=faldor20.fsharp-language-server-updated)
 
-### Vim
+### Neovim and Vim
+
 Clone this repo to your system and build it:
 
 ```
@@ -141,10 +148,13 @@ Ionide is a suite of F# plugins for VSCode; F# language server is analagous to t
 The implementation is a thin wrapper around [F# Compiler Service](https://fsharp.github.io/FSharp.Compiler.Service/) and is heavily focused on performance. For example, autocompleting in medium-sized file in F# Language Server (left) and Ionide (right):
 
 ![Autocomplete warm](videos/LSP-vs-Ionide-Warm.gif)
+
 # Contributing
+
 Please do!
 
-Any help is very much appreciated, issues, PR's, even just asking a question about how something works. I'm happy to help and be helped 
+Any help is very much appreciated, issues, PR's, even just asking a question about how something works. I'm happy to help and be helped.
+
 ## Building
 
 Run :
