@@ -122,7 +122,8 @@ let asHover(ToolTipText tips): Hover =
                 | Some(markdown) -> yield PlainString(markdown + "\n\n")
                 match one.Remarks with
                 | None | Some([||])-> ()
-                | Some(remarks) ->
+                | Some([|x|]) when x.Text="" ->()
+                | Some(remarks)->
                     yield PlainString("*" + (remarks|>formatTaggedTexts) + "*\n\n") ]
         | many ->
             let last = List.last(many)

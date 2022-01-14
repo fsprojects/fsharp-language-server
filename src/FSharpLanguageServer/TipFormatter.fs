@@ -131,6 +131,7 @@ type CachedMember = {
     returns: string option
     // For example, ("T:System.ArgumentNullException", "The property is being set to null.")
     exceptions: (string * string) list
+    text:string option
 }
 
 type private CachedFile = {
@@ -190,17 +191,21 @@ let parseHtml(node)=
     let parameters = [for e in node.Descendants("param") do yield e.GetAttributeValue("name", ""), e.InnerHtml]
     let returns = [for e in node.Descendants("returns") do yield e.InnerHtml]
     let exceptions = [for e in node.Descendants("exception") do yield cref(e), e.InnerHtml]
+    let text= [for e in node.Descendants("#text") do yield e.InnerHtml]
     {
         summary = List.tryHead(summary)
         parameters = parameters
         returns = List.tryHead(returns)
         exceptions = exceptions
+        text=List.tryHead(text)
     }
 ///Generates tooltip info from a parsed html data object
 let createCommentFromParsed data=
     let lines = [
         if data.summary.IsSome && data.summary.Value.Length > 0 then
             yield data.summary.Value.Trim()
+        if data.text.IsSome && data.text.Value.Length > 0 then
+            yield data.text.Value.Trim()
         for name, desc in data.parameters do
             yield sprintf "**%s** %s" name desc
         if data.returns.IsSome && data.returns.Value.Length > 0 then
@@ -235,6 +240,7 @@ let private ensure(docFile: FileInfo) =
             // For example, they contain unclosed <p> tags
             let html = new HtmlDocument()
             html.Load(xmlFile.FullName)
+            lgVerb "loaded xml for {file}" xmlFile.FullName
             // Find all members
             for m in html.DocumentNode.Descendants("member") do
                 let name = m.GetAttributeValue("name", "")
@@ -243,6 +249,7 @@ let private ensure(docFile: FileInfo) =
                     members = parsed
                     loadTime = xmlFile.LastWriteTime
                 }) |> ignore
+            lgVerb "Parsed members for {file}" xmlFile.FullName
         xmlFile
         
     
@@ -263,9 +270,9 @@ let docComment(doc: FSharpXmlDoc): string option =
     match doc with
     | FSharpXmlDoc.None -> None
     | FSharpXmlDoc.FromXmlText(xml) ->
-        let doc=HtmlDocument()  //TODO: it would be good to memoize this to stop it from being recalculated all the time
-        doc.LoadHtml(xml.UnprocessedLines|> String.concat "\n")
-        doc.DocumentNode
+        let htmlDoc=HtmlDocument()  //TODO: it would be good to memoize this to stop it from being recalculated all the time
+        htmlDoc.LoadHtml(xml.UnprocessedLines|> String.concat "\n")
+        htmlDoc.DocumentNode
         |>parseHtml
         |>createCommentFromParsed
     | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
@@ -273,17 +280,7 @@ let docComment(doc: FSharpXmlDoc): string option =
         match find(xmlFile, memberName) with
         | None -> None
         | Some(m) ->
-            let lines = [
-                if m.summary.IsSome && m.summary.Value.Length > 0 then
-                    yield m.summary.Value.Trim()
-                for name, desc in m.parameters do
-                    yield sprintf "**%s** %s" name desc
-                if m.returns.IsSome && m.returns.Value.Length > 0 then
-                    yield sprintf "**returns** %s" m.returns.Value
-                for name, desc in m.exceptions do
-                    yield sprintf "**exception** `%s` %s" name desc ]
-            let comment = String.concat "\n\n" lines
-            Some(comment)
+            m|>createCommentFromParsed 
 
 /// Render just the summary documentation
 let docSummaryOnly(doc: FSharpXmlDoc): string option =
