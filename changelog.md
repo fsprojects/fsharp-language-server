@@ -1,8 +1,12 @@
+## 0.1.60
+- Added support for any text inside a /// comment appearing in hover tooltips.
+- Fixed bug that inserted annoying ** into empty tooltips
+- Renamed Buildalyzer artifacts location
 ## 0.1.51
-new and improved logging
-MangleMaxine added improved grammars
-Fixed buildAnalyser deleting build artifacts
-added paket
+- New and improved logging
+- MangleMaxine added improved grammars
+- Fixed Buildalyzer deleting build artifacts
+- Added paket
 ## 0.1.5
 
 Improved signature help and hover for methods in classes. Both now include parameter information and possible exceptions
