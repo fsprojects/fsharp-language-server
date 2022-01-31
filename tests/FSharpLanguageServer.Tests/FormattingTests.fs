@@ -47,9 +47,9 @@ let hoverMethodParams() =
                 match x with
                 |PlainString(s)->s
                 |HighlightedString(s,_)->s
-            doc.Contains("This function has documentation")
+            doc.Contains("The encrypted authorization message expected by the server.")
             )
-        Assert.True(matches.Length>0,"List does not contain required function doc string from a non-xml comment")
+        Assert.True(matches.Length>0,"List does not contain required function doc string")
 [<Test>]
 let hoverMDDocs() = 
     let client, server = createServerAndReadFile("MainProject", "Hover.fs")
