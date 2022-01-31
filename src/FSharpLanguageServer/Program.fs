@@ -566,7 +566,7 @@ type Server(client: ILanguageClient) =
                 return capabilities
             }
         member this.Initialized(): Async<unit> =
-            lgInfo "Running inititialization"
+            lgInfof "Running inititialization"
             deferredInitialize
         member this.Shutdown(): Async<unit> =
             async { () }
