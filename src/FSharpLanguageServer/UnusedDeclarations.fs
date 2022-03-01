@@ -3,7 +3,9 @@ module FSharpLanguageServer.UnusedDeclarations
 // From https://github.com/Microsoft/visualfsharp/blob/master/vsintegration/src/FSharp.Editor/Diagnostics/UnusedOpensDiagnosticAnalyzer.fs
 
 open System.Collections.Generic
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
+open FSharp.Compiler.Symbols
+open FSharp.Compiler.CodeAnalysis
 
 type FSharpSymbol with
     member this.IsPrivateToFile =
@@ -43,7 +45,7 @@ type FSharpSymbolUse with
                 | _ -> this.Symbol.ImplementationLocation
         let declaredInTheFile =
             match declarationLocation with
-            | Some declRange -> declRange.FileName = this.RangeAlternate.FileName
+            | Some declRange -> declRange.FileName = this.Range.FileName
             | _ -> false
         isPrivate && declaredInTheFile
 
@@ -79,7 +81,7 @@ let getUnusedDeclarationRanges(symbolsUses: FSharpSymbolUse[], isScript: bool) =
     let unusedRanges =
         definitions
         |> Array.map (fun defSu -> defSu, usages.Contains defSu.Symbol.DeclarationLocation.Value)
-        |> Array.groupBy (fun (defSu, _) -> defSu.RangeAlternate)
+        |> Array.groupBy (fun (defSu, _) -> defSu.Range)
         |> Array.filter (fun (_, defSus) -> defSus |> Array.forall (fun (_, isUsed) -> not isUsed))
         |> Array.map (fun (m, _) -> m)
     unusedRanges

@@ -1,23 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="ProjectCracker.fs" />
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="Buildalyzer" Version="2.2.0" />
     <!-- Fix warnings from Buildalyzer indirect refs to old versions -->
-    <PackageReference Include="System.Threading.ThreadPool" Version="4.3.0" />
-    <PackageReference Include="System.Net.NameResolution" Version="4.3.0" />
-    <PackageReference Include="System.Security.Principal" Version="4.3.0" />
-    <PackageReference Include="System.IO.FileSystem.Primitives" Version="4.3.0" />
-    <PackageReference Include="System.IO.FileSystem" Version="4.3.0" />
   </ItemGroup>
-  
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
   </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

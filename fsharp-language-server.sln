@@ -3,6 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".paket", ".paket", "{A85B8490-3570-4135-9F62-0C30DF2FB72C}"
+	ProjectSection(SolutionItems) = preProject
+		paket.dependencies = paket.dependencies
+	EndProjectSection
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{C12C1289-6B1C-44FA-A500-F70B9530EA27}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "FSharpLanguageServer", "src\FSharpLanguageServer\FSharpLanguageServer.fsproj", "{56790B4C-96F9-4A15-99B3-D643EACEEB7B}"

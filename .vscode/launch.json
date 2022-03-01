@@ -5,6 +5,18 @@
 {
 	"version": "0.2.0",
     "configurations": [
+            {
+                "name": ".NET Core Attach",
+                "type": "coreclr",
+                "request": "attach",
+                "processId": "${command:pickProcess}",
+                "sourceLinkOptions": {
+                    "*": {
+                        "enabled": true
+                    }
+                },
+                "justMyCode": false
+            },
         // {
         //     "name": ".NET Core Attach",
         //     "type": "coreclr",

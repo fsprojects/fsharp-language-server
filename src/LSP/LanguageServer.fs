@@ -10,6 +10,7 @@ open FSharp.Data
 open Types 
 open LSP.Json.Ser
 open JsonExtensions
+open SemanticToken
 
 let private jsonWriteOptions = 
     { defaultJsonWriteOptions with 
@@ -49,6 +50,10 @@ let private serializeWorkspaceEdit = serializerFactory<WorkspaceEdit> jsonWriteO
 let private serializePublishDiagnostics = serializerFactory<PublishDiagnosticsParams> jsonWriteOptions
 let private serializeShowMessage = serializerFactory<ShowMessageParams> jsonWriteOptions
 let private serializeRegistrationParams = serializerFactory<RegistrationParams> jsonWriteOptions
+let private SerializeSemanticTokensParams=Option.map( serializerFactory<SemanticTokens> jsonWriteOptions)
+let private SerializeSemanticTokensDeltaParams=Option.map (serializerFactory<SemanticTokensDelta> jsonWriteOptions)
+let private SerializeSemanticTokensRangeParams=Option.map (serializerFactory<SemanticTokens> jsonWriteOptions)
+
 
 let private writeClient (client: BinaryWriter, messageText: string) =
     let messageBytes = Encoding.UTF8.GetBytes(messageText)
@@ -108,6 +113,7 @@ type private PendingTask =
 | Quit
 
 let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryReader, send: BinaryWriter) = 
+    
     let server = serverFactory(RealClient(send))
     let processRequest(request: Request): Async<string option> = 
         match request with 
@@ -149,6 +155,12 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
             server.DocumentRangeFormatting(p) |> thenMap serializeTextEditList |> thenSome
         | DocumentOnTypeFormatting(p) -> 
             server.DocumentOnTypeFormatting(p) |> thenMap serializeTextEditList |> thenSome
+        |SemanticTokensFull(p) ->
+            server.SemanticTokensFull(p)|>thenMap SerializeSemanticTokensParams |>thenMap (Option.defaultValue "null") |> thenSome
+        |SemanticTokensFullDelta(p)->
+            server.SemanticTokensFullDelta(p)|>thenMap SerializeSemanticTokensDeltaParams |>thenMap (Option.defaultValue "null") |> thenSome
+        |SemanticTokensRange(p)->
+            server.SemanticTokensRange(p)|>thenMap SerializeSemanticTokensRangeParams |>thenMap (Option.defaultValue "null") |> thenSome
         | Rename(p) -> 
             server.Rename(p) |> thenMap serializeWorkspaceEdit |> thenSome
         | ExecuteCommand(p) -> 
@@ -190,38 +202,46 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
                     let id = json?id.AsInteger()
                     let stillRunning, pendingRequest = pendingRequests.TryGetValue(id)
                     if stillRunning then
-                        dprintfn "Cancelling request %d" id
+                        lgInfo "Cancelling request {id}" id
                         pendingRequest.Cancel()
                     else 
-                        dprintfn "Request %d has already finished" id
+                        lgInfo "Request {id} has already finished" id
                 // Process other requests on worker thread
                 | Parser.NotificationMessage(method, json) -> 
+                    lgVerbosef "Got notification. method %s with: %s"  (method)(json.ToString())
                     let n = Parser.parseNotification(method, json)
                     let task = processNotification(n)
                     processQueue.Add(ProcessNotification(method, task))
                 | Parser.RequestMessage(id, method, json) -> 
+                    lgVerbosef "Got request. id %d method %s with: %s" id (method) (json.ToString())
                     let task = processRequest(Parser.parseRequest(method, json)) 
                     let cancel = new CancellationTokenSource()
                     processQueue.Add(ProcessRequest(id, task, cancel))
                     pendingRequests.[id] <- cancel
             processQueue.Add(Quit)
         with e -> 
-            dprintfn "Exception in read thread %O" e
+            lgError "Exception in read thread {exception}" e
     ).Start()
     // Process messages on main thread
     let mutable quit = false
     while not quit do 
         match processQueue.Take() with 
         | Quit -> quit <- true
-        | ProcessNotification(method, task) -> Async.RunSynchronously(task)
+        | ProcessNotification(method, task) -> 
+            lgDebugf "sending notification. method %s "  (method)
+            Async.RunSynchronously(task)
         | ProcessRequest(id, task, cancel) -> 
             if cancel.IsCancellationRequested then 
-                dprintfn "Skipping cancelled request %d" id
+                lgVerb "Skipping cancelled request %d" id
             else
                 try 
                     match Async.RunSynchronously(task, 0, cancel.Token) with 
-                    | Some(result) -> respond(send, id, result)
-                    | None -> respond(send, id, "null")
+                    | Some(result) -> 
+                        lgVerb2 "Sending Response. id {id} response {response}"  id (result)
+                        respond(send, id, result)
+                    | None -> 
+                        lgInfo "Sending Response. id {id}  NO response "  id 
+                        respond(send, id, "null")
                 with :? OperationCanceledException -> 
-                    dprintfn "Request %d was cancelled" id
+                    lgInfo "Request {id} was cancelled" id
             pendingRequests.TryRemove(id) |> ignore

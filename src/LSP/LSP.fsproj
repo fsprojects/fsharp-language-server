@@ -1,19 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TargetFramework>net6.0</TargetFramework>
   </PropertyGroup>
-
   <ItemGroup>
     <Compile Include="Log.fs" />
     <Compile Include="Ser.fs" />
-    <Compile Include="Types.fs" />
+    <Compile Include="Types/BaseTypes.fs" />
+    <Compile Include="Types/SemanticToken.fs" />
+    <Compile Include="Types/Types.fs" />
     <Compile Include="Tokenizer.fs" />
     <Compile Include="Parser.fs" />
     <Compile Include="DocumentStore.fs" />
     <Compile Include="LanguageServer.fs" />
   </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FSharp.Data" Version="3.0.0-beta3" />
-  </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

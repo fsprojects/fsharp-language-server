@@ -1,16 +1,15 @@
 module LSP.Types 
-
+open Microsoft.FSharp.Reflection
+open System
+open System.Collections.Concurrent
 open System
 open FSharp.Data
-
+open SemanticToken
+open BaseTypes 
 type DidChangeConfigurationParams = {
     settings: JsonValue
 }
 
-type WorkspaceFolder = {
-    uri: Uri
-    name: string
-}
 
 type WorkspaceFoldersChangeEvent = {
     added: WorkspaceFolder list
@@ -37,15 +36,6 @@ type VersionedTextDocumentIdentifier = {
     version: int 
 }
 
-type Position = {
-    line: int
-    character: int
-}
-
-type Range = {
-    start: Position
-    ``end``: Position
-}
 
 type TextDocumentContentChangeEvent = {
     range: Range option
@@ -58,9 +48,7 @@ type DidChangeTextDocumentParams = {
     contentChanges: TextDocumentContentChangeEvent list
 }
 
-type TextDocumentIdentifier = {
-    uri: Uri
-}
+
 
 [<RequireQualifiedAccess>]
 type TextDocumentSaveReason = 
@@ -405,6 +393,7 @@ type ExecuteCommandParams = {
     arguments: JsonValue list
 }
 
+
 type Request = 
 | Initialize of InitializeParams
 | Shutdown
@@ -429,6 +418,9 @@ type Request =
 | Rename of RenameParams
 | ExecuteCommand of ExecuteCommandParams
 | DidChangeWorkspaceFolders of DidChangeWorkspaceFoldersParams
+| SemanticTokensFull of SemanticTokensParams
+| SemanticTokensFullDelta of SemanticTokensDeltaParams
+| SemanticTokensRange of SemanticTokensRangeParams
 
 [<RequireQualifiedAccess>]
 type TextDocumentSyncKind = 
@@ -454,10 +446,12 @@ let defaultCompletionOptions = {
 
 type SignatureHelpOptions = {
     triggerCharacters: char list
+    retriggerCharacters:char list
 }
 
 let defaultSignatureHelpOptions = {
-    triggerCharacters = ['('; ',']
+    triggerCharacters = ['('; ','; ' ']
+    retriggerCharacters=[',' ;')'; ' ']
 }
 
 type CodeLensOptions = {
@@ -523,6 +517,7 @@ type ServerCapabilities = {
     renameProvider: bool
     documentLinkProvider: DocumentLinkOptions option
     executeCommandProvider: ExecuteCommandOptions option
+    semanticTokensProvider:SemanticTokensOptions option
 }
 
 let defaultServerCapabilities: ServerCapabilities = {
@@ -543,6 +538,7 @@ let defaultServerCapabilities: ServerCapabilities = {
     renameProvider = false
     documentLinkProvider = None
     executeCommandProvider = None
+    semanticTokensProvider=None
 }
 
 type InitializeResult = {
@@ -689,7 +685,10 @@ type ILanguageServer =
     abstract member Rename: RenameParams -> Async<WorkspaceEdit>
     abstract member ExecuteCommand: ExecuteCommandParams -> Async<unit>
     abstract member DidChangeWorkspaceFolders: DidChangeWorkspaceFoldersParams -> Async<unit>
-
+    abstract member SemanticTokensFull : SemanticTokensParams -> Async<SemanticTokens option>
+    abstract member SemanticTokensFullDelta : SemanticTokensDeltaParams-> Async<SemanticTokensDelta option>
+    abstract member SemanticTokensRange : SemanticTokensRangeParams-> Async<SemanticTokens option>
+    
 type PublishDiagnosticsParams = {
     uri: Uri 
     diagnostics: Diagnostic list

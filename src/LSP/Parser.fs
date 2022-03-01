@@ -6,7 +6,7 @@ open FSharp.Data
 open FSharp.Data.JsonExtensions
 open LSP.Json.Ser
 open Types
-
+open BaseTypes
 type RawMessage = {
     id: int option 
     method: string 
@@ -132,10 +132,10 @@ let parseNotification(method: string, maybeBody: JsonValue option): Notification
     | "textDocument/didClose", Some json -> DidCloseTextDocument (parseDidCloseTextDocumentParams json)
     | "workspace/didChangeWatchedFiles", Some json -> DidChangeWatchedFiles (parseDidChangeWatchedFilesParams json)
     | _, None -> 
-        dprintfn "%s is not a known notification, or it is expected to contain a body" method
+        lgWarn "{notification} is not a known notification, or it is expected to contain a body" method
         OtherNotification method
     | _, _ -> 
-        dprintfn "%s is not a known notification" method
+        lgWarn "{notification} is not a known notification" method
         OtherNotification method
 
 type InitializeParamsRaw = {
@@ -260,6 +260,10 @@ let parseExecuteCommandParams = deserializerFactory<ExecuteCommandParams> readOp
 
 let parseDidChangeWorkspaceFoldersParams = deserializerFactory<DidChangeWorkspaceFoldersParams> readOptions
 
+let parseSemanticTokensFull= deserializerFactory<SemanticToken.SemanticTokensParams> readOptions 
+let parseSemanticTokensDelta= deserializerFactory<SemanticToken.SemanticTokensDeltaParams> readOptions 
+let parseSemanticTokensRange= deserializerFactory<SemanticToken.SemanticTokensRangeParams> readOptions 
+
 let parseRequest(method: string, json: JsonValue): Request = 
     match method with 
     | "initialize" -> Initialize(parseInitialize json)
@@ -285,4 +289,7 @@ let parseRequest(method: string, json: JsonValue): Request =
     | "textDocument/rename" -> Rename(parseRenameParams json)
     | "workspace/executeCommand" -> ExecuteCommand(parseExecuteCommandParams json)
     | "workspace/didChangeWorkspaceFolders" -> DidChangeWorkspaceFolders(parseDidChangeWorkspaceFoldersParams json)
+    |  "textDocument/semanticTokens/full" ->SemanticTokensFull(parseSemanticTokensFull json)
+    |  "textDocument/semanticTokens/full/delta" ->SemanticTokensFullDelta(parseSemanticTokensDelta json)
+    |  "textDocument/semanticTokens/range" ->SemanticTokensRange(parseSemanticTokensRange json)
     | _ -> raise(Exception(sprintf "Unexpected request method %s" method))

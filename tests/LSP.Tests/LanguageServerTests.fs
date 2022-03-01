@@ -5,7 +5,9 @@ open System.IO
 open System.Text
 open FSharp.Data
 open LSP.Types
+open LSP.SemanticToken
 open NUnit.Framework
+open SemanticToken
 
 [<SetUp>]
 let setup() = 
@@ -82,7 +84,10 @@ type MockServer() =
         member this.Rename(p: RenameParams): Async<WorkspaceEdit> = TODO()
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> = TODO()
-
+        member this.SemanticTokensFull (p: SemanticTokensParams) : Async<SemanticTokens option>=TODO()
+        member this.SemanticTokensFullDelta (p: SemanticTokensDeltaParams): Async<SemanticTokensDelta option>=TODO()
+        
+        member this.SemanticTokensRange (p: SemanticTokensRangeParams): Async<SemanticTokens option>=TODO()
 let messageStream(messages: string list): BinaryReader = 
     let stdin = new MemoryStream()
     for m in messages do 

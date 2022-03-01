@@ -6,7 +6,7 @@ open System.IO
 open System.Collections.Generic
 open System.Text
 open Types 
-
+open BaseTypes
 type private Version = {
     text: StringBuilder 
     mutable version: int
@@ -65,7 +65,7 @@ type DocumentStore() =
         if doc.textDocument.version <= existing.version then 
             let oldVersion = existing.version
             let newVersion = doc.textDocument.version 
-            dprintfn "Change %d to doc %s is earlier than existing version %d" newVersion file.Name oldVersion
+            lgInfo3 "Changed version: {newVersion} of doc {name} is earlier than existing version {oldVersion}" newVersion file.Name oldVersion
         else 
             for change in doc.contentChanges do 
                 match change.range with 

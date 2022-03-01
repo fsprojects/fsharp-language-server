@@ -4,9 +4,11 @@
         ".idea/": true,
         "node_modules/": true,
         "out/": true,
-        "**/bin/": true,
+        "**/bin/": false,
         "**/obj/": true
     },
-    "fsharp.trace.server": "messages",
-    "files.trimTrailingWhitespace": false
+    "files.trimTrailingWhitespace": false,
+    "nixEnvSelector.suggestion": false,
+    "nixEnvSelector.nixFile": "${workspaceRoot}/shell.nix",
+    //"fsharp.useSystemDotnet": true
 }

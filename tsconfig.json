@@ -4,12 +4,12 @@
 		"noUnusedParameters": true,
 		"noImplicitAny": true,
 		"noImplicitReturns": true,		
-		"target": "es6",
+		"target": "es2019",
 		"module": "commonjs",
 		"moduleResolution": "node",
 		"rootDir": ".",
 		"outDir": "out",
-		"lib": [ "es2016" ],
+		"lib": [ "es2019" ],
 		"sourceMap": true
 	},
 	"exclude": [

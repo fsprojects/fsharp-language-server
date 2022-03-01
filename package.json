@@ -1,19 +1,19 @@
 {
-    "name": "fsharp-language-server",
-    "displayName": "F# Language Server",
-    "description": "F# Language Support using FSharp Compiler Services",
-    "author": "George Fraser",
+    "name": "fsharp-language-server-updated",
+    "displayName": "F# Language Server updated",
+    "description": "F# Language Support using FSharp Compiler Services updated to support net6.0 and fcs 41",
+    "author": "George Fraser and Eli Dowling",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.27",
+    "version": "0.1.60",
     "preview": false,
-    "publisher": "georgewfraser",
+    "publisher": "faldor20",
     "repository": {
         "type": "git",
-        "url": "https://github.com/fsprojects/fsharp-language-server"
+        "url": "https://github.com/faldor20/fsharp-language-server"
     },
     "engines": {
-        "vscode": "^1.24.0"
+        "vscode": "^1.52.0"
     },
     "categories": [
         "Programming Languages",
@@ -24,9 +24,7 @@
     ],
     "main": "./out/client/extension",
     "files": [
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp3.0/osx.10.11-x64/publish",
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp3.0/linux-x64/publish",
-        "./src/FSharpLanguageServer/bin/Release/netcoreapp3.0/win10-x64/publish"
+        "src/FSharpLanguageServer/bin/Release/net6.0/publish/"
     ],
     "contributes": {
         "languages": [
@@ -76,6 +74,24 @@
                     ],
                     "default": "off",
                     "description": "Traces the communication between VSCode and the language server."
+                },
+                "fsharp.debug.enable": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Sets whether to use dotnet run to run a debug build of FSlanguageserver"
+                },
+                "fsharp.customCommand": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": null,
+                    "description": "Allows you to set a custom command to run the langserver, good for testing custom version \n This must be just the command to run, eg: 'dotnet' put any args in customCommandArgs"
+                },
+                "fsharp.customCommandArgs": {
+                    "scope": "window",
+                    "type": "array",
+                    "default": null,
+                    "description": "Allows you to set a custom command args to run the langserver, good for testing custom version or passing special arguments"
                 }
             }
         },
@@ -112,12 +128,13 @@
         "ms-dotnettools.csharp"
     ],
     "dependencies": {
-        "@types/vscode": "^1.55.0",
-        "typescript": "^4.2.4",
-        "vscode-languageclient": "^4.2.1"
+        "vscode-languageclient": "^7.0.0"
     },
     "devDependencies": {
-        "@types/node": "^10.17.59",
-        "vscode-test": "^1.5.2"
+        "@types/vscode": "^1.52.0",
+        "typescript": "^4.4.4",
+        "vsce": "^2.3.0",
+        "@types/node": "^16.11.7",
+        "vscode-test": "^1.6.1"
     }
 }

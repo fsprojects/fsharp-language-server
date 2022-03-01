@@ -4,13 +4,14 @@ open FSharpLanguageServer.Tests.Common
 open FSharpLanguageServer.Program
 open System
 open System.IO
-open FSharp.Compiler.SourceCodeServices
+open FSharp.Compiler.EditorServices
 open FSharp.Compiler.Text
 open NUnit.Framework
 open LSP.Types
 open LSP
 open LSP.Log
 open FSharp.Data
+open FSharp.Compiler.CodeAnalysis
 
 [<SetUp>]
 let setup() = 
@@ -190,6 +191,7 @@ let ``hover over function``() =
     | None -> Assert.Fail("No hover")
     | Some hover -> if List.isEmpty hover.contents then Assert.Fail("Hover list is empty")
 
+        
 [<Test>]
 let ``hover over left edge``() = 
     let client, server = createServerAndReadFile("MainProject", "Hover.fs")
@@ -321,6 +323,13 @@ let ``find project symbols``() =
 let ``go to definition``() = 
     let client, server = createServerAndReadFile("MainProject", "Reference.fs")
     match server.GotoDefinition(textDocumentPosition("MainProject", "Reference.fs", 3, 30)) |> Async.RunSynchronously with 
+    | [] -> Assert.Fail("No symbol definition")
+    | [single] -> ()
+    | many -> Assert.Fail(sprintf "Multiple definitions found %A" many)
+[<Test>]
+let ``go to func definition``() = 
+    let client, server = createServerAndReadFile("MainProject", "Reference.fs")
+    match server.GotoDefinition(textDocumentPosition("MainProject", "Reference.fs", 5, 15)) |> Async.RunSynchronously with 
     | [] -> Assert.Fail("No symbol definition")
     | [single] -> ()
     | many -> Assert.Fail(sprintf "Multiple definitions found %A" many)

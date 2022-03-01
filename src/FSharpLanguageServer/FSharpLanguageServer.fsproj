@@ -1,29 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
+    <InvariantGlobalization>true</InvariantGlobalization>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
-    <RuntimeIdentifiers>win10-x64;osx.10.11-x64;linux-x64</RuntimeIdentifiers>
+    <TargetFramework>net6.0</TargetFramework>
+    <!-- <RuntimeIdentifiers>win10-x64;osx.10.11-x64;linux-x64</RuntimeIdentifiers> -->
   </PropertyGroup>
-
   <ItemGroup>
-    <Compile Include="ProgressBar.fs" />
+    <Compile Include="ToolTips/Format.fs" />
+    <Compile Include="ToolTips/XmlDoc.fs" />
+    <Compile Include="ToolTips/ToolTip.fs" />
+    <Compile Include="SourceLink.fs" />
+    <Compile Include="SyntaxTreeOps.fs" />
     <Compile Include="TipFormatter.fs" />
+    <Compile Include="ProgressBar.fs" />
     <Compile Include="Navigation.fs" />
     <Compile Include="Conversions.fs" />
     <Compile Include="ProjectManager.fs" />
+    <Compile Include="Semantic.fs" />
     <Compile Include="UnusedDeclarations.fs" />
     <Compile Include="DebounceCheck.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="FSharp.Compiler.Service" Version="34.1.1" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.8.4" />
-  </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
     <ProjectReference Include="..\ProjectCracker\ProjectCracker.fsproj" />
   </ItemGroup>
+  <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>
