@@ -7,6 +7,7 @@ before_build:
   - dotnet --list-sdks
   - dotnet --version
   # Restore deps
+  - dotnet tool restore
   - dotnet restore
 build_script:
   - dotnet build

@@ -2,6 +2,7 @@
 # Restore test projects
 
 echo 'Restoring sample projects...'
+dotnet tool restore
 dotnet restore sample/EmptyProject/EmptyProject.fsproj
 dotnet restore sample/FSharpKoans.Core/FSharpKoans.Core.fsproj
 dotnet restore sample/HasLocalDll/HasLocalDll.fsproj
