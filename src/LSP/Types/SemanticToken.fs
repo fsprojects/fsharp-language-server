@@ -5,6 +5,12 @@ open FSharp.Reflection
 open System.Collections.Generic
 open FSharp.Compiler.EditorServices
 open BaseTypes
+
+//!!=============================================================================================================================
+//!!!      This code comes from https://github.com/fsharp/FsAutoComplete and is licensed under Apache License, Version 2.0
+//!!================================================================================================================================
+
+
 //==========================================================
 //                  Util Functions
 //==========================================================

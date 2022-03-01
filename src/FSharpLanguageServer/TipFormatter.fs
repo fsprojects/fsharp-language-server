@@ -15,7 +15,7 @@ do HtmlAgilityPack.HtmlNode.ElementsFlags.Remove("param") |> ignore
 
 // Based on https://github.com/dotnet/roslyn/blob/master/src/Workspaces/Core/Portable/Utilities/Documentation/XmlDocumentationProvider.cs
 
-//Eli- Tagged text formatting ripped straight from fsac
+//Eli- Tagged text formatting from straight from fsac
 let formatTaggedText (t: TaggedText) : string =
     match t.Tag with
     | TextTag.ActivePatternResult
@@ -89,10 +89,12 @@ let formatTaggedFunctionText (t: TaggedText) : string =
     | TextTag.Record
     | TextTag.TypeParameter -> $"{t.Text}"
     | TextTag.Parameter-> $"\n    {t.Text}" //We use 4 spaces becuase tabs look way to big in completion popups
+    
     ///How to perform formatting:
     //When the type is a function:
     //Each paramater should have a \n\t before it to create seperation
     //The last occurance of -> should have a \nt\t before it as well
+
 let formatTaggedTexts (t:TaggedText[])= 
     //We check positions where we would exepect to find the name of the function in a  fucntion defintion eg: let map etc..  |0"let"|1" "|2"map"| etc..
     // or let rec map or let rec private map

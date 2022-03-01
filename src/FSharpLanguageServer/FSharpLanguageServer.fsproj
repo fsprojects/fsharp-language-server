@@ -7,9 +7,9 @@
     <!-- <RuntimeIdentifiers>win10-x64;osx.10.11-x64;linux-x64</RuntimeIdentifiers> -->
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ToolTips/Format.fs" />
-    <Compile Include="ToolTips/XmlDoc.fs" />
-    <Compile Include="ToolTips/ToolTip.fs" />
+    <Compile Include="FSAC/ToolTips/Format.fs" />
+    <Compile Include="FSAC/ToolTips/XmlDoc.fs" />
+    <Compile Include="FSAC/ToolTips/ToolTip.fs" />
     <Compile Include="SourceLink.fs" />
     <Compile Include="SyntaxTreeOps.fs" />
     <Compile Include="TipFormatter.fs" />
@@ -17,7 +17,7 @@
     <Compile Include="Navigation.fs" />
     <Compile Include="Conversions.fs" />
     <Compile Include="ProjectManager.fs" />
-    <Compile Include="Semantic.fs" />
+    <Compile Include="FSAC/Semantic.fs" />
     <Compile Include="UnusedDeclarations.fs" />
     <Compile Include="DebounceCheck.fs" />
     <Compile Include="Program.fs" />
