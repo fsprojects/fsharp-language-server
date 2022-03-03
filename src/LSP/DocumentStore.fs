@@ -7,7 +7,8 @@ open System.Collections.Generic
 open System.Text
 open Types 
 open BaseTypes
-type private Version = {
+open FSharp
+type private VolatileFile = {
     text: StringBuilder 
     mutable version: int
 }
@@ -36,7 +37,7 @@ open DocumentStoreUtils
 
 type DocumentStore() = 
     /// All open documents, organized by absolute path
-    let activeDocuments = new Dictionary<string, Version>()
+    let activeDocuments = new Dictionary<string, VolatileFile>()
     /// Replace a section of an open file
     let patch(doc: VersionedTextDocumentIdentifier, range: Range, text: string): unit = 
         let file = FileInfo(doc.uri.LocalPath)

@@ -348,7 +348,9 @@ type ProjectManager(checker: FSharpChecker) =
 
 
     /// All transitive deps of anproject, including itself
-    let transitiveDeps(fsprojOrFsx: FileInfo) = //TODO: this is terrible project checker is stupid solution to this problem
+    let transitiveDeps (fsprojOrFsx: FileInfo) = //TODO: this is terrible project checker is stupid solution to this problem
+        let timer=Diagnostics.Stopwatch.StartNew()
+    
         let touched = new HashSet<String>()
         let result = new List<FSharpProjectOptions>()
         let rec walk(options: FSharpProjectOptions) =
@@ -361,7 +363,10 @@ type ProjectManager(checker: FSharpChecker) =
                 result.Add(options)
         let root = cache.Get(fsprojOrFsx, analyzeLater)
         walk(root.resolved.Value.options)
-        List.ofSeq(result)
+        let deps=List.ofSeq(result)
+        timer.Stop()
+        lgDebug2 "Getting transitive deps for {@file} took {@time}ms" fsprojOrFsx.Name timer.ElapsedMilliseconds
+        deps
     /// Find all .fsproj files referenced by a .sln file
     let slnProjectReferences (sln: FileInfo): list<FileInfo> =
         // From https://github.com/OmniSharp/omnisharp-roslyn/blob/master/src/OmniSharp.MSBuild/SolutionParsing/ProjectBlock.cs
@@ -480,7 +485,8 @@ type ProjectManager(checker: FSharpChecker) =
     /// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
         //transitiveDeps(projectFile)(fun x ->this.FindProjectOptions (FileInfo(x.FileName))) //TODO: this might be terrible 
-        transitiveDeps(projectFile)
+        transitiveDeps (projectFile)
+
     /// Is `targetSourceFile` visible from `fromSourceFile`?
     member this.IsVisible(targetSourceFile: FileInfo, fromSourceFile: FileInfo) =
         match this.FindProjectOptions(fromSourceFile) with

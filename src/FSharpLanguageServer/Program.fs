@@ -229,8 +229,9 @@ type Server(client: ILanguageClient) =
             | _, None ->
                 return Error(sprintf "%s was closed" file.FullName)
             | Ok(projectOptions), Some(sourceText) ->
-                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with
+                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions,sourceText|>SourceText.ofString) with
                 | Some(parse, _, _) ->
+                    lgVerb "Getting cached parsing for file {@file}"file.FullName  
                     return Ok parse
                 | None ->
                     try
@@ -265,10 +266,11 @@ type Server(client: ILanguageClient) =
                     | parseResult, FSharpCheckFileAnswer.Succeeded(checkResult) -> return Ok(parseResult, checkResult)
                 }
 
-                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions) with
-                | Some(parseResult, checkResult, version) ->
-                    lgVerb2 "Getting typecheck for file with version {newVers}, previous version {oldVers}"  sourceVersion version
-                    if allowCached && version = sourceVersion then
+                match checker.TryGetRecentCheckResultsForFile(file.FullName, projectOptions,SourceText.ofString sourceText) with
+                | Some(parseResult, checkResult, hash) ->
+                    let newHash= sourceText.GetHashCode()
+                    lgVerb2 "Getting typecheck for file with hash {newHash}, previous hash {oldHash}"  newHash hash
+                    if allowCached && hash = newHash then
                         lgInfof "cached allowed and version is same,using recent Typecheck results"
                         return Ok(parseResult, checkResult)
                     else if allowCached && allowStale then
@@ -280,7 +282,7 @@ type Server(client: ILanguageClient) =
                             lgInfof "Re-compile timed out, using stale results"
                             return Ok(parseResult, checkResult)
                     else
-                        lgInfo2 "Checking: cannot use stale results and currentVersion {currentVers} did not match cached version {cachedVers}" version sourceVersion
+                        lgInfo2 "Checking: cannot use stale results and currenthash {currentVers} did not match cached hash {cachedVers}" newHash hash 
                         return! recompile
                 | _ ->
                     lgInfof "recompiling file becuase could not get parseTesult or checkResult"
