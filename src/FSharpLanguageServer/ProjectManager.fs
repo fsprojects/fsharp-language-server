@@ -284,10 +284,11 @@ type ProjectManager(checker: FSharpChecker) =
                     [|
                         // Dotnet framework should be specified explicitly
                         yield "--noframework"
-                        let names=cracked.projectReferences|>List.map( fun x->async{return (cache.Get(x, analyzeLater)).resolved.Value.target.FullName }|>Async.StartChild)|>Async.Parallel|>Async.RunSynchronously|>Async.Parallel|>Async.RunSynchronously
+                            
                         // Reference output of other projects
-                        for r in names do
-                            yield "-r:" + r
+                        for r in cracked.projectReferences do
+                            let options = cache.Get(r, analyzeLater)
+                            yield "-r:" + options.resolved.Value.target.FullName
                         
                         // Reference target .dll for .csproj proejcts
                         for r in cracked.otherProjectReferences do
