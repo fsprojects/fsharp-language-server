@@ -5,17 +5,28 @@
 {
 	"version": "0.2.0",
     "configurations": [
+        {
+            "name": ".net expecto tests",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build-expecto",
+            "program": "${workspaceFolder}/tests/FSharpLanguageServer.Tests.expecto/bin/Debug/net6.0/FSharpLanguageServer.Expecto.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "internalConsole"
+        },
             {
                 "name": ".NET Core Attach",
                 "type": "coreclr",
                 "request": "attach",
                 "processId": "${command:pickProcess}",
+                "requireExactSource": false,
                 "sourceLinkOptions": {
                     "*": {
                         "enabled": true
                     }
                 },
-                "justMyCode": false
             },
         // {
         //     "name": ".NET Core Attach",
