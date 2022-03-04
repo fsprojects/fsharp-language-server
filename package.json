@@ -79,7 +79,7 @@
                     "scope": "window",
                     "type": "boolean",
                     "default": false,
-                    "description": "Sets whether to use dotnet run to run a debug build of FSlanguageserver"
+                    "description": "Sets whether to use add the --attach-debugger arg to the launch ags, allowing you to debug the running langserver"
                 },
                 "fsharp.customCommand": {
                     "scope": "window",
@@ -92,6 +92,12 @@
                     "type": "array",
                     "default": null,
                     "description": "Allows you to set a custom command args to run the langserver, good for testing custom version or passing special arguments"
+                },
+                "fsharp.customDllPath": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": null,
+                    "description": "Allows you to set a custom path for the FsharpLanguageServer.dll \n handy for testing the debug version you just built"
                 }
             }
         },

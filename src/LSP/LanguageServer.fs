@@ -11,6 +11,7 @@ open Types
 open LSP.Json.Ser
 open JsonExtensions
 open SemanticToken
+open System.Diagnostics
 
 let private jsonWriteOptions = 
     { defaultJsonWriteOptions with 
@@ -112,7 +113,7 @@ type private PendingTask =
 | ProcessRequest of id: int * task: Async<string option> * cancel: CancellationTokenSource
 | Quit
 
-let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryReader, send: BinaryWriter) = 
+let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryReader, send: BinaryWriter, debugAttach:bool) = 
     
     let server = serverFactory(RealClient(send))
     let processRequest(request: Request): Async<string option> = 
@@ -222,6 +223,12 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
         with e -> 
             lgError "Exception in read thread {exception}" e
     ).Start()
+
+    if debugAttach then
+        lgInfof("Waiting for debugger to attach");
+        while not(Debugger.IsAttached ) do
+            Async.Sleep(100)|>Async.RunSynchronously;
+        lgInfof("Debugger attached");
     // Process messages on main thread
     let mutable quit = false
     while not quit do 

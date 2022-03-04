@@ -19,21 +19,28 @@ import {
 // Run using `dotnet` instead of self-contained executable
 
 export function activate(context: ExtensionContext) {
-	let FSLangServerFolder = Uri.joinPath(workspace.workspaceFolders[0].uri, ('src/FSharpLanguageServer'));
+	//let FSLangServerFolder = Uri.joinPath(workspace.workspaceFolders[0].uri, ('src/FSharpLanguageServer'));
 	const debugMode = workspace.getConfiguration().get("fsharp.debug.enable", false);
 	
 	const customCommand: string = workspace.getConfiguration().get("fsharp.customCommand", null);
 
 	const customCommandArgs: string[] = workspace.getConfiguration().get("fsharp.customCommandArgs", null);
-
-	let args: string[] = customCommandArgs ?? [binName()]
+	const customDllPath: string = workspace.getConfiguration().get("fsharp.customDllPath", null);
+	let customDllArgs = null
+	
+	if (customDllPath != null&&customDllPath != "") customDllArgs = [customDllPath];
+	
+	let args: string[] = customCommandArgs ?? (customDllArgs??[binName()])
+	if (debugMode) {
+		args.push("--attach-debugger")
+	}
 	//This always needs to be just a single command with no args. If not it will cause an error.
 	let serverMain =customCommand ?? findInPath('dotnet')??'dotnet';
 	
 	// The server is packaged as a standalone command
 
 
-	console.log("Going to start server with command ",serverMain);
+	console.log("Going to start server with command  ",serverMain,args);
 	
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
@@ -46,17 +53,6 @@ export function activate(context: ExtensionContext) {
 			env: {
 				...process.env,
 			}
-
-		}
-	}
-	if (debugMode) {
-		serverOptions = {
-			command: findInPath('dotnet')??'dotnet',
-			args: ['run', '--project', FSLangServerFolder.fsPath],
-			transport: TransportKind.stdio,
-			options: {
-				cwd: context.extensionPath,
-			},
 
 		}
 	}
