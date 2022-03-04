@@ -141,7 +141,7 @@ let mock(server: ILanguageServer) (messages: string list): string =
     let writeOut = new BinaryWriter(stdout)
     let readIn = messageStream(messages)
     let serverFactory = fun _ -> server
-    LanguageServer.connect(serverFactory, readIn, writeOut)
+    LanguageServer.connect(serverFactory, readIn, writeOut, false)
     Encoding.UTF8.GetString(stdout.ToArray())
 
 [<Test>]

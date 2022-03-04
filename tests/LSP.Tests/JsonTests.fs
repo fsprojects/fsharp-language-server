@@ -204,7 +204,8 @@ let ``deserialize optional types`` () =
     let found = deserializerFactory<int option list> options (JsonValue.Parse """[1]""")
     Assert.AreEqual([Some 1], found)
     let found = deserializerFactory<int option list> options (JsonValue.Parse """[null]""")
-    Assert.AreEqual([None], found)
+    let noneIntList: int option list=[None]
+    Assert.AreEqual(noneIntList, found)
 
 [<Test>]
 let ``deserialize map`` () = 

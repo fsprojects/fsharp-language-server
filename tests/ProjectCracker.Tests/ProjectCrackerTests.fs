@@ -164,7 +164,7 @@ let ``build unbuilt project``() =
 let ``find implicit references with netcoreapp3``() =
     let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NetCoreApp3"; "NetCoreApp3.fsproj"|] |> FileInfo
     let cracked = ProjectCracker.crack(fsproj)
-    CollectionAssert.Contains([for f in cracked.packageReferences do yield f.Name], "System.Core.dll")
+    CollectionAssert.Contains([for f in cracked.packageReferences do yield f.Name], "FSharp.Core.dll")
 
 [<Test>]
 let ``find implicit references with net5``() =
