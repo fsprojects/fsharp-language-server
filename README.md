@@ -1,4 +1,6 @@
 # F# Language Server
+# IMPORTANT
+Untill I can sort out access to publishing new versions of the original extension, this is the working version of this extension [F# Language Server updated](https://marketplace.visualstudio.com/items?itemName=faldor20.fsharp-language-server-updated)
 ## Recent Changes
 Now being actively maintained by @faldor20
 
