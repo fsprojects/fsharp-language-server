@@ -8,10 +8,9 @@ open LSP.Types
 open LSP.SemanticToken
 open NUnit.Framework
 open SemanticToken
+open Expecto
 
-[<SetUp>]
-let setup() = 
-    LSP.Log.diagnosticsLog := stdout
+ 
 
 let binaryWriter() = 
     let stream = new MemoryStream()
@@ -21,31 +20,34 @@ let binaryWriter() =
         Encoding.UTF8.GetString(bytes)
     writer, toString
 
-[<Test>]
-let ``write text``() = 
-    let writer, toString = binaryWriter() 
-    writer.Write(Encoding.UTF8.GetBytes "foo")
-    let found = toString()
-    Assert.AreEqual("foo", found)
+[<Tests>]
+let tests  =        
+    testList "language server Tests" [
+    test "write text"{
+        let writer, toString = binaryWriter() 
+        writer.Write(Encoding.UTF8.GetBytes "foo")
+        let found = toString()
+        Assert.AreEqual("foo", found)
+    }
 
-[<Test>]
-let ``write response``() = 
-    let writer, toString = binaryWriter() 
-    LanguageServer.respond(writer, 1, "2")
-    let expected = "Content-Length: 35\r\n\r\n\
-                    {\"id\":1,\"jsonrpc\":\"2.0\",\"result\":2}"
-    let found = toString()
-    Assert.AreEqual(expected, found)
+    test "write response"{
+        let writer, toString = binaryWriter() 
+        LanguageServer.respond(writer, 1, "2")
+        let expected = "Content-Length: 35\r\n\r\n\
+                        {\"id\":1,\"jsonrpc\":\"2.0\",\"result\":2}"
+        let found = toString()
+        Assert.AreEqual(expected, found)
+    }
 
-[<Test>]
-let ``write multibyte characters``() = 
-    let writer, toString = binaryWriter() 
-    LanguageServer.respond(writer, 1, "🔥")
-    let expected = "Content-Length: 38\r\n\r\n\
-                    {\"id\":1,\"jsonrpc\":\"2.0\",\"result\":🔥}"
-    let found = toString()
-    Assert.AreEqual(expected, found)
-
+    test "write multibyte characters"{
+        let writer, toString = binaryWriter() 
+        LanguageServer.respond(writer, 1, "🔥")
+        let expected = "Content-Length: 38\r\n\r\n\
+                        {\"id\":1,\"jsonrpc\":\"2.0\",\"result\":🔥}"
+        let found = toString()
+        Assert.AreEqual(expected, found)
+    }
+]
 let TODO() = raise (Exception "TODO")
 
 type MockServer() = 
@@ -108,34 +110,12 @@ let initializeMessage = """
 }
 """
 
-[<Test>]
-let ``read messages from a stream``() = 
-    let stdin = messageStream [initializeMessage]
-    let messages = LanguageServer.readMessages(stdin)
-    let found = Seq.toList(messages)
-    Assert.AreEqual([Parser.RequestMessage(1, "initialize", JsonValue.Parse "{}")], found)
-
 let exitMessage = """
 {
     "jsonrpc": "2.0",
     "method": "exit"
 }
 """
-    
-[<Test>]
-let ``exit message terminates stream``() = 
-    let stdin = messageStream [initializeMessage; exitMessage; initializeMessage]
-    let messages = LanguageServer.readMessages(stdin)
-    let found = Seq.toList messages
-    Assert.AreEqual([Parser.RequestMessage(1, "initialize", JsonValue.Parse "{}")], found)
-    
-[<Test>]
-let ``end of bytes terminates stream``() = 
-    let stdin = messageStream [initializeMessage]
-    let messages = LanguageServer.readMessages(stdin)
-    let found = Seq.toList messages
-    Assert.AreEqual([Parser.RequestMessage(1, "initialize", JsonValue.Parse "{}")], found)
-
 let mock(server: ILanguageServer) (messages: string list): string = 
     let stdout = new MemoryStream()
     let writeOut = new BinaryWriter(stdout)
@@ -143,17 +123,42 @@ let mock(server: ILanguageServer) (messages: string list): string =
     let serverFactory = fun _ -> server
     LanguageServer.connect(serverFactory, readIn, writeOut, false)
     Encoding.UTF8.GetString(stdout.ToArray())
+[<Tests>]
+let tests2  =        
+    testList "language server Tests" [
 
-[<Test>]
-let ``send Initialize``() = 
-    let message = """
-    {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {"processId": null,"rootUri":null,"capabilities":{}}
+    test "read messages from a stream"{
+        let stdin = messageStream [initializeMessage]
+        let messages = LanguageServer.readMessages(stdin)
+        let found = Seq.toList(messages)
+        Assert.AreEqual([Parser.RequestMessage(1, "initialize", JsonValue.Parse "{}")], found)
     }
-    """
-    let server = MockServer()
-    let result = mock server [message]
-    if not (result.Contains("capabilities")) then Assert.Fail(sprintf "%A does not contain capabilities" result)
+        
+
+    test "exit message terminates stream"{
+        let stdin = messageStream [initializeMessage; exitMessage; initializeMessage]
+        let messages = LanguageServer.readMessages(stdin)
+        let found = Seq.toList messages
+        Assert.AreEqual([Parser.RequestMessage(1, "initialize", JsonValue.Parse "{}")], found)
+    }   
+
+    test "end of bytes terminates stream"{
+        let stdin = messageStream [initializeMessage]
+        let messages = LanguageServer.readMessages(stdin)
+        let found = Seq.toList messages
+        Assert.AreEqual([Parser.RequestMessage(1, "initialize", JsonValue.Parse "{}")], found)
+    }
+    test "send Initialize"{
+        let message = """
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {"processId": null,"rootUri":null,"capabilities":{}}
+        }
+        """
+        let server = MockServer()
+        let result = mock server [message]
+        if not (result.Contains("capabilities")) then Assert.Fail(sprintf "%A does not contain capabilities" result)
+    }
+    ]
