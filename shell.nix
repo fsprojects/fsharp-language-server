@@ -3,6 +3,9 @@
 let
   buildDotnet = with pkgs.dotnetCorePackages; combinePackages [
     sdk_6_0
+    #required to make all tests pass
+    #sdk_5_0
+    #sdk_3_1
   ];
   in
 pkgs.mkShell {

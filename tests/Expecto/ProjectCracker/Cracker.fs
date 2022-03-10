@@ -173,7 +173,7 @@ let tests2  =
     test "find implicit references with netcoreapp3"{
         let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NetCoreApp3"; "NetCoreApp3.fsproj"|] |> FileInfo
         let cracked = ProjectCracker.crack(fsproj)
-        Expect.contains [for f in cracked.packageReferences do yield f.Name] "FSharp.Core.dll" "missing ref"
+        Expect.contains [for f in cracked.packageReferences do yield f.Name] "System.Core.dll" "missing ref"
     }
 
     test "find implicit references with net5"{
