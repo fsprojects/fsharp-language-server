@@ -902,15 +902,10 @@ let main(argv: array<string>): int =
     lgWarnf "warn log"
     lgErrorf "erroor log"
     let serverFactory(client) = Server(client) :> ILanguageServer
-    if argv|>Array.exists ((=)"--attach-debugger") then
-        Console.WriteLine("Waiting for debugger to attach");
-        while not(Debugger.IsAttached ) do
-            Thread.Sleep(100);
-        Console.WriteLine("Debugger attached");
-    lgInfof "Listening on stdin"
+    let debugAttach= argv|>Array.exists ((=)"--attach-debugger")
     dprintfn "fist log should have happened"
     try
-        LanguageServer.connect(serverFactory, read, write)
+        LanguageServer.connect(serverFactory, read, write,debugAttach)
         0 // return an integer exit code
     with e ->
         lgError "Exception in language server {err}" e

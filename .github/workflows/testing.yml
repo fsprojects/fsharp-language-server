@@ -27,8 +27,7 @@ jobs:
         run: dotnet tool restore
       - name: paket setup
         run: dotnet paket install
-      - run: dotnet restore 
-      - name: Build
-        run: dotnet build --no-restore
+      - name: Restore
+        run: bash ./scripts/restore.sh
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test --verbosity normal ./tests/Expecto/
