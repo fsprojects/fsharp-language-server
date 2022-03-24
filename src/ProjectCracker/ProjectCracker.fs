@@ -84,6 +84,14 @@ type JsonValue with
 
 let private frameworkPreference = [
     "net6.0", "net6.0";
+    "net6.0-ios","net6.0-ios";
+    "net6.0-macos","net6.0-macos";
+    "net6.0-maccatalyst","net6.0-maccatalyst";
+    "net6.0-tvos","net6.0-tvos";
+    "net6.0-android","net6.0-android";
+    "net6.0-windows", "net6.0-windows";
+
+    "net5.0-windows","net5.0-windows";
     "net5.0", "net5.0";
 
     "netcoreapp3.1", ".NETCoreApp,Version=v3.1";
@@ -194,11 +202,16 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let shortFramework, longFramework =
         let projectContainsFramework(short: string) =
             root?project?frameworks.TryGetProperty(short).IsSome
+        let defaultframework()=
+            let frameworkName=root?project?frameworks.Properties[0]|>fst
+            lgWarn "setting framewok to potentially unknown framework :{shortName}" frameworkName
+            (frameworkName,frameworkName)
         let mutable found: (string * string) option = None
         for short, long in frameworkPreference do
             if projectContainsFramework(short) && found.IsNone then
                 found <- Some(short, long)
-        found.Value
+        
+        found|>Option.defaultWith defaultframework
     lgInfo2 "Chose framework {shortName} / {longName}" shortFramework longFramework
     // Choose a version of a dependency by scanning targets
     let chooseVersion(dependencyName: string): string =
@@ -287,40 +300,48 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
         let version = chooseVersion(name)
         let dep = {name=name; version=version}
         findTransitiveDeps(dep)
-    let [| _; longFrameworkVersion |] = 
+    let longFrameworkVersion = 
       if longFramework.Contains("net5")||longFramework.Contains("net6") then //TODO: find a better solution, this is kind of  hack
-        longFramework.Split("net")
+        //split at '-' to remove platform parts lke net6.0-windows
+        longFramework.Split("net").[1].Split('-').[0]
       else
-        longFramework.Split("Version=v")
+        longFramework.Split("Version=v").[1]
     let (frameworkMajorVersion, frameworkMinorVersion) = parseVersion longFrameworkVersion
     let selectedRuntimes = Dictionary<string * int, CoreRuntime>()
     let runtimes = findRuntimePaths()
-    match root?project?frameworks.[shortFramework].TryGetProperty("frameworkReferences") with
-    | Some frameworkRefs ->
-        for frameworkRef, _ in frameworkRefs.Properties do
-            for runtime in runtimes do
-                // .NET Core does not support forward compatibility across minor versions or any
-                // compatibility between major versions. That means that the only case we need
-                // to worry about is finding a preferred framework when two candidates share a
-                // major version and both have a minor version at least as high as the target minor
-                // version.
-                //
-                // In that case, we prefer the framework which is closest to the target. This avoids
-                // drifting too far from the target framework (which could introduce extra API surface)
-                // when we have a closer alternative.
-                let versionMatch =
-                    runtime.majorVersion = frameworkMajorVersion
-                    && runtime.minorVersion >= frameworkMinorVersion
-                if frameworkRef = runtime.name && versionMatch then
-                    let runtimeKey = (runtime.name, runtime.majorVersion)
-                    if selectedRuntimes.ContainsKey(runtimeKey) then
-                        let previousMatch = selectedRuntimes.[runtimeKey]
-                        if runtime.minorVersion < previousMatch.minorVersion then
-                            selectedRuntimes.[runtimeKey] <- runtime
-                    else
+    //Find frameworks required by imported packages.
+    let packageFrameworks=
+        root?targets.[shortFramework].Properties|>Array.toList 
+        |>List.map(fun (name,prop)->prop.TryGetProperty("frameworkReferences"))
+        |>List.choose id
+        |>List.collect(fun x-> x.AsArray()|>Array.toList|>List.map(fun y->y.AsString()))
+    //Find frameworks required by this project.
+    let projectFrameworks=
+        root?project?frameworks.[shortFramework].TryGetProperty("frameworkReferences")
+        |>Option.map(fun x->x.Properties|>Array.map(fst)|>Array.toList)
+        |>Option.defaultValue []
+    for frameworkRef in packageFrameworks@projectFrameworks do
+        for runtime in runtimes do
+            // .NET Core does not support forward compatibility across minor versions or any
+            // compatibility between major versions. That means that the only case we need
+            // to worry about is finding a preferred framework when two candidates share a
+            // major version and both have a minor version at least as high as the target minor
+            // version.
+            //
+            // In that case, we prefer the framework which is closest to the target. This avoids
+            // drifting too far from the target framework (which could introduce extra API surface)
+            // when we have a closer alternative.
+            let versionMatch =
+                runtime.majorVersion = frameworkMajorVersion
+                && runtime.minorVersion >= frameworkMinorVersion
+            if  frameworkRef.Contains(runtime.name) && versionMatch then
+                let runtimeKey = (runtime.name, runtime.majorVersion)
+                if selectedRuntimes.ContainsKey(runtimeKey) then
+                    let previousMatch = selectedRuntimes.[runtimeKey]
+                    if runtime.minorVersion < previousMatch.minorVersion then
                         selectedRuntimes.[runtimeKey] <- runtime
-    | None ->
-        ()
+                else
+                    selectedRuntimes.[runtimeKey] <- runtime
     // ["/Users/georgefraser/.nuget/packages/", ...]
     let packageFolders = [for p, _ in root?packageFolders.Properties do yield p]
 

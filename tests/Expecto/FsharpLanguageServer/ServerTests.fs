@@ -420,4 +420,12 @@ let serverTests=
         let messages = diagnosticMessages(client)
         Expect.isEmpty messages "got type errors"
         }
+    test "Report no errors opening project using net6.0-windows framework" {
+        //This test is to fix issues with net6.0-windows and isssues discovering frameworks that should be imported based on packages.
+        //eg: We use elmish.wpf whith will require Microsoft.WindowsDesktop.App to be designated as a runtime.
+        //If it is not we will get type errors on the suse of functions like "Bind"
+        let client, server = createServerAndReadFile("Net6Windows", "Program.fs")
+        let messages = diagnosticMessages(client)
+        Expect.isEmpty messages ($"Got errors {messages}' opening wpf project ")
+        }
     ]
