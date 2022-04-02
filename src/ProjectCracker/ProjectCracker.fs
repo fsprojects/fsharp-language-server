@@ -508,8 +508,8 @@ let private project(fsproj: FileInfo): ProjectAnalyzer =
 let private inferTargetFramework(fsproj: FileInfo): AnalyzerResult =
     let opt = new Environment.EnvironmentOptions()
     opt.TargetsToBuild.Remove("Clean")|>ignore
-    opt.EnvironmentVariables.Add("IntermediateOutputPath", Path.Combine(fsproj.Directory.FullName, ".fslsp", "obj" ))
-    opt.EnvironmentVariables.Add("OutputPath", Path.Combine(fsproj.Directory.FullName, ".fslsp", "bin"))
+    opt.EnvironmentVariables.Add("IntermediateOutputPath", Path.Combine(fsproj.Directory.FullName, "obj/.fslsp", "obj" ))
+    opt.EnvironmentVariables.Add("OutputPath", Path.Combine(fsproj.Directory.FullName, "obj/.fslsp", "bin"))
     let builds = project(fsproj).Build(opt)
     // TODO get target framework from project.assets.json
     let mutable chosen: AnalyzerResult option = None
