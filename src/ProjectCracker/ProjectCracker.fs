@@ -311,7 +311,7 @@ let private parseProjectAssets(projectAssetsJson: FileInfo): ProjectAssets =
     let runtimes = findRuntimePaths()
     //Find frameworks required by imported packages.
     let packageFrameworks=
-        root?targets.[shortFramework].Properties|>Array.toList 
+        root?targets.[longFramework].Properties|>Array.toList 
         |>List.map(fun (name,prop)->prop.TryGetProperty("frameworkReferences"))
         |>List.choose id
         |>List.collect(fun x-> x.AsArray()|>Array.toList|>List.map(fun y->y.AsString()))

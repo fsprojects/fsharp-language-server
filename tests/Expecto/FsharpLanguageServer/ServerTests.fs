@@ -185,7 +185,7 @@ let serverTests=
     test "skip file not in project file" {
         let client, server = createServerAndReadFile("MainProject", "NotInFsproj.fs")
         let messages = diagnosticMessages(client)
-        if not (List.exists (fun(m:string) -> m.Contains("No .fsproj or .fsx file")) messages) then 
+        if not (List.exists (fun(m:string) -> m.Contains("No succesfully cracked .fsproj or .fsx file")) messages) then 
             failtestf "No 'Not in project' error in %A" messages
     }
     

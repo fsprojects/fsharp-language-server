@@ -141,7 +141,7 @@ let cracker(fsproj: FileInfo): string list =
         
 [<Tests>]
 let tests2  =        
-    testList "Parser2 test" [
+    testSequenced <| testList "Parser2 test" [
     test "find package references in EmptyProject"{
         let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "EmptyProject"; "EmptyProject.fsproj"|] |> FileInfo 
         Expect.containsAll (msbuild(fsproj)) (cracker(fsproj)) "sequences don't match"

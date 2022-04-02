@@ -457,7 +457,7 @@ type ProjectManager(checker: FSharpChecker) =
                         yield options
         }
         match Seq.tryHead crackLazily with
-        | None -> Error([Conversions.errorAtTop(sprintf "No .fsproj or .fsx file references %s" sourceFile.FullName)])
+        | None -> Error([Conversions.errorAtTop(sprintf "No succesfully cracked .fsproj or .fsx file references %s" sourceFile.FullName)])
         | Some(options) ->
             let cracked = options.resolved.Value
             if cracked.errors.IsEmpty then
