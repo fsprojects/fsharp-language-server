@@ -2,7 +2,7 @@ source https://api.nuget.org/v3/index.json
 
 nuget Expecto 9.0.4
 nuget FSharp.Core
-nuget Buildalyzer 3.2.3
+nuget Buildalyzer 4.1.3
 nuget FSharp.Compiler.Service 41.0.1
 nuget FSharp.Data 4.2.5
 nuget FSharp.UMX
