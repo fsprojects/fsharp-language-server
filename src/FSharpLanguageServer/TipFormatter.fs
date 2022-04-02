@@ -206,7 +206,7 @@ let createCommentFromParsed data=
     let lines = [
         if data.summary.IsSome && data.summary.Value.Length > 0 then
             yield data.summary.Value.Trim()
-        if data.text.IsSome && data.text.Value.Length > 0 then
+        else if data.text.IsSome && data.text.Value.Length > 0  then
             yield data.text.Value.Trim()
         for name, desc in data.parameters do
             yield sprintf "**%s** %s" name desc
