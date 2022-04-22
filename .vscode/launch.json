@@ -10,7 +10,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build-expecto",
-            "program": "${workspaceFolder}/tests/FSharpLanguageServer.Tests.expecto/bin/Debug/net6.0/FSharpLanguageServer.Expecto.dll",
+            "program": "${workspaceFolder}/tests/expecto/bin/Debug/net6.0/FSharpLanguageServer.Expecto.dll",
             "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

@@ -1,34 +1,19 @@
-namespace FSharpLanguageServer
+module FSharpLanguageServer.ProjectManager.Manager
 
 open LSP.Log
 open System
 open System.IO
 open System.Collections.Generic
-open System.Net
 open System.Text.RegularExpressions
-open System.Xml
-open FSharp.Data
-open FSharp.Data.JsonExtensions
 open LSP.Types
-open FSharp.Compiler.EditorServices
 open FSharp.Compiler.Text
 open ProjectCracker
 open FSharp.Compiler.CodeAnalysis
-
-type private ResolvedProject = {
-    sources: FileInfo list
-    options: FSharpProjectOptions
-    target: FileInfo
-    errors: Diagnostic list
-}
-
-type private LazyProject = {
-    file: FileInfo
-    resolved: Lazy<ResolvedProject>
-}
-
-type private ProjectCache() =
-    let knownProjects = new Dictionary<String, LazyProject>()
+open Types
+open FSharpLanguageServer
+///Information for a project that can be serialized then written to disk 
+type private ProjectCache(knownProjects) =
+    let knownProjects:Dictionary<String, LazyProject> =knownProjects;
 
     member this.Invalidate(fsprojOrFsx: FileInfo) =
         knownProjects.Remove(fsprojOrFsx.FullName) |> ignore
@@ -36,11 +21,12 @@ type private ProjectCache() =
             if not(knownProjects.ContainsKey(fsprojOrFsx.FullName)) then
                 lgVerb "Creating lazy analysis results entry for{file}" fsprojOrFsx.FullName
                 knownProjects.Add(fsprojOrFsx.FullName, analyzeLater(fsprojOrFsx))
-            knownProjects.[fsprojOrFsx.FullName]
-            
+            knownProjects.[fsprojOrFsx.FullName]    
+    new()=ProjectCache(new Dictionary<String, LazyProject>()) 
 
 /// Maintains caches of parsed versions of .fsprojOrFsx files
-type ProjectManager(checker: FSharpChecker) =
+///Usecache sets whether or not to save and load cracked project data from a file cache, this speeds up loading previosly loaded projects but should be disabled during unit testing
+type ProjectManager(checker: FSharpChecker,useCache:bool) =
     do lgInfof "created new Project Manager"
     /// Remember what .fsproj files are referenced by .sln files
     /// Keys are full paths to .sln files
@@ -48,9 +34,9 @@ type ProjectManager(checker: FSharpChecker) =
     let knownSolutions = new Dictionary<String, list<FileInfo>>()
     /// Remember what .fsproj and .fsx files are present
     let knownProjects = new HashSet<String>()
-    //// Cache expensive analyze operations
+    /// Cache expensive analyze operations
     let cache = ProjectCache()
-
+    
     let printOptions(options: FSharpProjectOptions) =
         // This is long but it's useful
         lgInfo "{fileName}: " options.ProjectFileName
@@ -274,57 +260,67 @@ type ProjectManager(checker: FSharpChecker) =
         /// Analyze a project
         let analyzeFsproj(fsproj: FileInfo) =
             lgInfo "Analyzing {name}" fsproj.Name
-            let cracked = ProjectCracker.crack(fsproj)
-            // Convert to FSharpProjectOptions
-            let options = {
-                IsIncompleteTypeCheckEnvironment = false
-                LoadTime = lastModified(fsproj)
-                OriginalLoadReferences = []
-                OtherOptions =
-                    [|
-                        // Dotnet framework should be specified explicitly
-                        yield "--noframework"
+            let cached=if useCache then match  FileCache.tryGetCached(fsproj)with|Ok x->Some x|Error a->None else None
+            match cached with
+            |Some x->
+                lgInfo "Cracked '{proj}' using data from cache" fsproj.FullName
+                x.Project
+            |None->
+                lgInfo "No up to date cached projectOptions file found for '{proj}', cracking normally " fsproj.FullName
+                let cracked = ProjectCracker.crack(fsproj)
+                // Convert to FSharpProjectOptions
+                let options = {
+                    IsIncompleteTypeCheckEnvironment = false
+                    LoadTime = lastModified(fsproj)
+                    OriginalLoadReferences = []
+                    OtherOptions =
+                        [|
+                            // Dotnet framework should be specified explicitly
+                            yield "--noframework"
+                                
+                            // Reference output of other projects
+                            for r in cracked.projectReferences do
+                                let options = cache.Get(r, analyzeLater)
+                                yield "-r:" + options.resolved.Value.target.FullName
                             
-                        // Reference output of other projects
-                        for r in cracked.projectReferences do
-                            let options = cache.Get(r, analyzeLater)
-                            yield "-r:" + options.resolved.Value.target.FullName
-                        
-                        // Reference target .dll for .csproj proejcts
-                        for r in cracked.otherProjectReferences do
-                            yield "-r:" + r.FullName
-                        // Reference packages
-                        for r in cracked.packageReferences do
-                            yield "-r:" + r.FullName
-                        // Direct dll references
-                        for r in cracked.directReferences do
-                            yield "-r:" + r.FullName
-                    |]
-                ProjectFileName = fsproj.FullName
-                ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
-                ReferencedProjects =
-                    [|
-                        for r in cracked.projectReferences do
-                            let options = cache.Get(r, analyzeLater)
-                            yield FSharpReferencedProject.CreateFSharp(options.resolved.Value.target.FullName, options.resolved.Value.options)
-                    |]
-                SourceFiles =
-                    [|
-                        for f in cracked.sources do
-                            yield f.FullName
-                    |]
-                Stamp = None
-                UnresolvedReferences = None
-                UseScriptResolutionRules = false
-            }
-            // Log what we inferred
-            printOptions(options)
-            {
-                sources=cracked.sources
-                options=options
-                target=cracked.target
-                errors=match cracked.error with None -> [] | Some(e) -> [Conversions.errorAtTop(e)]
-            }
+                            // Reference target .dll for .csproj proejcts
+                            for r in cracked.otherProjectReferences do
+                                yield "-r:" + r.FullName
+                            // Reference packages
+                            for r in cracked.packageReferences do
+                                yield "-r:" + r.FullName
+                            // Direct dll references
+                            for r in cracked.directReferences do
+                                yield "-r:" + r.FullName
+                        |]
+                    ProjectFileName = fsproj.FullName
+                    ProjectId = None // This is apparently relevant to multi-targeting builds https://github.com/Microsoft/visualfsharp/pull/4918
+                    ReferencedProjects =
+                        [|
+                            for r in cracked.projectReferences do
+                                let options = cache.Get(r, analyzeLater)
+                                yield FSharpReferencedProject.CreateFSharp(options.resolved.Value.target.FullName, options.resolved.Value.options)
+                        |]
+                    SourceFiles =
+                        [|
+                            for f in cracked.sources do
+                                yield f.FullName
+                        |]
+                    Stamp = None
+                    UnresolvedReferences = None
+                    UseScriptResolutionRules = false
+                }
+                // Log what we inferred
+                printOptions(options)
+                let projectData=
+                    {
+                        sources=cracked.sources
+                        options=options
+                        target=cracked.target
+                        errors=match cracked.error with None -> [] | Some(e) -> [Conversions.errorAtTop(e)]
+                    }
+                if useCache then FileCache.saveCache projectData fsproj
+                projectData
         // Direct to analyzeFsx or analyzeFsproj, depending on type
         if fsprojOrFsx.Name.EndsWith(".fsx") then
             {file=fsprojOrFsx; resolved=lazy(analyzeFsx(fsprojOrFsx))}

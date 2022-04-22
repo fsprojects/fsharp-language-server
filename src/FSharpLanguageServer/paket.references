@@ -2,4 +2,4 @@ FSharp.Compiler.Service
 HtmlAgilityPack
 FSharp.UMX
 FSharp.Core
-Newtonsoft.Json
+Thoth.Json.Net

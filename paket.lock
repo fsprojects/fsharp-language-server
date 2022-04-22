@@ -17,6 +17,7 @@ NUGET
     Expecto (9.0.4)
       FSharp.Core (>= 4.6) - restriction: || (>= net461) (>= netstandard2.0)
       Mono.Cecil (>= 0.11.3) - restriction: || (>= net461) (>= netstandard2.0)
+    Fable.Core (3.6.2) - restriction: && (< net46) (>= netstandard2.0)
     FParsec (1.1.1)
       FSharp.Core (>= 4.3.4) - restriction: || (>= net45) (>= netstandard2.0)
       System.ValueTuple (>= 4.4) - restriction: >= net45
@@ -458,7 +459,7 @@ NUGET
     ncrontab.signed (3.3.2) - restriction: >= net6.0
     NETStandard.Library (2.0.3) - restriction: || (&& (< net35) (>= netstandard2.0)) (&& (< net40) (>= netstandard1.6) (< netstandard2.0) (< uap10.0)) (&& (< net45) (>= netstandard1.0) (< netstandard1.3)) (&& (< net45) (>= netstandard1.3) (< netstandard2.0)) (>= net6.0) (>= uap10.1)
       Microsoft.NETCore.Platforms (>= 1.1) - restriction: || (&& (>= net45) (< netstandard1.3)) (&& (< net45) (>= netstandard1.1) (< netstandard1.2) (< win8)) (&& (< net45) (>= netstandard1.2) (< netstandard1.3) (< win8) (< wpa81)) (&& (< net45) (>= netstandard1.3) (< netstandard1.4) (< win8) (< wpa81)) (&& (< net45) (>= netstandard1.4) (< netstandard1.5) (< win8) (< wpa81)) (&& (< net45) (>= netstandard1.5) (< netstandard1.6) (< win8) (< wpa81)) (&& (< net45) (>= netstandard1.6) (< netstandard2.0) (< win8) (< wpa81)) (&& (< net45) (>= netstandard2.0)) (&& (>= net46) (< netstandard1.4)) (>= net461) (>= netcoreapp2.0) (&& (>= netstandard1.0) (< portable-net45+win8+wpa81)) (&& (< netstandard1.0) (>= portable-net45+win8) (< win8)) (&& (< netstandard1.0) (< portable-net45+win8) (>= portable-net45+win8+wpa81)) (&& (< netstandard1.0) (>= portable-net45+win8+wp8+wpa81) (< portable-net45+win8+wpa81)) (&& (< netstandard1.0) (>= win8)) (&& (< netstandard1.3) (< win8) (>= wpa81)) (&& (< netstandard1.5) (>= uap10.0)) (>= uap10.1) (>= wp8)
-    Newtonsoft.Json (13.0.1) - restriction: || (>= netcoreapp1.0) (>= uap10.0)
+    Newtonsoft.Json (13.0.1) - restriction: || (>= net46) (>= netcoreapp1.0) (>= netstandard2.0) (>= uap10.0)
     Newtonsoft.Json.Bson (1.0.2) - restriction: >= net6.0
       Newtonsoft.Json (>= 12.0.1) - restriction: || (>= net45) (>= netstandard1.3)
     NodaTime (3.0.9)
@@ -995,6 +996,10 @@ NUGET
       System.Xml.ReaderWriter (>= 4.3) - restriction: && (< monoandroid) (< monotouch) (< net46) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)
       System.Xml.XmlDocument (>= 4.3) - restriction: || (&& (< monoandroid) (< monotouch) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)) (>= net46)
       System.Xml.XPath (>= 4.3) - restriction: || (&& (< monoandroid) (< monotouch) (>= netstandard1.3) (< xamarinios) (< xamarinmac) (< xamarintvos) (< xamarinwatchos)) (>= net46)
+    Thoth.Json.Net (8.0)
+      Fable.Core (>= 3.0 < 4.0) - restriction: && (< net46) (>= netstandard2.0)
+      FSharp.Core (>= 4.7.2) - restriction: || (>= net46) (>= netstandard2.0)
+      Newtonsoft.Json (>= 11.0.2) - restriction: || (>= net46) (>= netstandard2.0)
     YoloDev.Expecto.TestSdk (0.12.13)
       Expecto (>= 9.0 < 10.0) - restriction: >= netcoreapp2.1
       FSharp.Core (>= 4.6) - restriction: >= netcoreapp2.1

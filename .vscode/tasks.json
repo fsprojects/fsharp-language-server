@@ -9,7 +9,7 @@
             "type": "shell",
             "args": [
                 "build",
-                "./tests/FSharpLanguageServer.Tests.expecto/FSharpLanguageServer.Expecto.fsproj",
+                "./tests/expecto/FSharpLanguageServer.Expecto.fsproj",
 
                 // Ask dotnet build to generate full paths for file names.
                 "/property:GenerateFullPaths=true",

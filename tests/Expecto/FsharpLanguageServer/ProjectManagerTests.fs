@@ -10,7 +10,8 @@ open LSP.Types
 open FSharp.Data
 open FSharp.Compiler.CodeAnalysis
 open Expecto
-
+open FSharpLanguageServer.ProjectManager.Manager
+open FSharpLanguageServer.ProjectManager
 type MockClient() = 
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
@@ -30,7 +31,7 @@ LSP.Log.diagnosticsLog := stdout
 let tests=testList "formatting" [
      
     test "find project file" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
         let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
@@ -41,7 +42,7 @@ let tests=testList "formatting" [
     }
      
     test "choose fsproj referenced by sln" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
         let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"; "Main.fs"|])
@@ -52,7 +53,7 @@ let tests=testList "formatting" [
     }
      
     test "find script file" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "Script"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
         let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "Script"; "LoadedByScript.fs"|])
@@ -63,7 +64,7 @@ let tests=testList "formatting" [
     }
      
     test "find an local dll" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
         let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
@@ -75,7 +76,7 @@ let tests=testList "formatting" [
     }
      
     test "project-file-not-found" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
         let project = projects.FindProjectOptions file
         match project with 
@@ -84,13 +85,13 @@ let tests=testList "formatting" [
     }
      
     test "bad project file" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "BadProject"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot root)
     }
      
     test "get script options" {
-        let projects = ProjectManager(FSharpChecker.Create())
+        let projects = ProjectManager(FSharpChecker.Create(),true)
         let script = Path.Combine [|projectRoot.FullName; "sample"; "Script"; "MainScript.fsx"|] |> FileInfo 
         projects.NewProjectFile(script)
         match projects.FindProjectOptions(script) with 
@@ -99,5 +100,19 @@ let tests=testList "formatting" [
             let references = [for o in options.OtherOptions do if o.StartsWith("-r:") then yield FileInfo(o.Substring("-r:".Length)).Name]
             Expect.contains references "FSharp.Core.dll" "Missing ref"
             Expect.contains references "System.Runtime.dll" "Missing ref"
+    }
+    test "get cached ProjectOptions" {
+        let projects = ProjectManager(FSharpChecker.Create(),true)
+        let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
+        Async.RunSynchronously(projects.AddWorkspaceRoot(root))
+        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+        let project = projects.FindProjectOptions(file)
+        match project with 
+        | Error(m) ->  failtestf "Couldn't load project %A" m
+        | Ok(f) -> 
+
+            let cacheJson= FileCache.tryGetCached(FileInfo(f.ProjectFileName))
+            Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
+            
     }
 ]

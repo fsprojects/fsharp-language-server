@@ -20,7 +20,7 @@ open FSharp.Compiler.Syntax
 open FSharp.Compiler.Symbols
 open FSharp.Compiler.Tokenization
 open System.Threading
-
+open FSharpLanguageServer.ProjectManager.Manager
 let private TODO() = raise (Exception "TODO")
 
 /// Look for a method call like foo.MyMethod() before the cursor
@@ -197,7 +197,7 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Syntax.
 type Server(client: ILanguageClient) =
     let docs = DocumentStore()
     let checker = FSharpChecker.Create()
-    let projects = ProjectManager(checker)
+    let projects = ProjectManager(checker,true)
 
     /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option =

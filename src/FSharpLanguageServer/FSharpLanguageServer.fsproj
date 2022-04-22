@@ -16,7 +16,9 @@
     <Compile Include="ProgressBar.fs" />
     <Compile Include="Navigation.fs" />
     <Compile Include="Conversions.fs" />
-    <Compile Include="ProjectManager.fs" />
+    <Compile Include="ProjectManager/Types.fs" />
+    <Compile Include="ProjectManager/FileCache.fs" />
+    <Compile Include="ProjectManager/ProjectManager.fs" />
     <Compile Include="FSAC/Semantic.fs" />
     <Compile Include="UnusedDeclarations.fs" />
     <Compile Include="DebounceCheck.fs" />
