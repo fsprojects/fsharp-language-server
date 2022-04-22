@@ -4,13 +4,7 @@ open ProjectCracker
 open LSP.Log
 open System
 open System.IO
-open System.Text.RegularExpressions
 open System.Diagnostics
-open Microsoft.Build
-open Microsoft.Build.Evaluation
-open Microsoft.Build.Utilities
-open Microsoft.Build.Framework
-open Microsoft.Build.Logging
 open Buildalyzer
 
 open Expecto

@@ -1,7 +1,5 @@
 Buildalyzer
 System.Threading.ThreadPool
 System.Net.NameResolution
-System.Security.Principal
-System.IO.FileSystem.Primitives
 System.IO.FileSystem
 FSharp.Core
