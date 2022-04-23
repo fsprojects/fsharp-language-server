@@ -4,7 +4,6 @@ open System
 open System.Text.RegularExpressions
 open FSharp.Data
 open LSP.Json.Ser
-open NUnit.Framework
 open Expecto
 
 LSP.Log.diagnosticsLog := stdout
@@ -12,49 +11,48 @@ LSP.Log.diagnosticsLog := stdout
 let removeSpace(expected: string) = 
     Regex.Replace(expected, @"\s", "")
 
-[<Tests>]
 let tests=
     testList "Json Tests" [
         test "remove space from string"{
             let found = removeSpace("foo bar")
-            Assert.AreEqual("foobar", found)
+            Expect.equal "foobar" found "fail"
         }
         
         test "remove newline from string"{
             let actual = """foo 
             bar"""
             let found = removeSpace(actual)
-            Assert.AreEqual("foobar", found)
+            Expect.equal "foobar" found "fail"
         }
         
         test "serialize primitive types to JSON"{
             let found = serializerFactory<bool> defaultJsonWriteOptions true
-            Assert.AreEqual("true", found)
+            Expect.equal "true" found "fail"
             let found = serializerFactory<int> defaultJsonWriteOptions 1
-            Assert.AreEqual("1", found)
+            Expect.equal "1" found "fail"
             let found = serializerFactory<string> defaultJsonWriteOptions "foo"
-            Assert.AreEqual("\"foo\"", found)
+            Expect.equal "\"foo\"" found "fail"
             let found = serializerFactory<char> defaultJsonWriteOptions 'f'
-            Assert.AreEqual("\"f\"", found)
+            Expect.equal "\"f\"" found "fail"
         }
         
         test "serialize URI to JSON"{
             let example = Uri("https://google.com")
             let found = serializerFactory<Uri> defaultJsonWriteOptions example
-            Assert.AreEqual("\"https://google.com/\"", found)
+            Expect.equal "\"https://google.com/\"" found "fail"
         }
         
         test "serialize JsonValue to JSON"{
             let example = JsonValue.Parse "{}"
             let found = serializerFactory<JsonValue> defaultJsonWriteOptions example
-            Assert.AreEqual("{}", found)
+            Expect.equal "{}" found "fail"
         }
         
         test "serialize option to JSON"{
             let found = serializerFactory<int option> defaultJsonWriteOptions (Some 1)
-            Assert.AreEqual("1", found)
+            Expect.equal "1" found "fail"
             let found = serializerFactory<int option> defaultJsonWriteOptions (None)
-            Assert.AreEqual("null", found)
+            Expect.equal "null" found "fail"
         }
     ]
 
@@ -65,19 +63,19 @@ let tests2=
         test "serialize record to JSON"{
             let record = {simpleMember = 1}
             let found = serializerFactory<SimpleRecord> defaultJsonWriteOptions record
-            Assert.AreEqual("""{"simpleMember":1}""", found)
+            Expect.equal """{"simpleMember":1}""" found "fail"
         }
         
         test "serialize list of ints to JSON"{
             let example = [1; 2]
             let found = serializerFactory<int list> defaultJsonWriteOptions example
-            Assert.AreEqual("""[1,2]""", found)
+            Expect.equal """[1,2]""" found "fail"
         }
         
         test "serialize list of strings to JSON"{
             let example = ["foo"; "bar"]
             let found = serializerFactory<string list> defaultJsonWriteOptions example
-            Assert.AreEqual("""["foo","bar"]""", found)
+            Expect.equal """["foo","bar"]""" found "fail"
         }
         
         test "serialize a record with a custom writer"{
@@ -85,7 +83,7 @@ let tests2=
             let customWriter(r: SimpleRecord): string = sprintf "simpleMember=%d" r.simpleMember
             let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
             let found = serializerFactory<SimpleRecord> options record
-            Assert.AreEqual("\"simpleMember=1\"", found)
+            Expect.equal "\"simpleMember=1\"" found "fail"
         }
     ]
 type Foo = Bar | Doh 
@@ -100,7 +98,7 @@ let tests3  =
             | Doh -> 20
             let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
             let found = serializerFactory<FooRecord> options record
-            Assert.AreEqual("""{"foo":10}""", found)
+            Expect.equal """{"foo":10}""" found "fail"
         }
     ]
 // type UnionWithFields =
@@ -164,9 +162,9 @@ let tests4  =
         let options = {defaultJsonWriteOptions with customWriters = [customWriter]}
         let example = MyFoo()
         let found = serializerFactory<IFoo> options example
-        Assert.AreEqual("\"foo\"", found)
+        Expect.equal "\"foo\"" found "fail"
         let found = serializerFactory<MyFoo> options example
-        Assert.AreEqual("\"foo\"", found)
+        Expect.equal "\"foo\"" found "fail"
     }
 
     
@@ -182,12 +180,12 @@ let tests4  =
         }"""
         let options = defaultJsonReadOptions
         let found = deserializerFactory<SimpleTypes> options (JsonValue.Parse sample)
-        Assert.AreEqual(true, found.b)
-        Assert.AreEqual(1, found.i)
-        Assert.AreEqual('x', found.c)
-        Assert.AreEqual("foo", found.s)
-        Assert.AreEqual(Uri("https://github.com"), found.webUri)
-        Assert.AreEqual("d:\\foo.txt", found.fileUri.LocalPath)
+        Expect.equal true found.b "fail"
+        Expect.equal 1 found.i "fail"
+        Expect.equal 'x' found.c "fail"
+        Expect.equal "foo" found.s "fail"
+        Expect.equal (Uri("https://github.com")) found.webUri "fail"
+        Expect.equal "d:\\foo.txt" found.fileUri.LocalPath "fail"
     }
 
     
@@ -204,39 +202,39 @@ let tests4  =
         }"""
         let options = defaultJsonReadOptions
         let found = deserializerFactory<ComplexTypes> options (JsonValue.Parse sample)
-        Assert.AreEqual({oneField=1}, found.nested)
-        Assert.AreEqual(1, found.stringAsInt)
-        Assert.AreEqual([1], found.intList)
-        Assert.AreEqual(Some 1, found.intOptionPresent)
-        Assert.AreEqual(None, found.intOptionAbsent)
+        Expect.equal {oneField=1} found.nested "fail"
+        Expect.equal 1 found.stringAsInt "fail"
+        Expect.equal [1] found.intList "fail"
+        Expect.equal (Some 1) found.intOptionPresent "fail"
+        Expect.equal None found.intOptionAbsent "fail"
     }
 
     
     test "deserialize optional types"{
         let options = defaultJsonReadOptions
         let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{"optionField":1}""")
-        Assert.AreEqual({optionField=Some 1}, found)
+        Expect.equal {optionField=Some 1} found "fail"
         let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{"optionField":null}""")
-        Assert.AreEqual({optionField=None}, found)
+        Expect.equal {optionField=None} found "fail"
         let found = deserializerFactory<TestOptionalRead> options (JsonValue.Parse """{}""")
-        Assert.AreEqual({optionField=None}, found)
+        Expect.equal {optionField=None} found "fail"
         let found = deserializerFactory<int option list> options (JsonValue.Parse """[1]""")
-        Assert.AreEqual([Some 1], found)
+        Expect.equal [Some 1] found "fail"
         let found = deserializerFactory<int option list> options (JsonValue.Parse """[null]""")
         let noneIntList: int option list=[None]
-        Assert.AreEqual(noneIntList, found)
+        Expect.equal noneIntList found "fail"
     }
     
     test "deserialize map"{
         let options = defaultJsonReadOptions
         let found = deserializerFactory<Map<string, int>> options (JsonValue.Parse """{"k":1}""")
         let map = Map.add "k" 1 Map.empty
-        Assert.AreEqual(map, found)
+        Expect.equal map found "fail"
     }
     
     test "deserialize enum"{
         let options = { defaultJsonReadOptions with customReaders = [deserializeTestEnum]}
         let found = deserializerFactory<ContainsEnum> options (JsonValue.Parse """{"e":1}""")
-        Assert.AreEqual(One, found.e)
+        Expect.equal One found.e "fail"
     }
 ]
