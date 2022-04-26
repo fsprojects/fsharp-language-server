@@ -352,6 +352,7 @@ type Server(client: ILanguageClient) =
         }
     /// Request that `uri` be checked when the user stops doing things for 1 second
     let backgroundCheck = DebounceCheck(doCheck, 1000)
+    let projectAssetsDebounce=DebounceCheck((fun file->async{projects.UpdateAssetsJson(file)}),1000)
     /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> =
         async {
@@ -637,7 +638,7 @@ type Server(client: ILanguageClient) =
                         | FileChangeType.Deleted ->
                             projects.DeleteSlnFile(file)
                     elif file.Name = "project.assets.json" then
-                        projects.UpdateAssetsJson(file)
+                        projectAssetsDebounce.CheckLater(file)
                 // Re-check all open files
                 // In theory we could optimize this by only re-checking descendents of changed projects,
                 // but in practice that will make little difference
