@@ -665,7 +665,13 @@ type Server(client: ILanguageClient) =
                         let declarations = checkResult.GetDeclarationListInfo(Some parseResult, p.position.line+1, line, partialName)
                         lastCompletion <- Some declarations
                         lgInfo "Found {num} completions" declarations.Items.Length
-                        return Some(asCompletionList(declarations))
+
+                        let addKeywords =
+                            not declarations.IsForType
+                            && not declarations.IsError
+                            && partialName.QualifyingIdents.IsEmpty
+                    
+                        return Some(asCompletionList declarations addKeywords)
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> =
             async {
@@ -688,6 +694,7 @@ type Server(client: ILanguageClient) =
                     lgDebug "Hover tooltipText={text}" tips
                     return Some(asHover(tips))
             }
+            
         // Add documentation to a completion item
         // Generating documentation is an expensive step, so we want to defer it until the user is actually looking at it
         member this.ResolveCompletionItem(p: CompletionItem): Async<CompletionItem> =
@@ -695,6 +702,7 @@ type Server(client: ILanguageClient) =
                 let mutable result = p
                 if lastCompletion.IsSome then
                     for candidate in lastCompletion.Value.Items do
+                            
                         if candidate.FullName = p.data?FullName.AsString() then
                             lgInfo "Resolve description for {candidate}" candidate.FullName
                             let! resolved = TipFormatter.resolveDocs(p, candidate)
