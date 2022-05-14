@@ -1,3 +1,7 @@
+## 0.1.80
+- Using Ionide.projInfo for project cracking which should fix all unessicary rechecks due to building the project
+- Added a project cracking caching feature so that projects now load way faster after being opened ap least once.
+It's a small list but this update was a pretty big undertaking and has made huge strides in project opening speed.
 ## 0.1.70
 ### User facing
 - Fixed a problem that meant it was never possible to use recent typechecks. This should massively improve autocomplete and hover speed consistency and reduce rechecking of files.
