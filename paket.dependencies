@@ -25,7 +25,7 @@ nuget YoloDev.Expecto.TestSdk 0.12.13
 
 
 
-nuget Microsoft.Build.Locator
+nuget Microsoft.Build.Locator 
 
 
 # don't expose as a package reference
@@ -33,7 +33,7 @@ nuget Microsoft.SourceLink.GitHub copy_local: true
 # don't copy runtime assets
 nuget Microsoft.Build.Framework copy_local: false
 nuget Microsoft.Build.Tasks.Core copy_local: false
-nuget Microsoft.Build.Utilities.Core copy_local: true #this needs to be copied or we get errors
+nuget Microsoft.Build.Utilities.Core  copy_local:false #this needs to be copied or we get errors
 nuget Microsoft.Build copy_local: false
 
 nuget Newtonsoft.Json 13.0.1

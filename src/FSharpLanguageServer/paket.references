@@ -2,3 +2,4 @@ FSharp.Compiler.Service
 HtmlAgilityPack
 FSharp.UMX
 Thoth.Json.Net
+Microsoft.Build.Utilities.Core

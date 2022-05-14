@@ -35,7 +35,7 @@ let tests=testSequenced<|testList "project cracking" [
         let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
         let project = projects.FindProjectOptions(file)
         match project with 
         | Error(m) ->  failtestf "%A" m
@@ -46,7 +46,7 @@ let tests=testSequenced<|testList "project cracking" [
         let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"; "Main.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "SlnReferences"; "Main.fs"|])
         let project = projects.FindProjectOptions(file)
         match project with 
         | Error(m) ->  failtestf "%A" m
@@ -57,7 +57,7 @@ let tests=testSequenced<|testList "project cracking" [
         let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "Script"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "Script"; "LoadedByScript.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "Script"; "LoadedByScript.fs"|])
         let project = projects.FindProjectOptions(file)
         match project with 
         | Error(m) ->  failtestf "%A" m
@@ -68,7 +68,7 @@ let tests=testSequenced<|testList "project cracking" [
         let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "Program.fs"|])
         match projects.FindProjectOptions(file) with 
         | Error(m) ->  failtestf "%A" m
         | Ok(parsed) ->
@@ -78,7 +78,7 @@ let tests=testSequenced<|testList "project cracking" [
      
     test "project-file-not-found" {
         let projects = ProjectManager(FSharpChecker.Create(),true)
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
         let project = projects.FindProjectOptions file
         match project with 
         | Ok(f) ->  failtestf "Shouldn't have found project file %s" f.ProjectFileName
@@ -98,7 +98,7 @@ let tests=testSequenced<|testList "project cracking" [
         match projects.FindProjectOptions(script) with 
         | Error(m) ->  failtestf "%A" m
         | Ok(options) -> 
-            let references = [for o in options.OtherOptions do if o.StartsWith("-r:") then yield FileInfo(o.Substring("-r:".Length)).Name]
+            let references = [for o in options.OtherOptions do if o.StartsWith("-r:") then yield normedFileInfo(o.Substring("-r:".Length)).Name]
             Expect.contains references "FSharp.Core.dll" "Missing ref"
             Expect.contains references "System.Runtime.dll" "Missing ref"
     }
@@ -106,13 +106,13 @@ let tests=testSequenced<|testList "project cracking" [
         let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
         let project = projects.FindProjectOptions(file)
         match project with 
         | Error(m) ->  failtestf "Couldn't load project %A" m
         | Ok(f) -> 
 
-            let cacheJson= FileCache.tryGetCached(FileInfo(f.ProjectFileName))
+            let cacheJson= FileCache.tryGetCached(normedFileInfo(f.ProjectFileName))
             Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
     }
 
@@ -142,7 +142,7 @@ let tests=testSequenced<|testList "project cracking" [
         let projects = ProjectManager(FSharpChecker.Create(),true)
         let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
         Async.RunSynchronously(projects.AddWorkspaceRoot(root))
-        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+        let file = normedFileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
         let project = projects.FindProjectOptions(file)
         
 
@@ -151,7 +151,7 @@ let tests=testSequenced<|testList "project cracking" [
         | Ok(f) -> 
 
             dotnetBuild(f.ProjectFileName);
-            let cacheJson= FileCache.tryGetCached(FileInfo(f.ProjectFileName))
+            let cacheJson= FileCache.tryGetCached(normedFileInfo(f.ProjectFileName))
             Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
             
     }

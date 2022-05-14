@@ -1,2 +1,12 @@
 YoloDev.Expecto.TestSdk
 Expecto
+
+
+
+
+Microsoft.Build
+Microsoft.Build.Framework
+Microsoft.Build.Locator
+Microsoft.Build.Tasks.Core
+Microsoft.Build.Utilities.Core copy_local:true
+Microsoft.SourceLink.GitHub

@@ -279,7 +279,7 @@ let docComment(doc: FSharpXmlDoc): string option =
         |>parseHtml
         |>createCommentFromParsed
     | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
-        let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
+        let xmlFile = normedFileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with
         | None -> None
         | Some(m) ->
@@ -294,7 +294,7 @@ let docSummaryOnly(doc: FSharpXmlDoc): string option =
         |> String.concat "\n"
         |> Some //TODO: make this use parsed data
     | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
-        let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
+        let xmlFile = normedFileInfo(Path.ChangeExtension(dllPath, ".xml"))
         match find(xmlFile, memberName) with
         | None -> None
         | Some(m) -> m.summary |> Option.map (fun(s) -> s.Trim())
@@ -310,7 +310,7 @@ let private overloadComment(docs: FSharpXmlDoc list): string option =
                 yield xml.UnprocessedLines
                         |> String.concat "\n"
             | FSharpXmlDoc.FromXmlFile(dllPath, memberName) ->
-                let xmlFile = FileInfo(Path.ChangeExtension(dllPath, ".xml"))
+                let xmlFile = normedFileInfo(Path.ChangeExtension(dllPath, ".xml"))
                 match find(xmlFile, memberName) with
                 | None -> ()
                 | Some(m) ->

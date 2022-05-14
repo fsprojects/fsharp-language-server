@@ -5,7 +5,7 @@ Microsoft.Build
 Microsoft.Build.Framework
 Microsoft.Build.Locator
 Microsoft.Build.Tasks.Core
-Microsoft.Build.Utilities.Core
+Microsoft.Build.Utilities.Core 
 Microsoft.SourceLink.GitHub
 Newtonsoft.Json
 

@@ -8,6 +8,7 @@ open FSharp.Compiler.Text
 open Thoth.Json.Net
 open Newtonsoft.Json
 open Types
+
 type CacheData={
     ///hash of the projects assets.json. This is used to see if the project has changed which would invalidate our hash.
     assetsHash :string

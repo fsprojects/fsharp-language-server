@@ -293,7 +293,7 @@ type Server(client: ILanguageClient,useCache:bool) =
     let lastCheckedOnDisk = new System.Collections.Generic.Dictionary<string, DateTime>()
     // TODO there might be a thread safety issue here---is this getting called from a separate thread?
     do checker.BeforeBackgroundFileCheck.Add(fun(fileName, _) ->
-        let file = FileInfo(fileName)
+        let file = normedFileInfo(fileName)
         lastCheckedOnDisk.[file.FullName] <- file.LastWriteTime)
 
     /// Figure out what files will be implicitly recompiled if we recompile `goal`
@@ -301,10 +301,10 @@ type Server(client: ILanguageClient,useCache:bool) =
         match projects.FindProjectOptions(goal) with
         | Ok(projectOptions) ->
             // Find all projects that goal depends on, including its own project
-            let projects = projects.TransitiveDeps(FileInfo(projectOptions.ProjectFileName))
+            let projects = projects.TransitiveDeps(normedFileInfo(projectOptions.ProjectFileName))
             // Take all files that lead up to goal, not including itself
             let files = [for p in projects do
-                            let sourceFiles = Array.map FileInfo p.SourceFiles
+                            let sourceFiles = Array.map normedFileInfo p.SourceFiles
                             let notGoal(f: FileInfo) = f.FullName <> goal.FullName
                             yield! Array.takeWhile notGoal sourceFiles]
             // Skip files until we find a modified file, then take all remaining files
@@ -356,7 +356,7 @@ type Server(client: ILanguageClient,useCache:bool) =
     /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> =
         async {
-            let file = FileInfo(textDocument.uri.LocalPath)
+            let file = normedFileInfo(textDocument.uri.LocalPath)
             let! c = checkOpenFile(file, true, false)
             let line = lineContent(file, position.line)
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
@@ -398,7 +398,7 @@ type Server(client: ILanguageClient,useCache:bool) =
         let version = docs.GetVersion(file) |> Option.defaultValue 0
         let edits = [
             for u in usages do
-                let range = refineRenameRange(u.Symbol, FileInfo(u.FileName), u.Range)
+                let range = refineRenameRange(u.Symbol, normedFileInfo(u.FileName), u.Range)
                 yield {range=range; newText=newName} ]
         {textDocument={uri=uri; version=version}; edits=edits}
 
@@ -438,7 +438,7 @@ type Server(client: ILanguageClient,useCache:bool) =
                 match symbol.DeclarationLocation with
                 | None -> None, None
                 | Some(range) ->
-                    let f = FileInfo(range.FileName)
+                    let f = normedFileInfo(range.FileName)
                     match projects.FindProjectOptions(f) with
                     | Error(_) -> None, Some(f)
                     | Ok(projectOptions) -> Some(projectOptions), Some(f)
@@ -462,15 +462,15 @@ type Server(client: ILanguageClient,useCache:bool) =
                 if isPrivate then
                     isSymbolFile(file)
                 elif isInternal then
-                    isSymbolProject(project) && isVisibleFromFile(FileInfo(file))
+                    isSymbolProject(project) && isVisibleFromFile(normedFileInfo(file))
                 else
-                    isVisibleFromFile(FileInfo(file))
+                    isVisibleFromFile(normedFileInfo(file))
             // Find all source files that can see symbol
             let visible = [
                 for projectOptions in projects.OpenProjects do
                     for fileName in projectOptions.SourceFiles do
                         if isVisibleFrom(projectOptions, fileName) then
-                            yield projectOptions, FileInfo(fileName)
+                            yield projectOptions, normedFileInfo(fileName)
             ]
             let visibleNames = String.concat ", " [for _, f in visible do yield f.Name]
             lgInfo2 "'findAllSymbolUses' Symbol {symbol} is visible from {names}" symbol.FullName visibleNames
@@ -579,18 +579,18 @@ type Server(client: ILanguageClient,useCache:bool) =
             }
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): Async<unit> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 // Store text in docs
                 docs.Open(p)
                 // Create a progress bar if #todo > 1
                 let todo = needsRecompile(file)
                 use progress = new ProgressBar(todo.Length, sprintf "Check %d files" todo.Length, client, todo.Length <= 1)
-                use increment = checker.BeforeBackgroundFileCheck.Subscribe(fun (fileName, _) -> progress.Increment(FileInfo(fileName)))
+                use increment = checker.BeforeBackgroundFileCheck.Subscribe(fun (fileName, _) -> progress.Increment(normedFileInfo(fileName)))
                 do! doCheck(file)
             }
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): Async<unit> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 docs.Change(p)
                 backgroundCheck.CheckLater(file)
             }
@@ -598,7 +598,7 @@ type Server(client: ILanguageClient,useCache:bool) =
         member this.WillSaveWaitUntilTextDocument(p: WillSaveTextDocumentParams): Async<TextEdit list> = TODO()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): Async<unit> =
             async {
-                let targetFile = FileInfo(p.textDocument.uri.LocalPath)
+                let targetFile = normedFileInfo(p.textDocument.uri.LocalPath)
                 let todo = [ for fromFile in docs.OpenFiles() do
                                 if projects.IsVisible(targetFile, fromFile) then
                                     yield fromFile ]
@@ -611,7 +611,7 @@ type Server(client: ILanguageClient,useCache:bool) =
             }
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): Async<unit> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 docs.Close(p)
                 // Only show errors for open files
                 publishErrors(file, [])
@@ -619,7 +619,7 @@ type Server(client: ILanguageClient,useCache:bool) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): Async<unit> =
             async {
                 for change in p.changes do
-                    let file = FileInfo(change.uri.LocalPath)
+                    let file = normedFileInfo(change.uri.LocalPath)
                     lgVerb2 "Watched file {file} {change}" file.FullName change.``type``
                     if file.Name.EndsWith(".fsproj") || file.Name.EndsWith(".fsx") then
                         match change.``type`` with
@@ -647,7 +647,7 @@ type Server(client: ILanguageClient,useCache:bool) =
             }
         member this.Completion(p: TextDocumentPositionParams): Async<CompletionList option> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 lgInfo3 "Autocompleting at {file}({line},{char})" file.FullName p.position.line p.position.character
                 let line = lineContent(file, p.position.line)
                 let partialName = QuickParse.GetPartialLongNameEx(line, p.position.character-1)
@@ -676,7 +676,7 @@ type Server(client: ILanguageClient,useCache:bool) =
             }
         member this.Hover(p: TextDocumentPositionParams): Async<Hover option> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, true, false)
                 let line = lineContent(file, p.position.line)
                 let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character)
@@ -712,7 +712,7 @@ type Server(client: ILanguageClient,useCache:bool) =
             }
         member this.SignatureHelp(p: TextDocumentPositionParams): Async<SignatureHelp option> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, true, true)
                 match c with
                 | Error errors ->
@@ -759,7 +759,7 @@ type Server(client: ILanguageClient,useCache:bool) =
         member this.DocumentHighlight(p: TextDocumentPositionParams): Async<DocumentHighlight list> = TODO()
         member this.DocumentSymbols(p: DocumentSymbolParams): Async<SymbolInformation list> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 let! maybeParse = parseFile(file)
                 match maybeParse with
                 | Error e ->
@@ -778,7 +778,7 @@ type Server(client: ILanguageClient,useCache:bool) =
                 for projectOptions in projects.OpenProjects do
                     lgInfo "...check project {projFile}" projectOptions.ProjectFileName
                     for sourceFileName in projectOptions.SourceFiles do
-                        let sourceFile = FileInfo(sourceFileName)
+                        let sourceFile = normedFileInfo(sourceFileName)
                         if all.Count < 50 then
                             lgVerb "...scan {sourceFile}" sourceFile.Name
                             match maybeMatchesQuery(p.query, sourceFile) with
@@ -799,14 +799,14 @@ type Server(client: ILanguageClient,useCache:bool) =
         member this.CodeActions(p: CodeActionParams): Async<Command list> = TODO()
         member this.CodeLens(p: CodeLensParams): Async<List<CodeLens>> =
             async {
-                let file = FileInfo(p.textDocument.uri.LocalPath)
+                let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 match projects.FindProjectOptions(file), getOrRead(file) with
                 | Ok(projectOptions), Some(sourceText) ->
                     let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
                     let! parse = checker.ParseFile(file.FullName, SourceText.ofString(sourceText), parsingOptions)
                     if file.Name.EndsWith(".fs") then
                         let fns = testFunctions(parse)
-                        let fsproj = FileInfo(projectOptions.ProjectFileName)
+                        let fsproj = normedFileInfo(projectOptions.ProjectFileName)
                         return [ for id, bindings in fns do
                                     yield asRunTest(fsproj, id, bindings)
                                     yield asDebugTest(fsproj, id, bindings) ]
@@ -831,7 +831,7 @@ type Server(client: ILanguageClient,useCache:bool) =
                     let fsi, name = goToImplementationData(p)
                     if not(fsi.Extension = ".fsi") then
                         raise(Exception(sprintf "Signature file %s should end with .fsi" fsi.Name))
-                    let file = FileInfo(fsi.FullName.Substring(0, fsi.FullName.Length - 1))
+                    let file = normedFileInfo(fsi.FullName.Substring(0, fsi.FullName.Length - 1))
                     match projects.FindProjectOptions(file), getOrRead(file) with
                     | Ok(projectOptions), Some(sourceText) ->
                         let parsingOptions, _ = checker.GetParsingOptionsFromProjectOptions(projectOptions)
@@ -871,21 +871,21 @@ type Server(client: ILanguageClient,useCache:bool) =
                     let byFile = List.groupBy (fun (usage:FSharpSymbolUse) -> usage.FileName) uses
                     let fileNames = List.map fst byFile
                     lgInfo3 "Renaming {oldName} to {newName} in {files}" s.Symbol.FullName p.newName (String.concat ", " fileNames)
-                    let renames = [for fileName, uses in byFile do yield renameTo(p.newName, FileInfo(fileName), uses)]
+                    let renames = [for fileName, uses in byFile do yield renameTo(p.newName, normedFileInfo(fileName), uses)]
                     return {documentChanges=List.ofSeq(renames)}
             }
         member this.ExecuteCommand(p: ExecuteCommandParams): Async<unit> = TODO()
         member this.DidChangeWorkspaceFolders(p: DidChangeWorkspaceFoldersParams): Async<unit> =
             async {
                 for root in p.event.added do
-                    let file = FileInfo(root.uri.LocalPath)
+                    let file = normedFileInfo(root.uri.LocalPath)
                     do! projects.AddWorkspaceRoot(file.Directory)
                 // TODO removed
             }
         member this.SemanticTokensFull (p: SemanticTokensParams) : Async<SemanticTokens option>=
             async{
                 let path= p.textDocument.uri.LocalPath
-                let! checks=checkOpenFile(FileInfo(path),true,true)
+                let! checks=checkOpenFile(normedFileInfo(path),true,true)
                 return! SemanticTokenization.getSemanticTokens None checks
             }
         member this.SemanticTokensFullDelta (p: SemanticTokensDeltaParams): Async<SemanticTokensDelta option>=TODO()
@@ -893,7 +893,7 @@ type Server(client: ILanguageClient,useCache:bool) =
         member this.SemanticTokensRange (p: SemanticTokensRangeParams): Async<SemanticTokens option>=
             async{
                 let path= p.textDocument.uri.LocalPath
-                let! checks=checkOpenFile(FileInfo(path),true,true)
+                let! checks=checkOpenFile(normedFileInfo(path),true,true)
                 let fcsRange = Conversions.toRange path p.range                
                 return! SemanticTokenization.getSemanticTokens (Some fcsRange) checks
             }
