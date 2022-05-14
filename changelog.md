@@ -1,3 +1,6 @@
+## 0.1.81
+- Added keywords to autocomplete
+- fixed a few bugs in the path normalization and caching
 ## 0.1.80
 - Using Ionide.projInfo for project cracking which should fix all unessicary rechecks due to building the project
 - Added a project cracking caching feature so that projects now load way faster after being opened ap least once.
