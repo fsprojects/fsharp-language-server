@@ -32,7 +32,7 @@ let private deserializeProjectData(json:string) :Dictionary<String,LazyProject> 
 
 let private getCachePath (projectPath:string)=Path.Combine(Path.GetDirectoryName(projectPath),"obj","fslspCache.json")
 
-let private getHash fileName=
+let getHash fileName=
     use md5 = System.Security.Cryptography.MD5.Create()
     use stream = File.OpenRead(fileName)
     md5.ComputeHash(stream)

@@ -33,6 +33,7 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
     /// Keys are full paths to .sln files
     /// Values are lists of .fsproj files referenced by the .sln file
     let knownSolutions = new Dictionary<String, list<FileInfo>>()
+    let assetsJsonHashes = new Dictionary<String, byte[]>()
     /// Remember what .fsproj and .fsx files are present
     let knownProjects = new HashSet<String>()
     /// Cache expensive analyze operations
@@ -439,13 +440,23 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
     member this.UpdateSlnFile(sln: FileInfo) =
         knownSolutions.[sln.FullName] <- slnProjectReferences(sln)
     member this.UpdateAssetsJson(assets: FileInfo) =
-
-        for fsproj in projectFileForAssets(assets) do
-            lgInfo "Invalidating project {project} becuase of changes to asset.json" fsproj.Name
-            invalidateDescendents(fsproj)
+        let jsonChanged=
+            match assetsJsonHashes.TryGetValue assets.FullName with
+            | true, lastHash -> 
+                let newHash= FileCache.getHash assets.FullName
+                if newHash=lastHash then
+                    true
+                else 
+                    assetsJsonHashes[assets.FullName]<-newHash
+                    false
+            | _ -> false
+        if jsonChanged then
+            for fsproj in projectFileForAssets(assets) do
+                lgInfo "Invalidating project {project} becuase of changes to asset.json" fsproj.Name
+                invalidateDescendents(fsproj)
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> =
 
-        let isSourceFile(f: FileInfo) = f.FullName = sourceFile.FullName 
+        let isSourceFile(f: FileInfo) = (f.FullName|> normalizeDriveLetter) = (sourceFile.FullName |>normalizeDriveLetter )
         // Does `p` contain a reference to `sourceFile`?
         let isMatch(p: ResolvedProject) = List.exists isSourceFile p.sources
         // Check if the text of `p` contains the name of `sourceFile` without cracking it
@@ -460,7 +471,7 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
             seq {
                 for KeyValue(sln, fsprojs) in knownSolutions do
                     for f in fsprojs do
-                        if fsproj.file.FullName = f.FullName then
+                        if(fsproj.file.FullName |> normalizeDriveLetter)= (f.FullName|>normalizeDriveLetter) then
                             lgDebug2 "{refProj} is referenced by {proj}" f.Name sln
                             yield sln
             } |> Seq.isEmpty |> not
