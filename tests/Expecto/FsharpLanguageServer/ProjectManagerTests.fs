@@ -12,6 +12,8 @@ open FSharp.Compiler.CodeAnalysis
 open Expecto
 open FSharpLanguageServer.ProjectManager.Manager
 open FSharpLanguageServer.ProjectManager
+open System.Diagnostics
+open LSP.Utils
 type MockClient() = 
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
@@ -27,8 +29,7 @@ type MockClient() =
 //setup
 
 LSP.Log.diagnosticsLog := stdout
-[<Tests>]
-let tests=testList "formatting" [
+let tests=testSequenced<|testList "project cracking" [
      
     test "find project file" {
         let projects = ProjectManager(FSharpChecker.Create(),true)
@@ -111,7 +112,46 @@ let tests=testList "formatting" [
         | Error(m) ->  failtestf "Couldn't load project %A" m
         | Ok(f) -> 
 
-            let cacheJson= FileCache.tryGetCached(FileInfo(f.ProjectFileName))
+            let cacheJson= FileCache.tryGetCached(normedFileInfo(f.ProjectFileName))
+            Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
+    }
+
+    let dotnetBuild(proj)=
+        let args = sprintf "build %s " proj
+        let info =
+            ProcessStartInfo(
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                FileName = "dotnet",
+                Arguments = args
+            )
+        let p=Process.Start(info)
+        
+        p.OutputDataReceived.Add(fun args -> if args.Data <> null then printfn "Build: %A" args.Data)
+        p.ErrorDataReceived.Add(fun args -> if args.Data <> null then printfn "Build Errors: %A" args.Data)
+        if not(p.Start()) then 
+            failwithf "Failed dotnet %s" args
+        p.BeginOutputReadLine()
+        p.BeginErrorReadLine()
+        p.WaitForExit()
+
+    //There exists a problem where building a paket project will change the project.assets.json as compared to buildalyzer
+    //this will cause the cache to be invalidated after every build and require rechecking of all files
+    test "building doesn't interfere with cached ProjectOptions" {
+        let projects = ProjectManager(FSharpChecker.Create(),true)
+        let root = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"|] |> DirectoryInfo
+        Async.RunSynchronously(projects.AddWorkspaceRoot(root))
+        let file = FileInfo(Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "Hover.fs"|])
+        let project = projects.FindProjectOptions(file)
+        
+
+        match project with 
+        | Error(m) ->  failtestf "Couldn't load project %A" m
+        | Ok(f) -> 
+
+            dotnetBuild(f.ProjectFileName);
+            let cacheJson= FileCache.tryGetCached(normedFileInfo(f.ProjectFileName))
             Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
             
     }

@@ -1,4 +1,4 @@
-module LSP.LanguageServerTests
+module LSP.Tests.LanguageServerTests
 
 open System
 open System.IO 
@@ -6,7 +6,7 @@ open System.Text
 open FSharp.Data
 open LSP.Types
 open LSP.SemanticToken
-open SemanticToken
+open LSP
 open Expecto
 
  
@@ -121,7 +121,7 @@ let mock(server: ILanguageServer) (messages: string list): string =
     let serverFactory = fun _ -> server
     LanguageServer.connect(serverFactory, readIn, writeOut, false)
     Encoding.UTF8.GetString(stdout.ToArray())
-[<Tests>]
+
 let tests2  =        
     testList "language server Tests" [
 

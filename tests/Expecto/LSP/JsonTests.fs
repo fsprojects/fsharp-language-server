@@ -1,4 +1,4 @@
-module LSP.JsonTests
+module LSP.Tests.JsonTests
 
 open System
 open System.Text.RegularExpressions
@@ -57,7 +57,7 @@ let tests=
     ]
 
 type SimpleRecord = {simpleMember: int}
-[<Tests>]
+
 let tests2=
     testList "Json Tests2" [
         test "serialize record to JSON"{
@@ -86,9 +86,10 @@ let tests2=
             Expect.equal "\"simpleMember=1\"" found "fail"
         }
     ]
-type Foo = Bar | Doh 
+
+type Foo= Bar | Doh 
 type FooRecord = {foo: Foo}
-[<Tests>]
+
 let tests3  =        
     testList "Json Tests3" [
         test "serialize a union with a custom writer"{
@@ -153,7 +154,7 @@ let deserializeTestEnum(i: int) =
 type ContainsEnum = {
     e: TestEnum
 }
-[<Tests>]
+
 let tests4  =        
     testList "Json Tests4" [
     test "serialize an interface with a custom writer"{

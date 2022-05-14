@@ -1,16 +1,15 @@
-module LSP.DocumentStoreTests
+module LSP.Tests.DocumentStoreTests
 
 open System
 open System.Text
 open System.IO
-open Types
-
+open LSP.Types
+open LSP
 
 
 LSP.Log.diagnosticsLog := stdout
 open Expecto
 
-[<Tests>]
 let tests=
     testList "formatting" [
 
@@ -64,7 +63,7 @@ let tests=
                   version = 1
                   text = helloWorld } }
         store.Open(openDoc)
-        let found = store.GetText(FileInfo(exampleUri.LocalPath))
+        let found = store.GetText(normedFileInfo(exampleUri.LocalPath))
         Expect.equal (Some(helloWorld) ) found "not equal"
     }
     let helloStore()= 
@@ -92,7 +91,7 @@ let tests=
                         rangeLength = None 
                         text = newText } ] }
         store.Change(replaceAll)
-        let found = store.GetText(FileInfo(exampleUri.LocalPath))
+        let found = store.GetText(normedFileInfo(exampleUri.LocalPath))
         Expect.equal (Some(newText)) found "not equal"
     }
 
@@ -112,7 +111,7 @@ let tests=
                         text = newText } ]
             }
         store.Change(replaceAll)
-        let found = store.GetText(FileInfo(exampleUri.LocalPath))
+        let found = store.GetText(normedFileInfo(exampleUri.LocalPath))
         Expect.equal (Some("Hello George!")) found "not equal"
     }
     ]

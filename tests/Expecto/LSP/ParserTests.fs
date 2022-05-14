@@ -1,15 +1,16 @@
-module LSP.ParserTests
+module LSP.Tests.ParserTests
 
-open Types
+open LSP.Types
 open System
-open Parser
+open LSP.Parser
 open FSharp.Data
+
 
 open Expecto
 
 LSP.Log.diagnosticsLog := stdout
 
-[<Tests>]
+
 let tests  =        
     testList "Parser test" [
     test "parse a RequestMessage"{

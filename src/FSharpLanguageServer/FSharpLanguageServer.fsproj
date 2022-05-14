@@ -26,7 +26,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\LSP\LSP.fsproj" />
-    <ProjectReference Include="..\ProjectCracker\ProjectCracker.fsproj" />
+<!--     <ProjectReference Include="..\ProjectCracker\ProjectCracker.fsproj" />
+ -->    <ProjectReference Include="..\ProjInfo\ProjInfo.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

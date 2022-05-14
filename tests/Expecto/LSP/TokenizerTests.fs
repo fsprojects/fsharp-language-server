@@ -1,11 +1,12 @@
-module LSP.TokenizerTests
+module LSP.Tests.TokenizerTests
 
 open System.IO
 open System.Text
 open Expecto
+open LSP
 LSP.Log.diagnosticsLog := stdout
 
-[<Tests>]
+
 let tests  =        
     testList "Parser test" [
 

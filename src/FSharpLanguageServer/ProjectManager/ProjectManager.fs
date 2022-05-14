@@ -1,13 +1,14 @@
 module FSharpLanguageServer.ProjectManager.Manager
 
 open LSP.Log
+open LSP.Utils
 open System
 open System.IO
 open System.Collections.Generic
 open System.Text.RegularExpressions
 open LSP.Types
 open FSharp.Compiler.Text
-open ProjectCracker
+//open ProjectCracker
 open FSharp.Compiler.CodeAnalysis
 open Types
 open FSharpLanguageServer
@@ -55,7 +56,7 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
     /// When was this .fsx, .fsproj or corresponding project.assets.json file modified?
     // TODO use checksum instead of time
     let lastModified(fsprojOrFsx: FileInfo) =
-        let assets = FileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
+        let assets = normedFileInfo(Path.Combine [| fsprojOrFsx.Directory.FullName; "obj"; "project.assets.json" |])
         if assets.Exists then
             max fsprojOrFsx.LastWriteTime assets.LastWriteTime
         else
@@ -216,7 +217,7 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
             "netstandard.dll"
         ]
         [ for d in relative do
-            let f = FileInfo(Path.Combine(dir, d))
+            let f = normedFileInfo(Path.Combine(dir, d))
             if f.Exists then
                 yield f
             else
@@ -252,13 +253,14 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
             let options = {inferred with OtherOptions = combinedOtherOptions}
             printOptions(options)
             {
-                sources=[for f in inferred.SourceFiles do yield FileInfo(f)]
+                sources=[for f in inferred.SourceFiles do yield normedFileInfo(f)]
                 options=options
-                target=FileInfo("NoOutputForFsx")
+                target=normedFileInfo("NoOutputForFsx")
                 errors=Conversions.asDiagnostics(errors)
             }
         /// Analyze a project
-        let analyzeFsproj(fsproj: FileInfo) =
+(*         let analyzeFsproj(fsproj: FileInfo) =
+        
             lgInfo "Analyzing {name}" fsproj.Name
             let cached=if useCache then match  FileCache.tryGetCached(fsproj)with|Ok x->Some x|Error a->None else None
             match cached with
@@ -321,11 +323,38 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
                     }
                 if useCache then FileCache.saveCache projectData fsproj
                 projectData
+         *)
+        let analyzeWithProjInfo (fsproj: FileInfo):ResolvedProject=
+            let normalizeDriveLetter (path:string)=
+                let a=path.ToCharArray() 
+                a[0]<-a[0] |>Char.ToUpperInvariant
+                string a
+
+            lgInfo "Analyzing {name}" fsproj.Name
+            let cached=if useCache then match  FileCache.tryGetCached(fsproj)with|Ok x->Some x|Error a->None else None
+            match cached with
+            |Some x->
+                lgInfo "Cracked '{proj}' using data from cache" fsproj.FullName
+                x.Project
+            |None->
+                lgInfo "No up to date cached projectOptions file found for '{proj}', cracking normally " fsproj.FullName
+                let (a,b,errors) =ProjInfo.crack fsproj.FullName
+                let Main=a.Head
+                let projectData=
+                    {
+                        options=b
+                        sources=(Main.SourceFiles|>List.map (normedFileInfo))
+                        target=Main.TargetPath|>(normedFileInfo)
+                        errors= errors|>Seq.map(fun err->Conversions.errorAtTop(sprintf "%A"err))|>Seq.toList
+                    }
+                if useCache then FileCache.saveCache projectData fsproj
+                projectData
+            
         // Direct to analyzeFsx or analyzeFsproj, depending on type
         if fsprojOrFsx.Name.EndsWith(".fsx") then
             {file=fsprojOrFsx; resolved=lazy(analyzeFsx(fsprojOrFsx))}
         elif fsprojOrFsx.Name.EndsWith(".fsproj") then
-            {file=fsprojOrFsx; resolved=lazy(analyzeFsproj(fsprojOrFsx))}
+            {file=fsprojOrFsx; resolved=lazy( analyzeWithProjInfo (fsprojOrFsx))}
         else
             raise(Exception(sprintf "Don't know how to analyze project %s" fsprojOrFsx.Name))
 
@@ -334,13 +363,13 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
         lgInfo "invalidating project :{projectName}" fsprojOrFsx.Name
         cache.Invalidate(fsprojOrFsx)
         for fileName in knownProjects do
-            let file = FileInfo(fileName)
+            let file = normedFileInfo(fileName)
             let project = cache.Get(file, analyzeLater)
             if project.resolved.IsValueCreated then
                 for ancestor in project.resolved.Value.options.ReferencedProjects do
                     if ancestor.FileName = fsprojOrFsx.FullName then
                         lgInfo2 "{fileName} has been invalidated by changes to {projectName}" ancestor.FileName fsprojOrFsx.Name
-                        cache.Invalidate(FileInfo(ancestor.FileName))
+                        cache.Invalidate(normedFileInfo(ancestor.FileName))
 
 
     /// All transitive deps of anproject, including itself
@@ -386,7 +415,7 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
                 if relativePath.EndsWith(".fsproj") then
                     let path = Path.Combine(sln.Directory.FullName, relativePath)
                     let normalize = Path.GetFullPath(path)
-                    yield FileInfo(normalize) ]
+                    yield normedFileInfo(normalize) ]
     member this.AddWorkspaceRoot(root: DirectoryInfo): Async<unit> =
         async {
             for f in root.EnumerateFiles("*.*", SearchOption.AllDirectories) do
@@ -410,20 +439,24 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
     member this.UpdateSlnFile(sln: FileInfo) =
         knownSolutions.[sln.FullName] <- slnProjectReferences(sln)
     member this.UpdateAssetsJson(assets: FileInfo) =
+    //    let normalizeAssets (Json:string)=
+            
+
         for fsproj in projectFileForAssets(assets) do
-            lgInfo "Invalidating project {project} becuase oof changes to asset.json" fsproj.Name
+            lgInfo "Invalidating project {project} becuase of changes to asset.json" fsproj.Name
             invalidateDescendents(fsproj)
     member this.FindProjectOptions(sourceFile: FileInfo): Result<FSharpProjectOptions, Diagnostic list> =
-        let isSourceFile(f: FileInfo) = f.FullName = sourceFile.FullName
+        let normedSourceFile= normedFileInfo(sourceFile.FullName)
+        let isSourceFile(f: FileInfo) = f.FullName = normedSourceFile.FullName 
         // Does `p` contain a reference to `sourceFile`?
         let isMatch(p: ResolvedProject) = List.exists isSourceFile p.sources
         // Check if the text of `p` contains the name of `sourceFile` without cracking it
         let isPotentialMatch(p: LazyProject) =
-            let containsFileName(line: string) = line.Contains(sourceFile.Name)
+            let containsFileName(line: string) = line.Contains(normedSourceFile.Name)
             let lines = File.ReadAllLines(p.file.FullName)
             Array.exists containsFileName lines
         let isCracked(p: LazyProject) = p.resolved.IsValueCreated
-        let knownProjectsList = [for f in knownProjects do yield cache.Get(FileInfo(f), analyzeLater)]
+        let knownProjectsList = [for f in knownProjects do yield cache.Get(normedFileInfo(f), analyzeLater)]
         let alreadyCracked, notYetCracked = List.partition isCracked knownProjectsList
         let isReferencedBySln(fsproj: LazyProject) =
             seq {
@@ -436,24 +469,25 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
         let referencedProjects, orphanProjects = List.partition isReferencedBySln notYetCracked
         let crackLazily = seq {
             // If file is an .fsx, return itself
-            if sourceFile.Name.EndsWith(".fsx") then
-                yield cache.Get(sourceFile, analyzeLater)
+            if normedSourceFile.Name.EndsWith(".fsx") then
+                yield cache.Get(normedSourceFile, analyzeLater)
             // First, look at all projects that have *already* been cracked
             for options in alreadyCracked do
                 if isMatch(options.resolved.Value) then
                     yield options
             // If that doesn't work, check other .fsproj files
-            lgInfo "No cracked project references {projectName}, looking at uncracked projects..." sourceFile.Name
+            lgInfo "No cracked project references {projectName}, looking at uncracked projects..." normedSourceFile.Name
             // Prioritize .fsproj files that are referenced by .sln files
             for options in referencedProjects@orphanProjects do
                 // Only parse projects that contain the simple name of `sourceFile`
                 if isPotentialMatch(options) then
-                    lgInfo2 "The text of {projectFile} contains the string {fileName}', cracking" options.file.Name sourceFile.Name
+                    lgInfo2 "The text of {projectFile} contains the string {fileName}', cracking" options.file.Name normedSourceFile.Name
                     if isMatch(options.resolved.Value) then
                         yield options
         }
         match Seq.tryHead crackLazily with
-        | None -> Error([Conversions.errorAtTop(sprintf "No succesfully cracked .fsproj or .fsx file references %s" sourceFile.FullName)])
+        | None ->
+            Error([Conversions.errorAtTop(sprintf "No succesfully cracked .fsproj or .fsx file references %s" normedSourceFile.FullName)])
         | Some(options) ->
             let cracked = options.resolved.Value
             if cracked.errors.IsEmpty then
@@ -474,13 +508,13 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
                     |None->lgWarn2 "Project {proj} has a reference to a project {refedProj} which we don't know how to handle " options.ProjectFileName parent.FileName
                 result.Add(options)
         for f in knownProjects do
-            let project = cache.Get(FileInfo(f), analyzeLater)
+            let project = cache.Get(normedFileInfo(f), analyzeLater)
             if project.resolved.IsValueCreated then
                 walk(project.resolved.Value.options)
         List.ofSeq(result)
     /// All transitive dependencies of `projectFile`, in dependency order
     member this.TransitiveDeps(projectFile: FileInfo): FSharpProjectOptions list =
-        //transitiveDeps(projectFile)(fun x ->this.FindProjectOptions (FileInfo(x.FileName))) //TODO: this might be terrible 
+        //transitiveDeps(projectFile)(fun x ->this.FindProjectOptions (normedFileInfo(x.FileName))) //TODO: this might be terrible 
         transitiveDeps (projectFile)
 
     /// Is `targetSourceFile` visible from `fromSourceFile`?
@@ -496,5 +530,5 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
             // Otherwise, check if targetSourceFile is in the transitive dependencies of fromProjectOptions
             else
                 let containsTarget(dependency: FSharpProjectOptions) = Array.contains targetSourceFile.FullName dependency.SourceFiles
-                let deps = transitiveDeps(FileInfo(fromProjectOptions.ProjectFileName))  //TODO: this might be terrible 
+                let deps = transitiveDeps(normedFileInfo(fromProjectOptions.ProjectFileName))  //TODO: this might be terrible 
                 List.exists containsTarget deps

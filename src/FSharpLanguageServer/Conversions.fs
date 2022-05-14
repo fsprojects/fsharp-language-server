@@ -1,6 +1,7 @@
 module FSharpLanguageServer.Conversions
 
 open LSP.Log
+open LSP.Utils
 open FSharp.Compiler
 open FSharp.Compiler.CodeAnalysis 
 open FSharp.Compiler.Symbols
@@ -259,7 +260,7 @@ let asGoToImplementation(name: string list, file: FileInfo, range: Text.range): 
 let goToImplementationData(goTo: CodeLens) =
     match goTo.data with
     | JsonValue.Array([|JsonValue.String(file); JsonValue.Array(jsonNames)|]) ->
-        FileInfo(file), [for JsonValue.String(j) in jsonNames do yield j ]
+        normedFileInfo(file), [for JsonValue.String(j) in jsonNames do yield j ]
 
 let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Text.range): CodeLens =
     let command =
@@ -308,3 +309,4 @@ let asDebugTest(fsproj: FileInfo, fullyQualifiedName: string list, test: Syntax.
                         arguments=[JsonValue.String(fsproj.FullName); JsonValue.String(String.concat "." fullyQualifiedName)] })
         data=JsonValue.Null
     }
+

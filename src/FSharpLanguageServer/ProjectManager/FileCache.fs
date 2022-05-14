@@ -1,5 +1,6 @@
 module FSharpLanguageServer.ProjectManager.FileCache
 open LSP.Log
+open LSP.Utils
 open System
 open System.IO
 open System.Collections.Generic
@@ -19,7 +20,7 @@ type FileInfoConverter() =
         
         override x.ReadJson( reader:JsonReader,  objectType:Type,  existingValue:FileInfo,  hasExistingValue:bool,  serializer:JsonSerializer)=
             let s = reader.Value:?>string
-            FileInfo(s)
+            normedFileInfo(s)
     
 let private serialzeProjectData (projectCache: Dictionary<String,LazyProject>)=
     let projectData=projectCache|> Seq.map(fun x->x.Key,x.Value.resolved.Value);
@@ -27,7 +28,7 @@ let private serialzeProjectData (projectCache: Dictionary<String,LazyProject>)=
 
 let private deserializeProjectData(json:string) :Dictionary<String,LazyProject> =
     let projects=System.Text.Json.JsonSerializer.Deserialize<(string*ResolvedProject) list>(json)
-    projects|>List.map(fun( name,proj)->KeyValuePair(name,{file=FileInfo(name); resolved= lazy(proj) }))|>Dictionary
+    projects|>List.map(fun( name,proj)->KeyValuePair(name,{file=normedFileInfo(name); resolved= lazy(proj) }))|>Dictionary
 
 let private getCachePath (projectPath:string)=Path.Combine(Path.GetDirectoryName(projectPath),"obj","fslspCache.json")
 
@@ -46,7 +47,7 @@ let extraEncoders=
     Extra.empty
     |>(Extra.withCustom 
         (fun (x:FileInfo)->Encode.string x.FullName)
-        (fun path value->Ok (FileInfo(value.ToString()))))
+        (fun path value->Ok (normedFileInfo(value.ToString()))))
     |>Extra.withCustom
         (fun (x:Range)->Encode.string <|System.Text.Json.JsonSerializer.Serialize(x))
         (fun path value->Ok (System.Text.Json.JsonSerializer.Deserialize<Range>(value.ToString()) ))
@@ -87,3 +88,9 @@ let saveCache (projectData:ResolvedProject) (fsproj:FileInfo) =
     File.WriteAllText(cachePath,cacheJson)
     lgInfo "Saved cache of projectOptions for '{proj}' " fsproj.FullName
 
+let deleteCache  (fsproj:FileInfo) =
+    let cachePath=getCachePath fsproj.FullName 
+    try
+        File.Delete(cachePath)
+        lgInfo "Deleted cache for '{proj}' " fsproj.FullName
+    with e-> lgWarn2 "Attempted to delete cache for {proj} but had exception {ex}" fsproj.FullName e

@@ -12,7 +12,7 @@ open FSharp.Compiler.CodeAnalysis
 open ServerTests
 open Expecto
 
-[<Tests>]
+
 let tests=
     testList "formatting" [
 

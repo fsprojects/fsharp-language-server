@@ -32,7 +32,7 @@ let private toHex (bytes: byte[]) =
 type [<Measure>] SourcelinkPattern
 
 let normalizeRepoPath (repo: string<RepoPathSegment>): string<NormalizedRepoPathSegment> =
-  let s = UMX.untag repo
+  let s = UMX.untag repo//TODO: this looks dodgy for non C drive letters
   let s' = s.TrimStart("c:".ToCharArray()).Replace(@"\", "/")
   UMX.tag<NormalizedRepoPathSegment> s'
 

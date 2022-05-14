@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+  <!--   <ProjectReference Include="..\..\src\ProjInfo\ProjInfo.fsproj" /> -->
+    <ProjectReference Include="..\..\src\ProjectCracker\ProjectCracker.fsproj" />
   </ItemGroup>
   <Import Project="..\..\.paket\Paket.Restore.targets" />
 </Project>

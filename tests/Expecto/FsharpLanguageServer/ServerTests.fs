@@ -21,7 +21,7 @@ type MockClient() =
     member val Diagnostics = System.Collections.Generic.List<PublishDiagnosticsParams>()
     interface ILanguageClient with 
         member this.PublishDiagnostics(p: PublishDiagnosticsParams): unit = 
-            let file = FileInfo(p.uri.LocalPath)
+            let file = normedFileInfo(p.uri.LocalPath)
             dprintfn "Received %d diagnostics for %s" p.diagnostics.Length file.Name
             this.Diagnostics.Add(p)
         member this.ShowMessage(p: ShowMessageParams): unit = 
@@ -43,7 +43,7 @@ let createServer(): MockClient * ILanguageServer =
     
 // TODO eliminate MainProject assumption
 let absPath(project, file: string): string = 
-    Path.Combine [|projectRoot.FullName; "sample"; project; file|]
+    Path.Combine [|projectRoot.FullName; "sample"; project; file|]|>normalizeDriveLetter
 
 let openFile(file: FileInfo): DidOpenTextDocumentParams = 
     {
@@ -57,7 +57,7 @@ let openFile(file: FileInfo): DidOpenTextDocumentParams =
     }
 
 let initializeServer(server: ILanguageServer, sampleRootPath: string, fileName: string) =
-    let file = FileInfo(Path.Combine(sampleRootPath, fileName))
+    let file = normedFileInfo(Path.Combine(sampleRootPath, fileName))
     let sampleRootUri = Uri("file://" + sampleRootPath)
     server.Initialize({defaultInitializeParams with rootUri=Some sampleRootUri}) |> Async.RunSynchronously |> ignore
     server.Initialized() |> Async.RunSynchronously
@@ -119,7 +119,6 @@ let textDocumentPosition(project: string, file: string, line: int, character: in
         textDocument = textDocument(project, file)
         position = position(line, character)
     }
-[<Tests>]
 let serverTests= 
     testList "server" [
     
@@ -359,7 +358,7 @@ let serverTests=
         let ranges = [
             for doc in edit.documentChanges do 
                 for e in doc.edits do 
-                    let file = FileInfo(doc.textDocument.uri.LocalPath).Name
+                    let file = normedFileInfo(doc.textDocument.uri.LocalPath).Name
                     yield file, e.range.start.line + 1, e.range.start.character + 1, e.range.``end``.character + 1 ]
         if not (List.contains ("RenameReference.fs", 3, 45, 59) ranges) then failtestf "%A" ranges
     }
