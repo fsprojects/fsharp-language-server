@@ -63,7 +63,7 @@ let tests=
                   version = 1
                   text = helloWorld } }
         store.Open(openDoc)
-        let found = store.GetText(normedFileInfo(exampleUri.LocalPath))
+        let found = store.GetText(FileInfo(exampleUri.LocalPath))
         Expect.equal (Some(helloWorld) ) found "not equal"
     }
     let helloStore()= 
@@ -91,7 +91,7 @@ let tests=
                         rangeLength = None 
                         text = newText } ] }
         store.Change(replaceAll)
-        let found = store.GetText(normedFileInfo(exampleUri.LocalPath))
+        let found = store.GetText(FileInfo(exampleUri.LocalPath))
         Expect.equal (Some(newText)) found "not equal"
     }
 
@@ -111,7 +111,7 @@ let tests=
                         text = newText } ]
             }
         store.Change(replaceAll)
-        let found = store.GetText(normedFileInfo(exampleUri.LocalPath))
+        let found = store.GetText(FileInfo(exampleUri.LocalPath))
         Expect.equal (Some("Hello George!")) found "not equal"
     }
     ]

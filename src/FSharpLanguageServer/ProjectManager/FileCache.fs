@@ -20,7 +20,7 @@ type FileInfoConverter() =
         
         override x.ReadJson( reader:JsonReader,  objectType:Type,  existingValue:FileInfo,  hasExistingValue:bool,  serializer:JsonSerializer)=
             let s = reader.Value:?>string
-            normedFileInfo(s)
+            FileInfo(s)
     
 let private serialzeProjectData (projectCache: Dictionary<String,LazyProject>)=
     let projectData=projectCache|> Seq.map(fun x->x.Key,x.Value.resolved.Value);
@@ -28,7 +28,7 @@ let private serialzeProjectData (projectCache: Dictionary<String,LazyProject>)=
 
 let private deserializeProjectData(json:string) :Dictionary<String,LazyProject> =
     let projects=System.Text.Json.JsonSerializer.Deserialize<(string*ResolvedProject) list>(json)
-    projects|>List.map(fun( name,proj)->KeyValuePair(name,{file=normedFileInfo(name); resolved= lazy(proj) }))|>Dictionary
+    projects|>List.map(fun( name,proj)->KeyValuePair(name,{file=FileInfo(name); resolved= lazy(proj) }))|>Dictionary
 
 let private getCachePath (projectPath:string)=Path.Combine(Path.GetDirectoryName(projectPath),"obj","fslspCache.json")
 
@@ -47,7 +47,7 @@ let extraEncoders=
     Extra.empty
     |>(Extra.withCustom 
         (fun (x:FileInfo)->Encode.string x.FullName)
-        (fun path value->Ok (normedFileInfo(value.ToString()))))
+        (fun path value->Ok (FileInfo(value.ToString()))))
     |>Extra.withCustom
         (fun (x:Range)->Encode.string <|System.Text.Json.JsonSerializer.Serialize(x))
         (fun path value->Ok (System.Text.Json.JsonSerializer.Deserialize<Range>(value.ToString()) ))

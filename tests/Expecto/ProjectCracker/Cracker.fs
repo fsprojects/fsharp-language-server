@@ -24,7 +24,7 @@ let projectRoot = findProjectRoot testDirectory
 let crackingTests  =        
     testList "cracking test" [
     test "crack a project file with projinfo"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "MainProject.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "MainProject.fsproj"|] |> FileInfo 
         let (cracked,opts,errs) = ProjInfo.crack(fsproj.FullName)
         printfn "ERROR:\n %A" errs
         Expect.isNonEmpty cracked "Should have at least one project"
@@ -40,7 +40,7 @@ let crackingTests  =
         
     }    
     test "crack a project file"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "MainProject.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "MainProject"; "MainProject.fsproj"|] |> FileInfo 
         let ( crack,opts,_) = ProjInfo.crackFileInf(fsproj)
         // Direct project reference
         let projectNames = crack.Head.ReferencedProjects|>List.map (fun x-> x.ProjectFileName|>Path.GetFileName)
@@ -60,14 +60,14 @@ let crackingTests  =
     }
     
     test "find compile sources"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "IndirectDep"; "IndirectDep.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "IndirectDep"; "IndirectDep.fsproj"|] |> FileInfo 
         let ( crack,opts,_) = ProjInfo.crackFileInf(fsproj)
         let cracked=crack|>List.head
         Expect.containsAll  [for f in cracked.SourceFiles do yield f|>Path.GetFileName] ["IndirectLibrary.fs"] "sequences don't match"
     }
 //Not sure if this is a problem. We do get intellisense for the types in the dll
     ptest "find reference includes"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "HasLocalDll.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "HasLocalDll"; "HasLocalDll.fsproj"|] |> FileInfo 
         let ( crack,opts,e) = ProjInfo.crackFileInf(fsproj)
         let cracked=crack|>List.head
         
@@ -75,14 +75,14 @@ let crackingTests  =
     }
 
     test "find CSharp reference"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp"; "ReferenceCSharp.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp"; "ReferenceCSharp.fsproj"|] |> FileInfo 
         let ( crack,opts,_) = ProjInfo.crackFileInf(fsproj)
         let cracked=crack|>List.head
         Expect.containsAll  [for f in cracked.ReferencedProjects do yield f.ProjectFileName|>Path.GetFileName] ["CSharpProject.csproj"] "sequences don't match"
     }
 
     test "find CSharp reference with modified AssemblyName"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp.AssemblyName"; "ReferenceCSharp.AssemblyName.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "ReferenceCSharp.AssemblyName"; "ReferenceCSharp.AssemblyName.fsproj"|] |> FileInfo 
         let ( crack,opts,_) = ProjInfo.crackFileInf(fsproj)
         let cracked=crack|>List.head
         let projects=cracked.ReferencedProjects|>List.map( fun ref->crack|>List.find(fun x->ref.ProjectFileName=x.ProjectFileName))
@@ -90,7 +90,7 @@ let crackingTests  =
     }
 //If this becomes a problem we can deal with it later. for now i'm not going to worry
     ptest "resolve template params"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "TemplateParams"; "TemplateParams.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "TemplateParams"; "TemplateParams.fsproj"|] |> FileInfo 
         let ( crack,opts,_) = ProjInfo.crackFileInf(fsproj)
         let cracked=crack|>List.head
         let expected = [
@@ -158,18 +158,18 @@ let cracker(fsproj: FileInfo): string list =
 let tests2  =        
     testSequenced <| testList "Parser2 test" [
     test "find package references in EmptyProject"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "EmptyProject"; "EmptyProject.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "EmptyProject"; "EmptyProject.fsproj"|] |> FileInfo 
         Expect.containsAll (msbuild(fsproj)) (cracker(fsproj)) "sequences don't match"
             
     }
     test "find package references in FSharpKoans"{
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "FSharpKoans.Core"; "FSharpKoans.Core.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "FSharpKoans.Core"; "FSharpKoans.Core.fsproj"|] |> FileInfo 
         Expect.containsAll (msbuild(fsproj)) (cracker(fsproj)) "sequences don't match"
             
     }
     test "issue 28"{
         // NETStandard.Library is autoReferenced=true, but it is also an indirect dependency of dependencies that are not autoReferenced
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "Issue28"; "Issue28.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "Issue28"; "Issue28.fsproj"|] |> FileInfo 
         Expect.containsAll (msbuild(fsproj)) (cracker(fsproj)) "sequences don't match"
     }
 
@@ -178,7 +178,7 @@ let tests2  =
         let obj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "obj"|] 
         if Directory.Exists(bin) then Directory.Delete(bin, true)
         if Directory.Exists(obj) then Directory.Delete(obj, true)
-        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "NotBuilt.fsproj"|] |> normedFileInfo 
+        let fsproj = Path.Combine [|projectRoot.FullName; "sample"; "NotBuilt"; "NotBuilt.fsproj"|] |> FileInfo 
         let ( crack,opts,error) = ProjInfo.crackFileInf(fsproj)
         let cracked=crack|>List.head
         if error.Count>0 then failtestf " Contained erros %A" (error)

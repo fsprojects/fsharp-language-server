@@ -6,7 +6,7 @@ type NormedFileInfo=FileInfo
 module Utils=
     let normalizeDriveLetter (path:string)=
         let a=path.ToCharArray() 
-        a[0]<-a[0] |>Char.ToLowerInvariant
+        a[0]<-a[0] |>Char.ToUpperInvariant
         new String(a)
-    let normedFileInfo path =
+    let FileInfo path =
         path|> normalizeDriveLetter|>NormedFileInfo

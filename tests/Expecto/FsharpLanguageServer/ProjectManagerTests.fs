@@ -112,7 +112,7 @@ let tests=testSequenced<|testList "project cracking" [
         | Error(m) ->  failtestf "Couldn't load project %A" m
         | Ok(f) -> 
 
-            let cacheJson= FileCache.tryGetCached(normedFileInfo(f.ProjectFileName))
+            let cacheJson= FileCache.tryGetCached(FileInfo(f.ProjectFileName))
             Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
     }
 
@@ -151,7 +151,7 @@ let tests=testSequenced<|testList "project cracking" [
         | Ok(f) -> 
 
             dotnetBuild(f.ProjectFileName);
-            let cacheJson= FileCache.tryGetCached(normedFileInfo(f.ProjectFileName))
+            let cacheJson= FileCache.tryGetCached(FileInfo(f.ProjectFileName))
             Expect.isOk cacheJson (sprintf"Could not get the cached project data, reason: %A" cacheJson)
             
     }

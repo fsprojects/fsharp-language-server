@@ -260,7 +260,7 @@ let asGoToImplementation(name: string list, file: FileInfo, range: Text.range): 
 let goToImplementationData(goTo: CodeLens) =
     match goTo.data with
     | JsonValue.Array([|JsonValue.String(file); JsonValue.Array(jsonNames)|]) ->
-        normedFileInfo(file), [for JsonValue.String(j) in jsonNames do yield j ]
+        FileInfo(file), [for JsonValue.String(j) in jsonNames do yield j ]
 
 let resolveGoToImplementation(unresolved: CodeLens, file: FileInfo, range: Text.range): CodeLens =
     let command =
