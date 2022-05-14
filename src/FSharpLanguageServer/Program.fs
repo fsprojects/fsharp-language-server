@@ -194,10 +194,10 @@ let private testFunctions(parse: FSharpParseFileResults): (string list * Syntax.
                 if isTestFunction(b) then
                     yield ctx, b ]
 
-type Server(client: ILanguageClient) =
+type Server(client: ILanguageClient,useCache:bool) =
     let docs = DocumentStore()
     let checker = FSharpChecker.Create()
-    let projects = ProjectManager(checker,true)
+    let projects = ProjectManager(checker,useCache)
 
     /// Get a file from docs, or read it from disk
     let getOrRead(file: FileInfo): string option =
@@ -910,7 +910,7 @@ let main(argv: array<string>): int =
     lgInfof "info log"
     lgWarnf "warn log"
     lgErrorf "erroor log"
-    let serverFactory(client) = Server(client) :> ILanguageServer
+    let serverFactory(client) = Server(client,true) :> ILanguageServer
     let debugAttach= argv|>Array.exists ((=)"--attach-debugger")
     dprintfn "fist log should have happened"
     try

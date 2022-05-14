@@ -38,7 +38,7 @@ let private diagnosticMessages(client: MockClient): string list =
 
 let createServer(): MockClient * ILanguageServer = 
     let client = MockClient()
-    let server = Server(client) :> ILanguageServer
+    let server = Server(client,false) :> ILanguageServer
     (client, server)
     
 // TODO eliminate MainProject assumption
@@ -250,7 +250,7 @@ let serverTests=
                     yield c.insertText]
         Expect.contains insertText (Some("``name with space``")) "missing correct completion"
     }
-    ftest "complete Keyword" {
+    test "complete Keyword" {
         let client, server = createServerAndReadFile("MainProject", "Completions.fs")
         match server.Completion(textDocumentPosition("MainProject", "Completions.fs", 15, 8)) |> Async.RunSynchronously with 
         | None ->  failtest "no completions"
