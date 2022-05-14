@@ -177,9 +177,14 @@ let private asCompletionItem(i: DeclarationListItem): CompletionItem =
 
 /// Convert an F# `DeclarationListInfo` to an LSP `CompletionList`
 /// Used in rendering autocomplete lists
-let asCompletionList(ds: DeclarationListInfo): CompletionList =
+let asCompletionList(ds: DeclarationListInfo) (addKeywords:bool): CompletionList =
+    
     let items = [for i in ds.Items do yield asCompletionItem(i)]
-    {isIncomplete=List.isEmpty(items); items=items}
+    let allItems=
+        if addKeywords then items @ FsAutoComplete.KeywordList.keywordCompletionItems
+        else items
+
+    {isIncomplete=List.isEmpty(allItems); items=allItems}
 
 /// Convert an F# `MethodGroupItemParameter` to an LSP `ParameterInformation`
 let private asParameterInformation(p: MethodGroupItemParameter): ParameterInformation =

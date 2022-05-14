@@ -250,6 +250,14 @@ let serverTests=
                     yield c.insertText]
         Expect.contains insertText (Some("``name with space``")) "missing correct completion"
     }
+    ftest "complete Keyword" {
+        let client, server = createServerAndReadFile("MainProject", "Completions.fs")
+        match server.Completion(textDocumentPosition("MainProject", "Completions.fs", 15, 8)) |> Async.RunSynchronously with 
+        | None ->  failtest "no completions"
+        | Some(completions) -> 
+            Expect.contains (labels(completions.items)) "match" "missing correct completion"
+    }
+    
     //TODO
     ptest "dont complete inside a string" {
         let client, server = createServerAndReadFile("MainProject", "CompleteInString.fs")

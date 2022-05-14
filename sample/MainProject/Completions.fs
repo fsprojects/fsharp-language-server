@@ -11,3 +11,5 @@ let private ``name with space``() =
 
 let private completeSpace() = 
     na
+let private completeKeyword() =
+    mat
