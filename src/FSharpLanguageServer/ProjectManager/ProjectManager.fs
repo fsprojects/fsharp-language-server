@@ -33,7 +33,7 @@ type ProjectManager(checker: FSharpChecker,useCache:bool) =
     /// Keys are full paths to .sln files
     /// Values are lists of .fsproj files referenced by the .sln file
     let knownSolutions = new Dictionary<String, list<FileInfo>>()
-    let assetsJsonHashes = new Dictionary<String, byte[]>()
+    let assetsJsonHashes = new Dictionary<String, string>()
     /// Remember what .fsproj and .fsx files are present
     let knownProjects = new HashSet<String>()
     /// Cache expensive analyze operations

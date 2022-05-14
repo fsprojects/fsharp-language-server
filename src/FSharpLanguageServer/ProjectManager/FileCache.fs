@@ -10,7 +10,7 @@ open Newtonsoft.Json
 open Types
 type CacheData={
     ///hash of the projects assets.json. This is used to see if the project has changed which would invalidate our hash.
-    assetsHash :byte array
+    assetsHash :string
     Project:ResolvedProject
     ///Used to allow deleting of old cache data if we make significant changes
     version:string
@@ -23,7 +23,7 @@ type FileInfoConverter() =
         
         override x.ReadJson( reader:JsonReader,  objectType:Type,  existingValue:FileInfo,  hasExistingValue:bool,  serializer:JsonSerializer)=
             let s = reader.Value:?>string
-            FileInfo(s)
+            normedFileInfo(s)
     
 let private serialzeProjectData (projectCache: Dictionary<String,LazyProject>)=
     let projectData=projectCache|> Seq.map(fun x->x.Key,x.Value.resolved.Value);
@@ -31,14 +31,14 @@ let private serialzeProjectData (projectCache: Dictionary<String,LazyProject>)=
 
 let private deserializeProjectData(json:string) :Dictionary<String,LazyProject> =
     let projects=System.Text.Json.JsonSerializer.Deserialize<(string*ResolvedProject) list>(json)
-    projects|>List.map(fun( name,proj)->KeyValuePair(name,{file=FileInfo(name); resolved= lazy(proj) }))|>Dictionary
+    projects|>List.map(fun( name,proj)->KeyValuePair(name,{file=normedFileInfo(name); resolved= lazy(proj) }))|>Dictionary
 
 let private getCachePath (projectPath:string)=Path.Combine(Path.GetDirectoryName(projectPath),"obj","fslspCache.json")
 
 let getHash fileName=
     use md5 = System.Security.Cryptography.MD5.Create()
     use stream = File.OpenRead(fileName)
-    md5.ComputeHash(stream)
+    md5.ComputeHash(stream) |>BitConverter.ToString
 
 let settings = 
     JsonSerializerSettings(
@@ -50,7 +50,7 @@ let extraEncoders=
     Extra.empty
     |>(Extra.withCustom 
         (fun (x:FileInfo)->Encode.string x.FullName)
-        (fun path value->Ok (FileInfo(value.ToString()))))
+        (fun path value->Ok (normedFileInfo(value.ToString()))))
     |>Extra.withCustom
         (fun (x:Range)->Encode.string <|System.Text.Json.JsonSerializer.Serialize(x))
         (fun path value->Ok (System.Text.Json.JsonSerializer.Deserialize<Range>(value.ToString()) ))
