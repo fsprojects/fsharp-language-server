@@ -12,7 +12,10 @@ type CacheData={
     ///hash of the projects assets.json. This is used to see if the project has changed which would invalidate our hash.
     assetsHash :byte array
     Project:ResolvedProject
+    ///Used to allow deleting of old cache data if we make significant changes
+    version:string
 }
+let currentVersion="0.1.80"
 type FileInfoConverter() =
     inherit JsonConverter<FileInfo>()
         override x.WriteJson( writer:JsonWriter,  value:FileInfo,  serializer:JsonSerializer)=
@@ -65,7 +68,8 @@ let tryGetCached (fsproj:FileInfo)=
             let assetsPath=Path.Combine(Path.GetDirectoryName(cachePath),"project.assets.json")
             let hash= getHash assetsPath
             
-            if cacheData.assetsHash=hash then Ok cacheData 
+            
+            if cacheData.assetsHash=hash && cacheData.version= currentVersion then Ok cacheData 
             else 
                 File.Delete(cachePath)
                 lgInfo "Not using cached projOptions for '{proj}' because the project.assets.json hash has changed" fsproj.FullName
@@ -83,7 +87,7 @@ let saveCache (projectData:ResolvedProject) (fsproj:FileInfo) =
     let assetsPath=Path.Combine(Path.GetDirectoryName(cachePath),"project.assets.json")
     let hash=getHash assetsPath
     
-    let data={assetsHash=hash;Project=projectData}
+    let data={assetsHash=hash;Project=projectData;version=currentVersion}
     let cacheJson= Encode.Auto.toString(4,data,extra=extraEncoders)
     File.WriteAllText(cachePath,cacheJson)
     lgInfo "Saved cache of projectOptions for '{proj}' " fsproj.FullName
