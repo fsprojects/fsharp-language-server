@@ -12,6 +12,7 @@ open Types
 type CacheData={
     ///hash of the projects assets.json. This is used to see if the project has changed which would invalidate our hash.
     assetsHash :string
+    fsprojHash :string
     Project:ResolvedProject
     ///Used to allow deleting of old cache data if we make significant changes
     version:string
@@ -55,7 +56,13 @@ let extraEncoders=
     |>Extra.withCustom
         (fun (x:Range)->Encode.string <|System.Text.Json.JsonSerializer.Serialize(x))
         (fun path value->Ok (System.Text.Json.JsonSerializer.Deserialize<Range>(value.ToString()) ))
+///Uses various methods to decide if the cache is still valid or if it needs to be discarded and replaced.
+let isCacheValid (fsprojPath:string) (cachePath:string) (cacheData:CacheData)=
 
+    let assetsPath=Path.Combine(Path.GetDirectoryName(cachePath),"project.assets.json")
+    let assetHash= getHash assetsPath
+    let fsprojHash= getHash fsprojPath
+    cacheData.assetsHash=assetHash && cacheData.fsprojHash=fsprojHash && cacheData.version=currentVersion
 ///**Attempts to get cached project data.**
 ///
 ///O returns the data if the project.assets.json files hash has not changed. A change would indicate that the cached data may no longer be valid.
@@ -66,11 +73,8 @@ let tryGetCached (fsproj:FileInfo)=
 
         try
             let cacheData=match(Decode.Auto.fromString(cacheJson,extra=extraEncoders))with|Ok a->a|Error e->failwithf "error %A"e
-            let assetsPath=Path.Combine(Path.GetDirectoryName(cachePath),"project.assets.json")
-            let hash= getHash assetsPath
             
-            
-            if cacheData.assetsHash=hash && cacheData.version= currentVersion then Ok cacheData 
+            if isCacheValid fsproj.FullName cacheJson cacheData  then Ok cacheData 
             else 
                 File.Delete(cachePath)
                 lgInfo "Not using cached projOptions for '{proj}' because the project.assets.json hash has changed" fsproj.FullName
@@ -86,9 +90,10 @@ let tryGetCached (fsproj:FileInfo)=
 let saveCache (projectData:ResolvedProject) (fsproj:FileInfo) =
     let cachePath=getCachePath fsproj.FullName 
     let assetsPath=Path.Combine(Path.GetDirectoryName(cachePath),"project.assets.json")
-    let hash=getHash assetsPath
+    let assetHash=getHash assetsPath
+    let fsprojHash=getHash fsproj.FullName
     
-    let data={assetsHash=hash;Project=projectData;version=currentVersion}
+    let data={assetsHash=assetHash; fsprojHash=fsprojHash;Project=projectData;version=currentVersion}
     let cacheJson= Encode.Auto.toString(4,data,extra=extraEncoders)
     File.WriteAllText(cachePath,cacheJson)
     lgInfo "Saved cache of projectOptions for '{proj}' " fsproj.FullName
