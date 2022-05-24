@@ -216,6 +216,13 @@ let serverTests=
         | None -> failtest "noHover"
         | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
     }
+    //See issue #106
+    test "hover over DU aginst pipe" {
+        let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+        match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 28, 10)) |> Async.RunSynchronously with 
+        | None -> failtest "No hover"
+        | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
+    }
 
     let labels(items: CompletionItem list) = 
         [for i in items do yield i.label]
@@ -425,7 +432,7 @@ let serverTests=
     test "report no type errors in CSharp reference" {
         let client, server = createServerAndReadFile("ReferenceCSharp", "Library.fs")
         let messages = diagnosticMessages(client)
-        Expect.isEmpty messages "got type errors"
+        Expect.isEmpty messages (sprintf "got type errors: %A" messages)
         }
     test "Report no errors opening project using net6.0-windows framework" {
         //This test is to fix issues with net6.0-windows and isssues discovering frameworks that should be imported based on packages.

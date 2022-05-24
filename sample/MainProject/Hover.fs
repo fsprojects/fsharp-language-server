@@ -23,3 +23,6 @@ let aliasedFunc:intFunc = (multiply 1 2)
 let docedFunction a b=
    a+b
 let methodTest=Authorization("a")
+
+type DUHover=
+    |HoverCase of string
