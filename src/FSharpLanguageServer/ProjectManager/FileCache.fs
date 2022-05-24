@@ -48,6 +48,7 @@ let settings =
         ConstructorHandling=ConstructorHandling.AllowNonPublicDefaultConstructor,
         Converters=[|new FileInfoConverter()|]
         )
+
 let extraEncoders=
     Extra.empty
     |>(Extra.withCustom 
@@ -56,6 +57,7 @@ let extraEncoders=
     |>Extra.withCustom
         (fun (x:Range)->Encode.string <|System.Text.Json.JsonSerializer.Serialize(x))
         (fun path value->Ok (System.Text.Json.JsonSerializer.Deserialize<Range>(value.ToString()) ))
+
 ///Uses various methods to decide if the cache is still valid or if it needs to be discarded and replaced.
 let isCacheValid (fsprojPath:string) (cachePath:string) (cacheData:CacheData)=
 
@@ -63,26 +65,27 @@ let isCacheValid (fsprojPath:string) (cachePath:string) (cacheData:CacheData)=
     let assetHash= getHash assetsPath
     let fsprojHash= getHash fsprojPath
     cacheData.assetsHash=assetHash && cacheData.fsprojHash=fsprojHash && cacheData.version=currentVersion
+
 ///**Attempts to get cached project data.**
 ///
 ///O returns the data if the project.assets.json files hash has not changed. A change would indicate that the cached data may no longer be valid.
 let tryGetCached (fsproj:FileInfo)=
-    let cachePath=getCachePath fsproj.FullName
-    if File.Exists(cachePath)then
-        let cacheJson= File.ReadAllText(cachePath)
+    let cacheFilePath=getCachePath fsproj.FullName
+    if File.Exists(cacheFilePath)then
+        let cacheJson= File.ReadAllText(cacheFilePath)
 
         try
-            let cacheData=match(Decode.Auto.fromString(cacheJson,extra=extraEncoders))with|Ok a->a|Error e->failwithf "error %A"e
+            let existingCacheData=match(Decode.Auto.fromString(cacheJson,extra=extraEncoders))with|Ok a->a|Error e->failwithf "error %A"e
             
-            if isCacheValid fsproj.FullName cacheJson cacheData  then Ok cacheData 
+            if isCacheValid fsproj.FullName cacheFilePath existingCacheData  then Ok existingCacheData 
             else 
-                File.Delete(cachePath)
+                File.Delete(cacheFilePath)
                 lgInfo "Not using cached projOptions for '{proj}' because the project.assets.json hash has changed" fsproj.FullName
                 Error "Hash had changed"
         with 
         |e->
             lgWarn2 "Cached projectOptions for '{proj}' could not be read, deleting it \nReson {exception}" fsproj e
-            File.Delete(cachePath)
+            File.Delete(cacheFilePath)
             Error(sprintf "%A" e)
     else Error "no cache file exists"
     
