@@ -353,12 +353,28 @@ type Server(client: ILanguageClient,useCache:bool) =
     /// Request that `uri` be checked when the user stops doing things for 1 second
     let backgroundCheck = DebounceCheck(doCheck, 1000)
     let projectAssetsDebounce=DebounceCheck((fun file->async{projects.UpdateAssetsJson(file)}),1000)
+
+    ///Fixes problems with getting identifiers in DU's when the union is against a pipe. It add's a space
+    let fixLineForIdentifying line (charPos:int)=
+        let mutable indicies:int list=List.empty 
+        let newLine=Regex.Replace(line,"(\\|)(?=\\w)",fun (x:Match) ->
+            indicies<- x.Index ::indicies
+            "| "
+            )
+        
+        //Adds one to the position we are looking for, for each match before our pos because we add an extra space at those points
+        let newPos=indicies|>List.rev|>List.fold(fun cPos matchPos -> if cPos<=matchPos then cPos+1 else cPos ) charPos
+        newLine,newPos
+
     /// Find the symbol at a position
     let symbolAt(textDocument: TextDocumentIdentifier, position: Position): Async<FSharpSymbolUse option> =
         async {
             let file = normedFileInfo(textDocument.uri.LocalPath)
             let! c = checkOpenFile(file, true, false)
             let line = lineContent(file, position.line)
+
+            let line, charPos =fixLineForIdentifying line position.character
+
             let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
             match c, maybeId with
             | Error(errors), _ ->
@@ -679,19 +695,23 @@ type Server(client: ILanguageClient,useCache:bool) =
                 let file = normedFileInfo(p.textDocument.uri.LocalPath)
                 let! c = checkOpenFile(file, true, false)
                 let line = lineContent(file, p.position.line)
-                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (p.position.character)
+                
+                let line, charPos = fixLineForIdentifying line p.position.character 
+
+
+                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (charPos)
                 match c, maybeId with
                 | Error(errors), _ ->
                     lgError "Check failed, errors: {errors}"  (errors)
                     return None
                 | _, None ->
-                    lgInfo3 "No identifier at{file}({line},{char})" file.FullName p.position.line p.position.character
+                    lgInfo3 "No identifier at{file}({line},{char})" file.FullName p.position.line charPos
                     return None
                     
                 | Ok(parseResult, checkResult), Some(id, _, _) ->
                     lgInfo "Hover over {id}" id
                     let ids = List.ofArray(id.Split('.'))
-                    let tips = checkResult.GetToolTip(p.position.line+1, p.position.character+1, line, ids, FSharpTokenTag.Identifier)
+                    let tips = checkResult.GetToolTip(p.position.line+1, charPos+1, line, ids, FSharpTokenTag.Identifier)
                     lgDebug "Hover tooltipText={text}" tips
                     return Some(asHover(tips))
             }
