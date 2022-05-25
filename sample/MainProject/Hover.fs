@@ -26,3 +26,9 @@ let methodTest=Authorization("a")
 
 type DUHover=
     |HoverCase of string
+
+type HoverTestType(state:int)=
+    let mutable state= state
+    ///This should have hover text
+    member this.newState(newState)= state<-newState
+

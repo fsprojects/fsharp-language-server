@@ -697,7 +697,7 @@ type Server(client: ILanguageClient,useCache:bool) =
                 let line = lineContent(file, p.position.line)
                 
                 let line, charPos = fixLineForIdentifying line p.position.character 
-
+                let addedChars=charPos-p.position.character
 
                 let maybeId = QuickParse.GetCompleteIdentifierIsland false line (charPos)
                 match c, maybeId with
@@ -708,10 +708,10 @@ type Server(client: ILanguageClient,useCache:bool) =
                     lgInfo3 "No identifier at{file}({line},{char})" file.FullName p.position.line charPos
                     return None
                     
-                | Ok(parseResult, checkResult), Some(id, _, _) ->
+                | Ok(parseResult, checkResult), Some(id, endOfIdentifier, _) ->
                     lgInfo "Hover over {id}" id
                     let ids = List.ofArray(id.Split('.'))
-                    let tips = checkResult.GetToolTip(p.position.line+1, charPos+1, line, ids, FSharpTokenTag.Identifier)
+                    let tips = checkResult.GetToolTip(p.position.line+1, endOfIdentifier+addedChars, line, ids, FSharpTokenTag.Identifier)
                     lgDebug "Hover tooltipText={text}" tips
                     return Some(asHover(tips))
             }
