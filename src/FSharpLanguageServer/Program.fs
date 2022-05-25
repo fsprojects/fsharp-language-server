@@ -363,7 +363,7 @@ type Server(client: ILanguageClient,useCache:bool) =
             )
         
         //Adds one to the position we are looking for, for each match before our pos because we add an extra space at those points
-        let newPos=indicies|>List.rev|>List.fold(fun cPos matchPos -> if cPos<=matchPos then cPos+1 else cPos ) charPos
+        let newPos=indicies|>List.rev|>List.fold(fun cPos matchPos -> if matchPos<=cPos then cPos+1 else cPos ) charPos
         newLine,newPos
 
     /// Find the symbol at a position
@@ -375,7 +375,7 @@ type Server(client: ILanguageClient,useCache:bool) =
 
             let line, charPos =fixLineForIdentifying line position.character
 
-            let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
+            let maybeId = QuickParse.GetCompleteIdentifierIsland false line (charPos)
             match c, maybeId with
             | Error(errors), _ ->
                 lgError "'SymbolAt' Check failed, errors: %A" (errors)
@@ -699,7 +699,7 @@ type Server(client: ILanguageClient,useCache:bool) =
                 let line, charPos = fixLineForIdentifying line p.position.character 
                 let addedChars=charPos-p.position.character
 
-                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (charPos)
+                let maybeId = QuickParse.GetCompleteIdentifierIsland false line charPos
                 match c, maybeId with
                 | Error(errors), _ ->
                     lgError "Check failed, errors: {errors}"  (errors)
