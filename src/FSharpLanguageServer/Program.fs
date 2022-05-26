@@ -713,7 +713,18 @@ type Server(client: ILanguageClient,useCache:bool) =
                     let ids = List.ofArray(id.Split('.'))
                     let tips = checkResult.GetToolTip(p.position.line+1, endOfIdentifier+addedChars, line, ids, FSharpTokenTag.Identifier)
                     lgDebug "Hover tooltipText={text}" tips
-                    return Some(asHover(tips))
+                    let hover=
+                        match tips with
+                            | ToolTipText (elems) when elems.IsEmpty|| elems |> List.forall ((=) ToolTipElement.None) ->
+                                match ids with
+                                | [ ident ] ->
+                                    match FsAutoComplete.KeywordList.keywordTooltips.TryGetValue ident with
+                                    | true, keywordTip -> Some(asHover(keywordTip))
+                                    | _ -> None
+                                | _ -> None
+                            |_->Some(asHover(tips))
+                    if hover.IsNone then lgWarn "Could not make tooltip info for {id}" id
+                    return hover
             }
             
         // Add documentation to a completion item
