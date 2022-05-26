@@ -375,7 +375,7 @@ type Server(client: ILanguageClient,useCache:bool) =
 
             let line, charPos =fixLineForIdentifying line position.character
 
-            let maybeId = QuickParse.GetCompleteIdentifierIsland false line (charPos)
+            let maybeId = QuickParse.GetCompleteIdentifierIsland true line (charPos)
             match c, maybeId with
             | Error(errors), _ ->
                 lgError "'SymbolAt' Check failed, errors: %A" (errors)
