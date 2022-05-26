@@ -1,4 +1,19 @@
+## 0.1.82 
+
+### Issues fixed
+- Hovering not working in various scenarios
+  - All but the last char of class members
+  - Keywords
+  - DU's where the name doesn't have a space between it and the pipe. eg: '|MyDu of string'
+- Renaming and goto definition not working when the cursor is next to the end of the word.
+- Renaming not working for DU's when the name touches the pipe
+- Not rebuilding the cache when fsproj has changed but assets.json has not 
+### Internal 
+- Switched to yarn
+
 ## 0.1.81
+- Added keywords to autocomplete
+- fixed a few bugs in the path normalization and caching
 - Added keywords to autocomplete
 - fixed a few bugs in the path normalization and caching
 ## 0.1.80
