@@ -4,7 +4,7 @@
 set -e
 
 # Needed once
-npm install
+yarn install
 
 # Build self-contained archives for windows, mac and linux
 dotnet clean

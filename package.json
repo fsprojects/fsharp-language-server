@@ -5,7 +5,7 @@
     "author": "George Fraser and Eli Dowling",
     "license": "MIT",
     "icon": "Icon512.png",
-    "version": "0.1.81",
+    "version": "0.1.82",
     "preview": false,
     "publisher": "faldor20",
     "repository": {
@@ -125,10 +125,10 @@
         ]
     },
     "scripts": {
-        "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
+        "vscode:prepublish": "yarn run compile",
+        "compile": "tsc -p ./ && dotnet publish -c Release src/FSharpLanguageServer",
         "watch": "tsc -watch -p ./",
-        "test": "npm run compile && node ./node_modules/vscode/bin/test"
+        "test": "yarn run compile && node ./node_modules/vscode/bin/test"
     },
     "extensionDependencies": [
         "ms-dotnettools.csharp"
@@ -141,6 +141,6 @@
         "typescript": "^4.4.4",
         "vsce": "^2.3.0",
         "@types/node": "^16.11.7",
-        "vscode-test": "^1.6.1"
+        "@vscode/test-electron": "^1.6.1"
     }
 }

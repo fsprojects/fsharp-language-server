@@ -1,4 +1,4 @@
-npm install
+yarn install
 paket install
 dotnet restore
 dotnet clean
