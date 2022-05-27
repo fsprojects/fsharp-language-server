@@ -363,7 +363,7 @@ type Server(client: ILanguageClient,useCache:bool) =
             )
         
         //Adds one to the position we are looking for, for each match before our pos because we add an extra space at those points
-        let newPos=indicies|>List.rev|>List.fold(fun cPos matchPos -> if cPos<=matchPos then cPos+1 else cPos ) charPos
+        let newPos=indicies|>List.rev|>List.fold(fun cPos matchPos -> if matchPos<=cPos then cPos+1 else cPos ) charPos
         newLine,newPos
 
     /// Find the symbol at a position
@@ -375,7 +375,7 @@ type Server(client: ILanguageClient,useCache:bool) =
 
             let line, charPos =fixLineForIdentifying line position.character
 
-            let maybeId = QuickParse.GetCompleteIdentifierIsland false line (position.character)
+            let maybeId = QuickParse.GetCompleteIdentifierIsland true line (charPos)
             match c, maybeId with
             | Error(errors), _ ->
                 lgError "'SymbolAt' Check failed, errors: %A" (errors)
@@ -697,9 +697,9 @@ type Server(client: ILanguageClient,useCache:bool) =
                 let line = lineContent(file, p.position.line)
                 
                 let line, charPos = fixLineForIdentifying line p.position.character 
+                let addedChars=charPos-p.position.character
 
-
-                let maybeId = QuickParse.GetCompleteIdentifierIsland false line (charPos)
+                let maybeId = QuickParse.GetCompleteIdentifierIsland false line charPos
                 match c, maybeId with
                 | Error(errors), _ ->
                     lgError "Check failed, errors: {errors}"  (errors)
@@ -708,12 +708,23 @@ type Server(client: ILanguageClient,useCache:bool) =
                     lgInfo3 "No identifier at{file}({line},{char})" file.FullName p.position.line charPos
                     return None
                     
-                | Ok(parseResult, checkResult), Some(id, _, _) ->
+                | Ok(parseResult, checkResult), Some(id, endOfIdentifier, _) ->
                     lgInfo "Hover over {id}" id
                     let ids = List.ofArray(id.Split('.'))
-                    let tips = checkResult.GetToolTip(p.position.line+1, charPos+1, line, ids, FSharpTokenTag.Identifier)
+                    let tips = checkResult.GetToolTip(p.position.line+1, endOfIdentifier+addedChars, line, ids, FSharpTokenTag.Identifier)
                     lgDebug "Hover tooltipText={text}" tips
-                    return Some(asHover(tips))
+                    let hover=
+                        match tips with
+                            | ToolTipText (elems) when elems.IsEmpty|| elems |> List.forall ((=) ToolTipElement.None) ->
+                                match ids with
+                                | [ ident ] ->
+                                    match FsAutoComplete.KeywordList.keywordTooltips.TryGetValue ident with
+                                    | true, keywordTip -> Some(asHover(keywordTip))
+                                    | _ -> None
+                                | _ -> None
+                            |_->Some(asHover(tips))
+                    if hover.IsNone then lgWarn "Could not make tooltip info for {id}" id
+                    return hover
             }
             
         // Add documentation to a completion item

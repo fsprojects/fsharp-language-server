@@ -88,7 +88,7 @@ The language server protocol (LSP) is very similar to the API defined by the F# 
 Clone this repo to your system and build it:
 
 ```
-npm install
+yarn install
 dotnet build -c Release
 ```
 
@@ -120,15 +120,15 @@ Neovim with Deoplete completion:\
 Clone this repo to your system and build it:
 
 ```
-npm install
+yarn install
 
 # Pick the appropriate target based upon your OS 
-dotnet publish -c Release -r linux-x64 src/FSharpLanguageServer
-dotnet publish -c Release -r osx.10.11-x64 src/FSharpLanguageServer
-dotnet publish -c Release -r win10-x64 src/FSharpLanguageServer
+dotnet publish -c Release
+dotnet publish -c Release
+dotnet publish -c Release 
 ```
 
-Make sure that the FSharpLanguageServer (in `src/FSharpLanguageServer/bin/Release/netcoreapp3.0/PLATFORM/publish`) is in your PATH. Alternatively, you can set the path to the server executable manually within your .spacemacs user-config:
+Make sure that the FSharpLanguageServer (in `src/FSharpLanguageServer/bin/Release/net6.0/publish`) is in your PATH. Alternatively, you can set the path to the server executable manually within your .spacemacs user-config:
 
 ```
 (setq fsharp2-lsp-executable "/path/to/FSharpLanguageServer")
@@ -166,7 +166,7 @@ Any help is very much appreciated, issues, PR's, even just asking a question abo
 
 Run :
 
-- ``npm install`` to setup node deps (not needed unless you plan to build the vsix extension package)
+- ``yarn install`` to setup node deps (not needed unless you plan to build the vsix extension package)
 
 - ``dotnet tool restore`` to install paket
 
@@ -178,4 +178,19 @@ Essentially you just publish the language server with ``dotnet publish -c Releas
 
 If you want to try your newly created extension run ``code --install-extension build.vsix``
 
-You can also change the Fsharp.debug setting in vscode which will cause the installed extension to try to build fslsp when it launches. Very handy for testing many smaller changes without republishing the extension. 
+## Debugging
+Set the Fsharp.debug and fsharp.CustomDll path settings in vscode.
+fsharp.debug: Stops execution of the langserver until you attach the vscode debugger to the dotnet instance.
+fsharp.customDllPath: allows you to specify a dll to run instead of the packaged version of fslsp. 
+#### Live project:
+- Open two instances of vscode one in a testing project, one in the fsharp-language-server project
+- Make changes to the test project and then run ``dotnet publish`` in src\FSharpLanguageServer.
+- use the workspace settings in the test project to set fsharp.debug to true and fsharp.customDllPath to the path of the dll you just published
+- Reload the other instance of vscode and attach the debugger to monitor the changes.
+
+#### Tests:
+- Write a test for your problem
+- Change "test" to "ftest"
+- In the vscode debugger dropdown select ".net expecto tests"
+- Debug your test
+

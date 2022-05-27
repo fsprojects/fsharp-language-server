@@ -216,6 +216,7 @@ let serverTests=
         | None -> failtest "noHover"
         | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
     }
+
     //See issue #106
     test "hover over DU aginst pipe" {
         let client, server = createServerAndReadFile("MainProject", "Hover.fs")
@@ -224,6 +225,26 @@ let serverTests=
         | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
     }
 
+    test "hover over first char of DU aginst pipe" {
+        let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+        match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 28, 6)) |> Async.RunSynchronously with 
+        | None -> failtest "No hover"
+        | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
+    }
+
+    test "hover over middle of member name" {
+        let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+        match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 33, 20)) |> Async.RunSynchronously with 
+        | None -> failtest "No hover"
+        | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
+    }
+
+    test "hover over keyword" {
+        let client, server = createServerAndReadFile("MainProject", "Hover.fs")
+        match server.Hover(textDocumentPosition("MainProject", "Hover.fs", 1, 1)) |> Async.RunSynchronously with 
+        | None -> failtest "No hover"
+        | Some hover -> Expect.isNonEmpty hover.contents "Hover list is empty"
+    }
     let labels(items: CompletionItem list) = 
         [for i in items do yield i.label]
 
