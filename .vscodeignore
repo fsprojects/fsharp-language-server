@@ -8,7 +8,7 @@
 !Icon512.png
 !LICENSE.md
 !package.json
-!changeog.md
+!changelog.md
 !syntaxes/**
 !src/FSharpLanguageServer/bin/Release/net6.0/publish/**
 !src/FSharpLanguageServer/bin/Release/net6.0/assembly/README.md
