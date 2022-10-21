@@ -137,10 +137,11 @@
         "vscode-languageclient": "^7.0.0"
     },
     "devDependencies": {
-        "@types/vscode": "^1.52.0",
-        "typescript": "^4.4.4",
-        "vsce": "^2.3.0",
+        "tsc": "^2.0.4",
         "@types/node": "^16.11.7",
-        "@vscode/test-electron": "^1.6.1"
+        "@types/vscode": "^1.52.0",
+        "@vscode/test-electron": "^1.6.1",
+        "typescript": "^4.4.4",
+        "vsce": "^2.3.0"
     }
 }

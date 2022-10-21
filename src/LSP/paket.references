@@ -2,3 +2,4 @@ FSharp.Compiler.Service
 FSharp.Data
 Serilog.Sinks.Console
 Serilog.Sinks.File
+FSharp.SystemTextJson

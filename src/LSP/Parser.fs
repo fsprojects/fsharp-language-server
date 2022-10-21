@@ -292,4 +292,5 @@ let parseRequest(method: string, json: JsonValue): Request =
     |  "textDocument/semanticTokens/full" ->SemanticTokensFull(parseSemanticTokensFull json)
     |  "textDocument/semanticTokens/full/delta" ->SemanticTokensFullDelta(parseSemanticTokensDelta json)
     |  "textDocument/semanticTokens/range" ->SemanticTokensRange(parseSemanticTokensRange json)
-    | _ -> raise(Exception(sprintf "Unexpected request method %s" method))
+    | _ -> Unsupported method
+        

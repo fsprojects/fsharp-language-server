@@ -12,7 +12,10 @@ open LSP.Json.Ser
 open JsonExtensions
 open SemanticToken
 open System.Diagnostics
-
+open System.Text.Json
+open System.Text.Json.Serialization
+let jsonOptions = JsonSerializerOptions()
+jsonOptions.Converters.Add(JsonFSharpConverter())
 let private jsonWriteOptions = 
     { defaultJsonWriteOptions with 
         customWriters = 
@@ -107,7 +110,13 @@ type RealClient (send: BinaryWriter) =
         member this.CustomNotification(method: string, json: JsonValue): unit = 
             let jsonString = json.ToString(JsonSaveOptions.DisableFormatting)
             notifyClient(send, method, jsonString)
-
+        member this.WorkDoneProgressNotification (token, workProgress):unit=
+            let notification={
+                token=token
+                value=workProgress
+            }
+            let json=JsonSerializer.Serialize(notification,jsonOptions)
+            notifyClient(send,"$/progress",json)
 type private PendingTask = 
 | ProcessNotification of method: string * task: Async<unit> 
 | ProcessRequest of id: int * task: Async<string option> * cancel: CancellationTokenSource
@@ -170,6 +179,8 @@ let connect(serverFactory: ILanguageClient -> ILanguageServer, receive: BinaryRe
             server.DidChangeWorkspaceFolders(p) |> thenNone
         | Shutdown ->
             server.Shutdown() |> thenNone
+        |Unsupported method-> 
+            async{do (Log.lgError "Unexpected request method {Method}" method)}|>thenNone
     let processNotification(n: Notification) = 
         match n with 
         | Initialized ->

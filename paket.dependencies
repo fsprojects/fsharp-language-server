@@ -22,6 +22,7 @@ nuget System.Security.Principal 4.3.0
 nuget System.Threading.ThreadPool 4.3.0
 nuget Thoth.Json.Net 8.0.0
 nuget YoloDev.Expecto.TestSdk 0.12.13
+nuget FSharp.SystemTextJson
 
 
 

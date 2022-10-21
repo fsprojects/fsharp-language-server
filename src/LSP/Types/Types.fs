@@ -421,6 +421,7 @@ type Request =
 | SemanticTokensFull of SemanticTokensParams
 | SemanticTokensFullDelta of SemanticTokensDeltaParams
 | SemanticTokensRange of SemanticTokensRangeParams
+| Unsupported of string
 
 [<RequireQualifiedAccess>]
 type TextDocumentSyncKind = 
@@ -745,9 +746,48 @@ type Registration = {
 type RegistrationParams = {
     registrations: Registration list
 }
+///The base of a Work done Progress Item
+///Should always be made using a constructor function 
+type WorkDoneProgress={
+    kind:string
+    title:string option
+    cancellable:bool option
+    message:string option
+    percentage:uint option
+}
+type ProgressNotification={
+    token:string
+    value:WorkDoneProgress
+}
+let workDoneProgressBegin (title, cancellable, message, percentage) =
+    {
+    kind="begin"
+    title= Some title
+    cancellable=cancellable
+    message=message
+    percentage=percentage
+    }
+let workDoneProgressReport (cancellable, message ,percentage) =
+    {
+    kind="report"
+    title= None
+    cancellable= cancellable
+    message=message
+    percentage=percentage
+    }
+
+let workDoneProgressEnd (message) =
+    {
+    kind="end"
+    title= None
+    cancellable=None
+    message=message
+    percentage=None
+    }
 
 type ILanguageClient =
     abstract member PublishDiagnostics: PublishDiagnosticsParams -> unit 
     abstract member ShowMessage: ShowMessageParams -> unit
     abstract member RegisterCapability: RegisterCapability -> unit
     abstract member CustomNotification: string * JsonValue -> unit
+    abstract member WorkDoneProgressNotification:string* WorkDoneProgress -> unit

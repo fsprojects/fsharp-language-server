@@ -7,8 +7,8 @@
 import * as path from 'path';
 import * as fs from "fs";
 import * as cp from 'child_process';
-import { window, workspace, ExtensionContext, Progress, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
-import { NotificationType } from 'vscode-languageclient';
+import { window, workspace, ExtensionContext, Range, commands, tasks, Task, TaskExecution, ShellExecution, Uri, TaskDefinition, debug } from 'vscode';
+// import { NotificationType } from 'vscode-languageclient';
 import {
 	LanguageClient,
 	LanguageClientOptions,
@@ -17,31 +17,32 @@ import {
 } from 'vscode-languageclient/node';
 //import { env } from 'process';
 // Run using `dotnet` instead of self-contained executable
+let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
 	//let FSLangServerFolder = Uri.joinPath(workspace.workspaceFolders[0].uri, ('src/FSharpLanguageServer'));
 	const debugMode = workspace.getConfiguration().get("fsharp.debug.enable", false);
-	
+
 	const customCommand: string = workspace.getConfiguration().get("fsharp.customCommand", null);
 
 	const customCommandArgs: string[] = workspace.getConfiguration().get("fsharp.customCommandArgs", null);
 	const customDllPath: string = workspace.getConfiguration().get("fsharp.customDllPath", null);
 	let customDllArgs = null
-	
-	if (customDllPath != null&&customDllPath != "") customDllArgs = [customDllPath];
-	
-	let args: string[] = customCommandArgs ?? (customDllArgs??[binName()])
+
+	if (customDllPath != null && customDllPath != "") customDllArgs = [customDllPath];
+
+	let args: string[] = customCommandArgs ?? (customDllArgs ?? [binName()])
 	if (debugMode) {
 		args.push("--attach-debugger")
 	}
 	//This always needs to be just a single command with no args. If not it will cause an error.
-	let serverMain =customCommand ?? findInPath('dotnet')??'dotnet';
-	
+	let serverMain = customCommand ?? findInPath('dotnet') ?? 'dotnet';
+
 	// The server is packaged as a standalone command
 
 
-	console.log("Going to start server with command  ",serverMain,args);
-	
+	console.log("Going to start server with command  ", serverMain, args);
+
 	// If the extension is launched in debug mode then the debug server options are used
 	// Otherwise the run options are used
 	let serverOptions: ServerOptions = {
@@ -75,20 +76,25 @@ export function activate(context: ExtensionContext) {
 	}
 
 	// Create the language client and start the client.
-	let client = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions);
-	let disposable = client.start();
+	client = new LanguageClient('fsharp', 'F# Language Server', serverOptions, clientOptions);
+	client.start();
 
 	// Push the disposable to the context's subscriptions so that the 
 	// client can be deactivated on extension deactivation
-	context.subscriptions.push(disposable);
 
 	// When the language client activates, register a progress-listener
-	client.onReady().then(() => createProgressListeners(client));
 
 	// Register test-runner
 	commands.registerCommand('fsharp.command.test.run', runTest);
 	commands.registerCommand('fsharp.command.test.debug', debugTest);
 	commands.registerCommand('fsharp.command.goto', goto);
+}
+
+export function deactivate(): Thenable<void> | undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
 }
 
 function goto(file: string, startLine: number, startColumn: number, _endLine: number, _endColumn: number) {
@@ -179,64 +185,6 @@ function debugTest(projectPath: string, fullyQualifiedName: string): Promise<num
 		child.stderr.on('data', chunk => outputChannel.append(chunk.toString()));
 		child.on('close', (code, _signal) => resolve(code))
 	})
-}
-
-interface StartProgress {
-	title: string
-	nFiles: number
-}
-
-function createProgressListeners(client: LanguageClient) {
-	// Create a "checking files" progress indicator
-
-	let progressListener = new class {
-		countChecked = 0
-		nFiles = 0
-		progress: Progress<{ message?: string }>
-		resolve: (nothing: {}) => void
-
-		startProgress(start: StartProgress) {
-			// TODO implement user cancellation
-			// TODO Change 15 to ProgressLocation.Notification
-			window.withProgress({ title: start.title, location: 15 }, progress => new Promise((resolve, _reject) => {
-				this.countChecked = 0;
-				this.nFiles = start.nFiles;
-				this.progress = progress;
-				this.resolve = resolve;
-			}));
-		}
-
-		private percentComplete() {
-			return Math.floor(this.countChecked / (this.nFiles + 1) * 100);
-		}
-
-		incrementProgress(fileName: string) {
-			if (this.progress != null) {
-				let oldPercent = this.percentComplete();
-				this.countChecked++;
-				let newPercent = this.percentComplete();
-				let report = { message: fileName, increment: newPercent - oldPercent };
-				this.progress.report(report);
-			}
-		}
-
-		endProgress() {
-			this.countChecked = 0
-			this.nFiles = 0
-			this.progress = null
-			this.resolve({})
-		}
-	}
-	// Use custom notifications to drive progressListener
-	client.onNotification(new NotificationType('fsharp/startProgress'), (start: StartProgress) => {
-		progressListener.startProgress(start);
-	});
-	client.onNotification(new NotificationType('fsharp/incrementProgress'), (fileName: string) => {
-		progressListener.incrementProgress(fileName);
-	});
-	client.onNotification(new NotificationType('fsharp/endProgress'), () => {
-		progressListener.endProgress();
-	});
 }
 
 function binName() {
