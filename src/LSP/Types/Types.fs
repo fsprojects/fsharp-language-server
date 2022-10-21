@@ -789,5 +789,5 @@ type ILanguageClient =
     abstract member PublishDiagnostics: PublishDiagnosticsParams -> unit 
     abstract member ShowMessage: ShowMessageParams -> unit
     abstract member RegisterCapability: RegisterCapability -> unit
-    abstract member CustomNotification: string * JsonValue -> unit
+    abstract member CustomNotification:int* string * JsonValue -> unit
     abstract member WorkDoneProgressNotification:string* WorkDoneProgress -> unit

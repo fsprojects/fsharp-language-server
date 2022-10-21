@@ -73,6 +73,9 @@ let respond(client: BinaryWriter, requestId: int, jsonText: string) =
 let private notifyClient(client: BinaryWriter, method: string, jsonText: string) = 
     let messageText = sprintf """{"jsonrpc":"2.0","method":"%s","params":%s}""" method jsonText
     writeClient(client, messageText)
+let private notifyClientWithId(client: BinaryWriter,id:int, method: string, jsonText: string) = 
+    let messageText = sprintf """{"jsonrpc":"2.0","id":%i,"method":"%s","params":%s}""" id method jsonText
+    writeClient(client, messageText)
 
 let private thenMap (f: 'A -> 'B) (result: Async<'A>): Async<'B> =
     async {
@@ -107,9 +110,10 @@ type RealClient (send: BinaryWriter) =
                 let message = {registrations=[register]}
                 let json = serializeRegistrationParams(message)
                 notifyClient(send, "client/registerCapability", json)
-        member this.CustomNotification(method: string, json: JsonValue): unit = 
+        member this.CustomNotification(id,method: string,json: JsonValue): unit = 
             let jsonString = json.ToString(JsonSaveOptions.DisableFormatting)
-            notifyClient(send, method, jsonString)
+            notifyClientWithId(send,id, method, jsonString)
+    
         member this.WorkDoneProgressNotification (token, workProgress):unit=
             let notification={
                 token=token
