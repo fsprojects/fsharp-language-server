@@ -1,7 +1,8 @@
 # F# Language Server
 # IMPORTANT
+##Ending support
 This is not supported past .net 6.0. My(@faldor20) complaints with ionide have been resloved and the main fsharp project has plans for making an official language server. I see no reason to continue development on this.
-
+##Vscode Extension
 Untill I can sort out access to publishing new versions of the original extension, this is the working version of this extension [F# Language Server updated](https://marketplace.visualstudio.com/items?itemName=faldor20.fsharp-language-server-updated)
 ## Recent Changes
 Now being actively maintained by @faldor20
